@@ -27,12 +27,12 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
                     inclination={0.49}
                 />
             )}
-            {!hdr && <Environment preset="warehouse" />}
+            <Environment preset="sunset" />
             {!hdr && <ambientLight intensity={0.05} />}
-            <Sun position={sunPosition} size={200} color="#ffddaa" intensity={13.0} hdr={hdr} />
+            <Sun position={sunPosition} size={200} color="#ffddaa" intensity={5.0} hdr={hdr} />
 
             {/* Player */}
-            <Ship enableLights={!hdr} />
+            <Ship enableLights={!hdr} position={[0, 10, 450]} />
 
             {/* Environment Objects */}
             <Planet position={[3000, 500, -6000]} size={4000} color="#4466aa" hdr={hdr} sunPosition={sunPosition} />

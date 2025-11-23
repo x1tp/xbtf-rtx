@@ -7,8 +7,9 @@ import { TradingInterface } from './components/TradingInterface';
 import { RTXEffects } from './components/RTXEffects';
 import { PathTracerOverlay } from './components/PathTracerOverlay';
 import type { PerspectiveCamera, Scene as ThreeScene, Mesh, MeshStandardMaterial, WebGLRenderer } from 'three';
-import { Box3, Vector3, SRGBColorSpace, ACESFilmicToneMapping } from 'three';
+import { Box3, Vector3, SRGBColorSpace, ACESFilmicToneMapping, PCFSoftShadowMap } from 'three';
 import { Station } from './components/Station';
+import { PhysicsStepper } from './physics/PhysicsStepper';
 
 const SDR_EXPOSURE = 1.2;
 const HDR_EXPOSURE = 0.9;
@@ -31,7 +32,8 @@ function App() {
   }
 
   const det = detectFloatSupport();
-  const [pathTracerEnabled, setPathTracerEnabled] = useState(true);
+  const [pathTracerEnabled, setPathTracerEnabled] = useState(false);
+  const [ptDepsKey, setPtDepsKey] = useState(0);
   const [ptStatus, setPtStatus] = useState<'idle' | 'ready' | 'unsupported' | 'error'>(
     det.supported ? 'idle' : 'unsupported'
   );
@@ -65,18 +67,17 @@ function App() {
           gl.toneMapping = ACESFilmicToneMapping;
           gl.toneMappingExposure = pathTracerEnabled ? HDR_EXPOSURE : SDR_EXPOSURE;
           gl.shadowMap.enabled = true;
-          // import { PCFSoftShadowMap } from 'three'
-          // ensure type is available
-          // set via any to avoid type issues in TSX without extra imports
-          (gl.shadowMap as any).type = (require('three') as any).PCFSoftShadowMap;
+          gl.shadowMap.type = PCFSoftShadowMap;
           glRef.current = gl as WebGLRenderer;
           sceneRef.current = scene;
           cameraRef.current = camera as PerspectiveCamera;
+          setPtDepsKey((k) => k + 1);
         }}
       >
         <Suspense fallback={null}>
           <Scene hdr={pathTracerEnabled} />
           <RTXEffects enabled={!pathTracerEnabled} />
+          <PhysicsStepper />
         </Suspense>
       </Canvas>
       <ExposureSync enabled={pathTracerEnabled} glRef={glRef} />
@@ -84,6 +85,7 @@ function App() {
         enabled={pathTracerEnabled}
         sceneRef={sceneRef}
         cameraRef={cameraRef}
+        depsKey={ptDepsKey}
         onStatus={(status, message) => {
           setPtStatus(status);
           setPtMessage(message ?? null);
@@ -287,8 +289,6 @@ function ViewerCanvas({ modelPath }: { modelPath?: string }) {
             enablePan
             enableZoom
             dampingFactor={0.08}
-            zoomSpeed={1}
-            panSpeed={1}
             minDistance={2}
             maxDistance={500}
           />
@@ -346,4 +346,9 @@ function Dimensions({ center, dims }: { center: [number, number, number]; dims: 
       <Line points={[[cx - hx, cy - hy - py, cz + hz + pz], [cx + hx, cy - hy - py, cz + hz + pz]]} color="#3fb6ff" lineWidth={2} dashed dashSize={0.3} gapSize={0.2} />
       <Text position={[cx, cy - hy - py - 0.5, cz + hz + pz]} fontSize={0.6} color="#c3e7ff">{dx.toFixed(2)}</Text>
       <Line points={[[cx + hx + px, cy - hy, cz - hz], [cx + hx + px, cy + hy, cz - hz]]} color="#00ffa6" lineWidth={2} dashed dashSize={0.3} gapSize={0.2} />
-      <Text position={[cx + hx + px + 0.5, cy, cz - hz]} fontSize={0.6} color="#c3e7ff">{dy.toFixed(2)}</T
+      <Text position={[cx + hx + px + 0.5, cy, cz - hz]} fontSize={0.6} color="#c3e7ff">{dy.toFixed(2)}</Text>
+      <Line points={[[cx - hx - px, cy + hy + py, cz - hz], [cx - hx - px, cy + hy + py, cz + hz]]} color="#ff8c3f" lineWidth={2} dashed dashSize={0.3} gapSize={0.2} />
+      <Text position={[cx - hx - px - 0.5, cy + hy + py, cz]} fontSize={0.6} color="#c3e7ff">{dz.toFixed(2)}</Text>
+    </>
+  );
+}

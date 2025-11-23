@@ -6,6 +6,7 @@ interface SunProps {
     size?: number;
     color?: string;
     intensity?: number;
+    hdrIntensity?: number;
     hdr?: boolean;
     lensFlares?: boolean;
 }
@@ -15,6 +16,7 @@ export const Sun: React.FC<SunProps> = ({
     size = 500,
     color = '#ffaa00',
     intensity = 2,
+    hdrIntensity = intensity * 5000,
     hdr = false,
     lensFlares = true
 }) => {
@@ -140,18 +142,20 @@ export const Sun: React.FC<SunProps> = ({
           at 'position', the light should be at 0,0,0 relative to the group.
        */}
             <directionalLight
-                intensity={hdr ? intensity : Math.max(intensity, 12)}
+                intensity={hdr ? hdrIntensity : Math.max(intensity, 12)}
                 color={color}
                 castShadow
                 shadow-mapSize-width={4096}
                 shadow-mapSize-height={4096}
-                shadow-camera-far={50000}
-                shadow-camera-left={-1000}
-                shadow-camera-right={1000}
-                shadow-camera-top={1000}
-                shadow-camera-bottom={-1000}
+                shadow-camera-near={1}
+                shadow-camera-far={100000}
+                shadow-camera-left={-10000}
+                shadow-camera-right={10000}
+                shadow-camera-top={10000}
+                shadow-camera-bottom={-10000}
                 shadow-bias={-0.0005}
                 shadow-normalBias={0.02}
+                shadow-radius={2}
             />
 
             {/* Add a glow effect using a sprite or another larger inverted sphere if needed later */}

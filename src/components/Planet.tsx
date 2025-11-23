@@ -3,6 +3,8 @@ import { Sphere } from '@react-three/drei';
 import * as THREE from 'three';
 import { TextureLoader, SRGBColorSpace, LinearSRGBColorSpace, ClampToEdgeWrapping, RepeatWrapping, ShaderMaterial, AdditiveBlending, Color, Vector3 } from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
+import { ensureRapier, getWorld } from '../physics/RapierWorld';
+import type RAPIERType from '@dimforge/rapier3d-compat';
 
 interface PlanetProps {
     position: [number, number, number];
@@ -106,6 +108,7 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, onTexturesLoaded
 
     const planetRef = useRef<THREE.Group>(null);
     const cloudsRef = useRef<THREE.Mesh>(null);
+    const planetBodyRef = useRef<RAPIERType.RigidBody | null>(null);
     const sunDir = useMemo(() => {
         const sun = new THREE.Vector3().fromArray(sunPosition);
         const planet = new THREE.Vector3().fromArray(position);
@@ -172,13 +175,29 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, onTexturesLoaded
         if (cloudsRef.current) {
             cloudsRef.current.rotation.y += delta * 0.002;
         }
+        if (planetBodyRef.current && planetRef.current) {
+            const p = new THREE.Vector3().fromArray(position);
+            planetBodyRef.current.setTranslation({ x: p.x, y: p.y, z: p.z }, true);
+        }
     });
+
+    useEffect(() => {
+        (async () => {
+            const RAPIER = await ensureRapier();
+            const world = await getWorld();
+            const bodyDesc = RAPIER.RigidBodyDesc.fixed();
+            const body = world.createRigidBody(bodyDesc);
+            const collDesc = RAPIER.ColliderDesc.ball(size);
+            world.createCollider(collDesc, body);
+            planetBodyRef.current = body;
+        })();
+    }, [size]);
 
     return (
         <group position={position} name="PlanetGroup">
             {/* EARTH */}
             <group ref={planetRef} name="Planet">
-                <Sphere args={[size, 128, 128]}>
+                <Sphere args={[size, 128, 128]} castShadow receiveShadow>
                     <primitive object={earthMaterial} attach="material" />
                 </Sphere>
             </group>

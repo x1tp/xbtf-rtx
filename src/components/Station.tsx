@@ -5,6 +5,7 @@ import type { GLTF } from 'three-stdlib';
 import { OBJLoader } from 'three-stdlib';
 import { MTLLoader } from 'three-stdlib';
 import { Group, MeshStandardMaterial, Mesh, SRGBColorSpace, LinearSRGBColorSpace, DoubleSide, Box3, Vector3, TextureLoader, BufferGeometry, Float32BufferAttribute, Texture, RepeatWrapping } from 'three';
+import { ensureRapier, getWorld } from '../physics/RapierWorld';
 
 interface StationProps {
     position: [number, number, number];
@@ -185,8 +186,8 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
                     mesh.receiveShadow = true;
                     group.add(mesh);
                 }
-                stationRef.current.clear();
-                stationRef.current.add(group);
+                stationRef.current?.clear();
+                stationRef.current?.add(group);
             })();
         }
         if (isObj && stationRef.current) {
@@ -231,6 +232,41 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
                     if (stationRef.current) {
                         stationRef.current.clear();
                         stationRef.current.add(obj);
+                        (async () => {
+                            const RAPIER = await ensureRapier();
+                            const world = await getWorld();
+                            obj.updateWorldMatrix(true, true);
+                            obj.traverse((o) => {
+                                const mesh = o as Mesh;
+                                const g = mesh.geometry as BufferGeometry;
+                                if (!g || !g.attributes?.position) return;
+                                const pos = g.getAttribute('position');
+                                const count = pos.count;
+                                const verts = new Float32Array(count * 3);
+                                const v = new Vector3();
+                                for (let i = 0; i < count; i++) {
+                                    const x = pos.getX(i);
+                                    const y = pos.getY(i);
+                                    const z = pos.getZ(i);
+                                    v.set(x, y, z).applyMatrix4(mesh.matrixWorld);
+                                    verts[i * 3 + 0] = v.x;
+                                    verts[i * 3 + 1] = v.y;
+                                    verts[i * 3 + 2] = v.z;
+                                }
+                                let idx: Uint32Array | null = null;
+                                if (g.index) {
+                                    idx = Uint32Array.from((g.index.array as unknown as number[]));
+                                } else {
+                                    const triCount = Math.floor(verts.length / 3);
+                                    idx = new Uint32Array(triCount);
+                                    for (let i = 0; i < triCount; i++) idx[i] = i;
+                                }
+                                const bodyDesc = RAPIER.RigidBodyDesc.fixed();
+                                const body = world.createRigidBody(bodyDesc);
+                                const collDesc = RAPIER.ColliderDesc.trimesh(verts, idx!);
+                                world.createCollider(collDesc, body);
+                            });
+                        })();
                     }
                 });
             });
@@ -264,6 +300,43 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
             }
             if (Array.isArray(mat)) mat.forEach(apply); else if (mat) apply(mat as MeshStandardMaterial);
         });
+        if (!isBod && stationRef.current) {
+            (async () => {
+                const RAPIER = await ensureRapier();
+                const world = await getWorld();
+                gltf.scene.updateWorldMatrix(true, true);
+                gltf.scene.traverse((o) => {
+                    const mesh = o as Mesh;
+                    const g = mesh.geometry as BufferGeometry;
+                    if (!g || !g.attributes?.position) return;
+                    const pos = g.getAttribute('position');
+                    const count = pos.count;
+                    const verts = new Float32Array(count * 3);
+                    const v = new Vector3();
+                    for (let i = 0; i < count; i++) {
+                        const x = pos.getX(i);
+                        const y = pos.getY(i);
+                        const z = pos.getZ(i);
+                        v.set(x, y, z).applyMatrix4(mesh.matrixWorld);
+                        verts[i * 3 + 0] = v.x;
+                        verts[i * 3 + 1] = v.y;
+                        verts[i * 3 + 2] = v.z;
+                    }
+                    let idx: Uint32Array | null = null;
+                    if (g.index) {
+                        idx = Uint32Array.from((g.index.array as unknown as number[]));
+                    } else {
+                        const triCount = Math.floor(verts.length / 3);
+                        idx = new Uint32Array(triCount);
+                        for (let i = 0; i < triCount; i++) idx[i] = i;
+                    }
+                    const bodyDesc = RAPIER.RigidBodyDesc.fixed();
+                    const body = world.createRigidBody(bodyDesc);
+                    const collDesc = RAPIER.ColliderDesc.trimesh(verts, idx!);
+                    world.createCollider(collDesc, body);
+                });
+            })();
+        }
     }, [gltf, gl, isBod, isObj, modelPath]);
 
     return (
