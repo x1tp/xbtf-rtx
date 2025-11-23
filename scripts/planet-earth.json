@@ -1,0 +1,6 @@
+{
+  "name": "planet_earth",
+  "prompt": "blue ocean planet with varied landmasses and polar ice caps",
+  "resolution": 4096,
+  "forceAi": true
+}

@@ -1,0 +1,28 @@
+{
+  "name": "cockpit",
+  "operations": [
+    { "type": "group", "name": "root" },
+
+    { "type": "add_primitive", "kind": "sphere", "size": [1.6, 32, 32], "scale": [1.6, 0.9, 1.6], "position": [0, 0.8, -0.2], "material": { "color": "#9fc4ff", "roughness": 0.1, "metalness": 0.0, "transparent": true, "opacity": 0.25 }, "name": "canopy", "parent": "root" },
+
+    { "type": "add_primitive", "kind": "torus", "size": [1.6, 0.06, 24, 64], "rotation": [1.57, 0, 0], "position": [0, 0.9, -0.2], "material": { "color": "#60666f", "metalness": 0.75, "roughness": 0.35 }, "name": "canopy_frame_top", "parent": "root" },
+    { "type": "add_primitive", "kind": "torus", "size": [1.4, 0.05, 24, 64], "rotation": [1.57, 0, 0], "position": [0, 0.4, -0.2], "material": { "color": "#60666f", "metalness": 0.75, "roughness": 0.35 }, "name": "canopy_frame_mid", "parent": "root" },
+
+    { "type": "add_primitive", "kind": "box", "size": [4, 1, 1], "position": [0, -1.4, -1.6], "material": { "color": "#6a6f7a", "roughness": 0.35, "metalness": 0.65, "emissive": "#1a202c", "emissiveIntensity": 0.45 }, "name": "dashboard", "parent": "root" },
+
+    { "type": "add_primitive", "kind": "plane", "size": [0.8, 0.4, 1, 1], "position": [-1, -1.1, -1.49], "material": { "color": "#001b0c", "emissive": "#004b22", "emissiveIntensity": 1.4 }, "name": "hud_left", "parent": "root" },
+    { "type": "add_primitive", "kind": "plane", "size": [0.8, 0.4, 1, 1], "position": [1, -1.1, -1.49], "material": { "color": "#001b0c", "emissive": "#004b22", "emissiveIntensity": 1.4 }, "name": "hud_right", "parent": "root" },
+
+    { "type": "add_primitive", "kind": "box", "size": [1.5, 2, 0.5], "rotation": [0, 0.5, 0], "position": [-2.5, -1.0, -1.5], "material": { "color": "#777777", "roughness": 0.45, "metalness": 0.55, "emissive": "#1b1b1b", "emissiveIntensity": 0.3 }, "name": "panel_left", "parent": "root" },
+    { "type": "add_primitive", "kind": "box", "size": [1.5, 2, 0.5], "rotation": [0, -0.5, 0], "position": [2.5, -1.0, -1.5], "material": { "color": "#777777", "roughness": 0.45, "metalness": 0.55, "emissive": "#1b1b1b", "emissiveIntensity": 0.3 }, "name": "panel_right", "parent": "root" },
+
+    { "type": "add_primitive", "kind": "box", "size": [3, 0.2, 0.5], "position": [0, 1.6, -1.5], "material": { "color": "#555555", "roughness": 0.45, "emissive": "#111111", "emissiveIntensity": 0.2 }, "name": "top_frame", "parent": "root" },
+
+    { "type": "add_primitive", "kind": "cylinder", "size": [0.12, 0.12, 0.8, 24], "rotation": [0, 0, 1.2], "position": [-0.6, -1.2, -1.2], "material": { "color": "#3a3f46", "metalness": 0.6, "roughness": 0.4 }, "name": "stick_left", "parent": "root" },
+    { "type": "add_primitive", "kind": "cylinder", "size": [0.12, 0.12, 0.8, 24], "rotation": [0, 0, -1.2], "position": [0.6, -1.2, -1.2], "material": { "color": "#3a3f46", "metalness": 0.6, "roughness": 0.4 }, "name": "stick_right", "parent": "root" },
+
+    { "type": "add_primitive", "kind": "box", "size": [0.8, 0.4, 0.8], "position": [-0.6, -1.4, -0.6], "material": { "color": "#4f5560", "roughness": 0.6, "metalness": 0.3 }, "name": "seat_left", "parent": "root" },
+    { "type": "add_primitive", "kind": "box", "size": [0.8, 0.4, 0.8], "position": [0.6, -1.4, -0.6], "material": { "color": "#4f5560", "roughness": 0.6, "metalness": 0.3 }, "name": "seat_right", "parent": "root" }
+  ],
+  "constraints": { "maxFaces": 50000, "heightRange": [0, 5] }
+}

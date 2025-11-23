@@ -1,0 +1,14 @@
+/===============================================================
+/ Body zum Testen, ob eine Lichtquelle ueberdeckt wird
+/===============================================================
+
+100000; / Groesse (recht willkuerlich)
+
+0;0;0;		/ Blickpunkt
+10;0;10000;
+-10;0;10000;
+-1;  -1;   -1; / marks end of coords for body
+
+2; 0;1;2; -1;
+-99; 0000000000000001;
+-99; 0000000000000000; /Mark end of body

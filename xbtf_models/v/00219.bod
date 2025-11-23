@@ -1,0 +1,278 @@
+/===============================================================
+/ Automatically generated bodyfile. from 3ds file: 219.3ds
+/===============================================================
+
+/{
+/Chunk type "Main", offset 0x0, size 1557 bytes
+/  {
+/  Unknown chunk: 0x0002, offset 0x6, size: 10 bytes.
+/  0x03000000
+/  Chunk type "Object Mesh", offset 0x10, size 1150 bytes
+/    {
+/    Unknown chunk: 0x3D3E, offset 0x16, size: 10 bytes.
+/    0x03000000
+/    Chunk type "Material", offset 0x20, size 222 bytes
+/      {
+/      Chunk type "Material name", offset 0x26, size 18 bytes
+/        Material name "Material #3"
+/      Chunk type "Ambient color", offset 0x38, size 15 bytes
+/        {
+/        Chunk type "RGB byte", offset 0x3E, size 9 bytes
+/              Red: 0, Green: 0, Blue: 0
+/        }
+/      Chunk type "Diffuse color", offset 0x47, size 15 bytes
+/        {
+/        Chunk type "RGB byte", offset 0x4D, size 9 bytes
+/              Red: 102, Green: 178, Blue: 102
+/        }
+/      Chunk type "Specular color", offset 0x56, size 15 bytes
+/        {
+/        Chunk type "RGB byte", offset 0x5C, size 9 bytes
+/              Red: 229, Green: 229, Blue: 229
+/        }
+/      Unknown chunk: 0xA040, offset 0x65, size: 14 bytes.
+/      0x3000080000002800
+/      Unknown chunk: 0xA041, offset 0x73, size: 14 bytes.
+/      0x3000080000001e00
+/      Unknown chunk: 0xA050, offset 0x81, size: 14 bytes.
+/      0x3000080000000000
+/      Unknown chunk: 0xA052, offset 0x8F, size: 14 bytes.
+/      0x3000080000000000
+/      Unknown chunk: 0xA053, offset 0x9D, size: 14 bytes.
+/      0x3000080000000000
+/      Unknown chunk: 0xA100, offset 0xAB, size: 8 bytes.
+/      0x0300
+/      Unknown chunk: 0xA084, offset 0xB3, size: 14 bytes.
+/      0x3000080000000000
+/      Unknown chunk: 0xA08A, offset 0xC1, size: 6 bytes.
+/      0x
+/      Unknown chunk: 0xA087, offset 0xC7, size: 10 bytes.
+/      0x0000803f
+/      Chunk type "Texture map", offset 0xD1, size 45 bytes
+/        {
+/        Unknown chunk: 0x0030, offset 0xD7, size: 8 bytes.
+/        0x6400
+/        Chunk type "Map filename", offset 0xDF, size 13 bytes
+/          Map filename "25.jpg"
+/        Unknown chunk: 0xA351, offset 0xEC, size: 8 bytes.
+/        0x0000
+/        Unknown chunk: 0xA353, offset 0xF4, size: 10 bytes.
+/        0x00000000
+/        }
+/      }
+/    Chunk type "Material", offset 0xFE, size 222 bytes
+/      {
+/      Chunk type "Material name", offset 0x104, size 18 bytes
+/        Material name "Material #2"
+/      Chunk type "Ambient color", offset 0x116, size 15 bytes
+/        {
+/        Chunk type "RGB byte", offset 0x11C, size 9 bytes
+/              Red: 0, Green: 0, Blue: 0
+/        }
+/      Chunk type "Diffuse color", offset 0x125, size 15 bytes
+/        {
+/        Chunk type "RGB byte", offset 0x12B, size 9 bytes
+/              Red: 102, Green: 178, Blue: 102
+/        }
+/      Chunk type "Specular color", offset 0x134, size 15 bytes
+/        {
+/        Chunk type "RGB byte", offset 0x13A, size 9 bytes
+/              Red: 229, Green: 229, Blue: 229
+/        }
+/      Unknown chunk: 0xA040, offset 0x143, size: 14 bytes.
+/      0x3000080000002800
+/      Unknown chunk: 0xA041, offset 0x151, size: 14 bytes.
+/      0x3000080000001e00
+/      Unknown chunk: 0xA050, offset 0x15F, size: 14 bytes.
+/      0x3000080000000000
+/      Unknown chunk: 0xA052, offset 0x16D, size: 14 bytes.
+/      0x3000080000000000
+/      Unknown chunk: 0xA053, offset 0x17B, size: 14 bytes.
+/      0x3000080000000000
+/      Unknown chunk: 0xA100, offset 0x189, size: 8 bytes.
+/      0x0300
+/      Unknown chunk: 0xA084, offset 0x191, size: 14 bytes.
+/      0x3000080000000000
+/      Unknown chunk: 0xA08A, offset 0x19F, size: 6 bytes.
+/      0x
+/      Unknown chunk: 0xA087, offset 0x1A5, size: 10 bytes.
+/      0x0000803f
+/      Chunk type "Texture map", offset 0x1AF, size 45 bytes
+/        {
+/        Unknown chunk: 0x0030, offset 0x1B5, size: 8 bytes.
+/        0x6400
+/        Chunk type "Map filename", offset 0x1BD, size 13 bytes
+/          Map filename "40.jpg"
+/        Unknown chunk: 0xA351, offset 0x1CA, size: 8 bytes.
+/        0x0000
+/        Unknown chunk: 0xA353, offset 0x1D2, size: 10 bytes.
+/        0x00000000
+/        }
+/      }
+/    Unknown chunk: 0x0100, offset 0x1DC, size: 10 bytes.
+/    0x0000803f
+/    Chunk type "Object Block", offset 0x1E6, size 341 bytes
+/      Object name "B_Tunnel"
+/      {
+/      Chunk type "Tri-Mesh", offset 0x1F5, size 326 bytes
+/        {
+/        Chunk type "Vertex list", offset 0x1FB, size 104 bytes
+/           Part 1 vertices: 8
+/        Chunk type "Mappings list", offset 0x263, size 72 bytes
+/          Vertices: 8
+/        Chunk type "Matrix", offset 0x2AB, size 54 bytes
+/          Rotation matrix:
+/              1.000000, 0.000000, 0.000000
+/              0.000000, -0.000000, 1.000000
+/              0.000000, -1.000000, -0.000000
+/          Translation matrix: 0.000000, -0.000000, 0.000008
+/        Chunk type "Face list", offset 0x2E1, size 90 bytes
+
+/           Faces: 4
+/          {
+/          Chunk type "Face material", offset 0x309, size 28 bytes
+/            Material name for faces: "Material #3"
+/            Faces with this material: 4
+/                Face 0
+/                Face 1
+/                Face 2
+/                Face 3
+/          Chunk type "Smoothings", offset 0x325, size 22 bytes
+/            Smoothing groups: 5, 
+/            Smoothing groups: 5, 
+/            Smoothing groups: 7, 
+/            Smoothing groups: 7, 
+/          }
+/        }
+/      }
+/    Chunk type "Object Block", offset 0x33B, size 339 bytes
+/      Object name "side01"
+/      {
+/      Chunk type "Tri-Mesh", offset 0x348, size 326 bytes
+/        {
+/        Chunk type "Vertex list", offset 0x34E, size 104 bytes
+/           Part 2 vertices: 8
+/        Chunk type "Mappings list", offset 0x3B6, size 72 bytes
+/          Vertices: 8
+/        Chunk type "Matrix", offset 0x3FE, size 54 bytes
+/          Rotation matrix:
+/              1.000000, 0.000000, 0.000000
+/              0.000000, -0.000000, 1.000000
+/              0.000000, -1.000000, -0.000000
+/          Translation matrix: 0.000000, -0.000000, 0.000008
+/        Chunk type "Face list", offset 0x434, size 90 bytes
+
+/           Faces: 4
+/          {
+/          Chunk type "Face material", offset 0x45C, size 28 bytes
+/            Material name for faces: "Material #2"
+/            Faces with this material: 4
+/                Face 0
+/                Face 1
+/                Face 2
+/                Face 3
+/          Chunk type "Smoothings", offset 0x478, size 22 bytes
+/            Smoothing groups: 6, 
+/            Smoothing groups: 6, 
+/            Smoothing groups: 6, 
+/            Smoothing groups: 6, 
+/          }
+/        }
+/      }
+/    }
+/  Chunk type "Keyframer data", offset 0x48E, size 391 bytes
+/    {
+/    Unknown chunk: 0xB00A, offset 0x494, size: 21 bytes.
+/    0x05004d41585343454e450064000000
+/    Chunk type "Frames", offset 0x4A9, size 14 bytes
+/          Start: 0, End: 100
+/    Unknown chunk: 0xB009, offset 0x4B7, size: 10 bytes.
+/    0x00000000
+/    Chunk type "Track info", offset 0x4C1, size 171 bytes
+/      {
+/      Chunk type "Object number", offset 0x4C7, size 8 bytes
+/        Object number: 0
+/      Chunk type "Track Obj. Name", offset 0x4CF, size 21 bytes
+/        Track object name "B_Tunnel"
+/        Object name data: 0x4000, 0x0, 0xFFFFFFFF
+/      Unknown chunk: 0xB013, offset 0x4E4, size: 18 bytes.
+/      0x000000800000008000000080
+/      Chunk type "Position keys", offset 0x4F6, size 38 bytes
+/        Position keys: 1
+/          Frame 0: Flags 0x0, X: 0.000000, Y: -0.000000, Z: 0.000008
+/      Chunk type "Rotation keys", offset 0x51C, size 42 bytes
+/        Rotation keys: 1
+/          Frame 0: Flags 0x0, W: 1.570796, X: -1.000000, Y: 0.000000, Z: 0.000000
+/      Chunk type "Scale keys", offset 0x546, size 38 bytes
+/        Scale keys: 1
+/          Frame 0: Flags 0x0, X: 1.000000, Y: 1.000000, Z: 1.000000
+/      }
+/    Chunk type "Track info", offset 0x56C, size 169 bytes
+/      {
+/      Chunk type "Object number", offset 0x572, size 8 bytes
+/        Object number: 1
+/      Chunk type "Track Obj. Name", offset 0x57A, size 19 bytes
+/        Track object name "side01"
+/        Object name data: 0x4000, 0x0, 0x0
+/      Unknown chunk: 0xB013, offset 0x58D, size: 18 bytes.
+/      0x000000800000008000000080
+/      Chunk type "Position keys", offset 0x59F, size 38 bytes
+/        Position keys: 1
+/          Frame 0: Flags 0x0, X: 0.000000, Y: 0.000000, Z: 0.000000
+/      Chunk type "Rotation keys", offset 0x5C5, size 42 bytes
+/        Rotation keys: 1
+/          Frame 0: Flags 0x0, W: 0.000000, X: 0.000000, Y: 0.000000, Z: 0.000000
+/      Chunk type "Scale keys", offset 0x5EF, size 38 bytes
+/        Scale keys: 1
+/          Frame 0: Flags 0x0, X: 1.000000, Y: 1.000000, Z: 1.000000
+/      }
+/    }
+/  }
+/}
+
+
+MATERIAL: 0;25; 0;0;0;  102;178;102;  229;229;229;
+MATERIAL: 1;40; 0;0;0;  102;178;102;  229;229;229;
+
+
+10000; / Automatic Object Size
+
+/*** WARNING: could not substitute 8 by 0
+/*** WARNING: could not substitute 9 by 1
+/*** WARNING: could not substitute 10 by 2
+/*** WARNING: could not substitute 11 by 3
+/*** WARNING: could not substitute 12 by 4
+/*** WARNING: could not substitute 13 by 5
+/*** WARNING: could not substitute 14 by 6
+/*** WARNING: could not substitute 15 by 7
+/Center: 0, 0, -1
+99999; -49999; -99998; /0 (ex 1)
+99999; 50000; -99999; /1 (ex 3)
+99999; 49999; 100000; /2 (ex 7)
+99999; -50000; 100000; /3 (ex 5)
+-99999; 50000; -99999; /4 (ex 2)
+-99999; -49999; -99998; /5 (ex 0)
+-99999; -50000; 100000; /6 (ex 4)
+-99999; 49999; 100000; /7 (ex 6)
+-99999; -49999; -99998; /8 (ex 8)
+99999; -49999; -99998; /9 (ex 9)
+99999; -50000; 100000; /10 (ex 13)
+-99999; -50000; 100000; /11 (ex 12)
+99999; 50000; -99999; /12 (ex 11)
+-99999; 50000; -99999; /13 (ex 10)
+-99999; 49999; 100000; /14 (ex 14)
+99999; 49999; 100000; /15 (ex 15)
+-1;  -1;   -1; / marks end of coords for body
+/----- Part 0: (0 / -1 / 1)"B_Tunnel"
+0; 0; 2; 1; -25;	16; -0.000795;-0.499203; 0.999203;1.500796; 0.999204;-0.499202; /(0)Flags 0x6
+0; 2; 0; 3; -25;	16; 0.999203;1.500796; -0.000795;-0.499203; -0.000796;1.500795; /(1)Flags 0x6
+0; 4; 6; 5; -25;	64; 1.000796;-0.500795; 0.000796;1.499202; 0.000797;-0.500796; /(2)Flags 0x6
+0; 6; 4; 7; -25;	64; 0.000796;1.499202; 1.000796;-0.500795; 1.000795;1.499203; /(3)Flags 0x6
+-99; 0000000000010001;
+/----- Part 1: (1 / 0 / 0)"side01"
+1; 8; 10; 9; -25;	32; 1.500000;-0.500397; -0.499999;1.499601; -0.499999;-0.500397; /(4)Flags 0x6
+1; 10; 8; 11; -25;	32; -0.499999;1.499601; 1.500000;-0.500397; 1.499999;1.499601; /(5)Flags 0x6
+1; 12; 14; 13; -25;	32; -0.499999;-0.499601; 1.499999;1.500397; 1.500000;-0.499601; /(6)Flags 0x6
+1; 14; 12; 15; -25;	32; 1.499999;1.500397; -0.499999;-0.499601; -0.499999;1.500397; /(7)Flags 0x6
+-99; 0000000000010001;
+-99; 0000000000000000; /Mark end of body

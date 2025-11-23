@@ -1,0 +1,16 @@
+newmtl mat_0
+Kd 1 1 1
+map_Kd true/28.jpg
+
+newmtl mat_1
+Kd 1 1 1
+map_Kd true/37.jpg
+
+newmtl mat_2
+Kd 1 1 1
+map_Kd true/24.jpg
+
+newmtl mat_3
+Kd 1 1 1
+d 0.35
+Tr 0.65

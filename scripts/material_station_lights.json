@@ -1,0 +1,6 @@
+{
+  "name": "station_lights",
+  "prompt": "glowing cyan light strips and panels, minimal noise, tileable",
+  "emissiveColor": "00eaff",
+  "resolution": 1024
+}
