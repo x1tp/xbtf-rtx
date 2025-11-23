@@ -2,7 +2,7 @@ import type { FC } from 'react';
 import { useLoader, useFrame } from '@react-three/fiber';
 import { OBJLoader, MTLLoader } from 'three-stdlib';
 import { Color, Mesh, MeshPhongMaterial, MeshStandardMaterial, MeshPhysicalMaterial } from 'three';
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { useGameStore } from '../store/gameStore';
 
 interface CockpitProps {
