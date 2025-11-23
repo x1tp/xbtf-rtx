@@ -142,7 +142,7 @@ export const Sun: React.FC<SunProps> = ({
           at 'position', the light should be at 0,0,0 relative to the group.
        */}
             <directionalLight
-                intensity={hdr ? hdrIntensity : Math.max(intensity, 12)}
+                intensity={hdr ? hdrIntensity : intensity}
                 color={color}
                 castShadow
                 shadow-mapSize-width={4096}
