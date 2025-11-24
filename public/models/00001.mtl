@@ -1,14 +1,17 @@
 newmtl mat_0
 Kd 1 1 1
 map_Kd true/28.jpg
+map_bump true/28_normal_soft.png
 
 newmtl mat_1
 Kd 1 1 1
 map_Kd true/37.jpg
+map_bump true/37_normal_soft.png
 
 newmtl mat_2
 Kd 1 1 1
 map_Kd true/24.jpg
+map_bump true/24_normal_soft.png
 
 newmtl mat_3
 Kd 1 1 1

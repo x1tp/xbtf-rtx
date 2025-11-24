@@ -319,16 +319,59 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
                             m.side = DoubleSide;
                             if (m.map) { m.map.colorSpace = SRGBColorSpace; m.map.anisotropy = aniso; }
                             if (m.emissiveMap) { m.emissiveMap.colorSpace = SRGBColorSpace; m.emissiveMap.anisotropy = aniso; }
-                            if (m.normalMap) { m.normalMap.colorSpace = LinearSRGBColorSpace; m.normalMap.anisotropy = aniso; }
+                            if ((m as unknown as { bumpMap?: Texture }).bumpMap && !m.normalMap) {
+                                m.normalMap = (m as unknown as { bumpMap?: Texture }).bumpMap as Texture;
+                                (m as unknown as { bumpMap?: Texture }).bumpMap = undefined;
+                            }
+                            if (m.normalMap) {
+                                m.normalMap.colorSpace = LinearSRGBColorSpace;
+                                m.normalMap.anisotropy = aniso;
+                                m.normalMap.flipY = false;
+                                if (m.normalScale) m.normalScale.set(0.7, 0.7);
+                            }
                             if (m.roughnessMap) { m.roughnessMap.colorSpace = LinearSRGBColorSpace; m.roughnessMap.anisotropy = aniso; }
                             if (m.metalnessMap) { m.metalnessMap.colorSpace = LinearSRGBColorSpace; m.metalnessMap.anisotropy = aniso; }
+                            const tloader = new TextureLoader();
+                            const src = (m.map && (m.map as Texture).image && (m.map as Texture).image && (m.map as Texture).image.src ? (m.map as Texture).image.src : ((m.map as Texture | undefined) && (m.map as Texture).source && (m.map as Texture).source.data && (m.map as Texture).source.data.src ? (m.map as Texture).source.data.src : '')) as string;
+                            const ext = src.toLowerCase().endsWith('.png') ? 'png' : 'jpg';
+                            const base = src ? src.replace(/\.(png|jpg)$/i, '') : '';
+                            const tryTex = (url: string | null, linear: boolean) => {
+                                if (!url) return null;
+                                const tx = tloader.load(url);
+                                tx.colorSpace = linear ? LinearSRGBColorSpace : SRGBColorSpace;
+                                tx.anisotropy = aniso;
+                                tx.flipY = false;
+                                return tx;
+                            };
+                            if (base) {
+                                const lm = tryTex(`${base}-light.${ext}`, true);
+                                if (lm) { m.lightMap = lm; m.lightMapIntensity = 1.0; }
+                                const ao = tryTex(`${base}-ao.${ext}`, true);
+                                if (ao) { m.aoMap = ao; m.aoMapIntensity = 0.8; }
+                                const rr = tryTex(`${base}-roughness.${ext}`, true);
+                                if (rr) m.roughnessMap = rr;
+                                const mm = tryTex(`${base}-metallic.${ext}`, true);
+                                if (mm) m.metalnessMap = mm;
+                                const em = tryTex(`${base}-emissive.${ext}`, false);
+                                if (em) { m.emissiveMap = em; m.emissiveIntensity = 1.0; }
+                            }
+                            if (typeof m.metalness === 'number') m.metalness = Math.min(m.metalness ?? 0.0, 0.1);
+                            if (typeof m.roughness === 'number') m.roughness = Math.max(m.roughness ?? 0.8, 0.9);
                             const n = m.name?.toLowerCase?.() || '';
                             if (n === 'mat_3') { m.transparent = true; m.opacity = 0.35; }
                             m.needsUpdate = true;
                         };
-                        const g = mesh.geometry as unknown as { attributes?: Record<string, unknown>; computeVertexNormals?: () => void };
+                        const g = mesh.geometry as unknown as { attributes?: Record<string, unknown>; computeVertexNormals?: () => void } | undefined;
                         if (g && g.attributes && !('normal' in g.attributes) && typeof g.computeVertexNormals === 'function') {
                             g.computeVertexNormals();
+                        }
+                        const geo = mesh.geometry as BufferGeometry | undefined;
+                        if (geo && typeof (geo as BufferGeometry).getAttribute === 'function') {
+                            const uv = geo.getAttribute('uv');
+                            const uv2 = geo.getAttribute('uv2');
+                            if (uv && !uv2) {
+                                geo.setAttribute('uv2', (uv as Float32BufferAttribute).clone());
+                            }
                         }
                         const mat = mesh.material as MeshStandardMaterial | MeshStandardMaterial[] | null | undefined;
                         if (Array.isArray(mat)) mat.forEach(apply); else if (mat) apply(mat as MeshStandardMaterial);
@@ -344,6 +387,7 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
         }
         if (!isBod && !isObj) {
             const aniso = gl?.capabilities?.getMaxAnisotropy?.() ?? 4;
+            const tloader = new TextureLoader();
             gltf.scene.traverse((o) => {
                 const mesh = o as Mesh;
                 const mat = mesh.material as MeshStandardMaterial | MeshStandardMaterial[] | null | undefined;
@@ -357,15 +401,48 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
                     mesh.visible = false;
                     return;
                 }
-                const apply = (m: MeshStandardMaterial) => {
-                    m.side = DoubleSide;
-                    if (m.map) { m.map.colorSpace = SRGBColorSpace; m.map.anisotropy = aniso; }
-                    if (m.emissiveMap) { m.emissiveMap.colorSpace = SRGBColorSpace; m.emissiveMap.anisotropy = aniso; }
-                    if (m.normalMap) { m.normalMap.colorSpace = LinearSRGBColorSpace; m.normalMap.anisotropy = aniso; }
-                    if (m.roughnessMap) { m.roughnessMap.colorSpace = LinearSRGBColorSpace; m.roughnessMap.anisotropy = aniso; }
-                    if (m.metalnessMap) { m.metalnessMap.colorSpace = LinearSRGBColorSpace; m.metalnessMap.anisotropy = aniso; }
-                    m.needsUpdate = true;
-                };
+                    const apply = (m: MeshStandardMaterial) => {
+                        m.side = DoubleSide;
+                        if (m.map) { m.map.colorSpace = SRGBColorSpace; m.map.anisotropy = aniso; }
+                        if (m.emissiveMap) { m.emissiveMap.colorSpace = SRGBColorSpace; m.emissiveMap.anisotropy = aniso; }
+                        if (m.normalMap) { m.normalMap.colorSpace = LinearSRGBColorSpace; m.normalMap.anisotropy = aniso; }
+                        if (m.roughnessMap) { m.roughnessMap.colorSpace = LinearSRGBColorSpace; m.roughnessMap.anisotropy = aniso; }
+                        if (m.metalnessMap) { m.metalnessMap.colorSpace = LinearSRGBColorSpace; m.metalnessMap.anisotropy = aniso; }
+                        const nm = m.name?.toLowerCase?.() || '';
+                        if (nm.includes('station_hull')) {
+                            const bc = tloader.load('/materials/station_hull/baseColor.png');
+                            bc.colorSpace = SRGBColorSpace; bc.anisotropy = aniso; bc.flipY = false;
+                            const rr = tloader.load('/materials/station_hull/roughness.png');
+                            rr.colorSpace = LinearSRGBColorSpace; rr.anisotropy = aniso; rr.flipY = false;
+                            const mm = tloader.load('/materials/station_hull/metallic.png');
+                            mm.colorSpace = LinearSRGBColorSpace; mm.anisotropy = aniso; mm.flipY = false;
+                            m.map = bc;
+                            m.roughnessMap = rr;
+                            m.metalnessMap = mm;
+                        } else if (nm.includes('station_brushed')) {
+                            const bc = tloader.load('/materials/station_brushed/baseColor.png');
+                            bc.colorSpace = SRGBColorSpace; bc.anisotropy = aniso; bc.flipY = false;
+                            const rr = tloader.load('/materials/station_brushed/roughness.png');
+                            rr.colorSpace = LinearSRGBColorSpace; rr.anisotropy = aniso; rr.flipY = false;
+                            const mm = tloader.load('/materials/station_brushed/metallic.png');
+                            mm.colorSpace = LinearSRGBColorSpace; mm.anisotropy = aniso; mm.flipY = false;
+                            m.map = bc;
+                            m.roughnessMap = rr;
+                            m.metalnessMap = mm;
+                        } else if (nm.includes('station_lights')) {
+                            const bc = tloader.load('/materials/station_lights/baseColor.png');
+                            bc.colorSpace = SRGBColorSpace; bc.anisotropy = aniso; bc.flipY = false;
+                            const em = tloader.load('/materials/station_lights/emissive.png');
+                            em.colorSpace = SRGBColorSpace; em.anisotropy = aniso; em.flipY = false;
+                            m.map = bc;
+                            m.emissiveMap = em;
+                        }
+                        if (m.normalMap && m.normalScale) m.normalScale.set(0.35, 0.35);
+                        if (typeof m.metalness === 'number') m.metalness = Math.min(m.metalness, 0.12);
+                        if (typeof m.roughness === 'number') m.roughness = Math.max(m.roughness, 0.9);
+                        if (m.aoMap) m.aoMapIntensity = 0.8;
+                        m.needsUpdate = true;
+                    };
                 const g = mesh.geometry as unknown as { attributes?: Record<string, unknown>; computeVertexNormals?: () => void };
                 if (g && g.attributes && !('normal' in g.attributes) && typeof g.computeVertexNormals === 'function') {
                     g.computeVertexNormals();

@@ -38,12 +38,13 @@ interface PlanetProps {
 }
 
 export const Planet: React.FC<PlanetProps> = ({ position, size, onTexturesLoaded, cloudsParams, atmosphereEnabled = true, sunPosition }) => {
+    const surfaceShaderUniformsRef = useRef<Record<string, { value: unknown }> | null>(null);
 
     // 1. THE EARTH SURFACE MATERIAL
     // We removed clearcoat because it makes land look like plastic.
     // We rely entirely on the roughnessMap to make oceans shiny and land matte.
     const earthMaterial = useMemo(() => {
-        return new THREE.MeshPhysicalMaterial({
+        const mat = new THREE.MeshPhysicalMaterial({
             color: new THREE.Color(0xffffff),
             roughness: 1.0,
             metalness: 0.0,
@@ -52,21 +53,57 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, onTexturesLoaded
             sheenRoughness: 1.0,
             specularIntensity: 0.1,
         });
+
+        mat.onBeforeCompile = (shader) => {
+            shader.uniforms.cloudsMap = { value: null };
+            shader.uniforms.cloudShadowOffset = { value: 0 };
+            mat.userData.shader = shader;
+            surfaceShaderUniformsRef.current = shader.uniforms;
+
+            shader.fragmentShader = shader.fragmentShader.replace(
+                '#include <common>',
+                `
+                #include <common>
+                uniform sampler2D cloudsMap;
+                uniform float cloudShadowOffset;
+                `
+            );
+
+            shader.fragmentShader = shader.fragmentShader.replace(
+                '#include <map_fragment>',
+                `
+                #include <map_fragment>
+                
+                // Cloud Shadows
+                #ifdef USE_UV
+                    // Sample the cloud texture with an offset to account for independent rotation
+                    // Use vUv instead of vMapUv to ensure it works even if the main map isn't loaded yet
+                    vec4 cloudColor = texture2D(cloudsMap, vec2(vUv.x + cloudShadowOffset, vUv.y));
+                    
+                    // Darken the surface where clouds are present
+                    // 0.6 intensity provides a visible but natural shadow
+                    diffuseColor.rgb *= (1.0 - cloudColor.r * 0.6);
+                #endif
+                `
+            );
+        };
+
+        return mat;
     }, []);
 
     // 2. THE CLOUD MATERIAL
-    // Critical Fix: alphaTest allows rays to pass through the empty parts of the texture
-    const initialCloudOpacity = (cloudsParams && typeof cloudsParams.opacity === 'number') ? cloudsParams.opacity : 0.9;
-    const initialCloudAlphaTest = (cloudsParams && typeof cloudsParams.alphaTest === 'number') ? cloudsParams.alphaTest : 0.3;
+    // Clouds
+    const initialCloudOpacity = (cloudsParams && typeof cloudsParams.opacity === 'number') ? cloudsParams.opacity : 0.8;
+    const initialCloudAlphaTest = (cloudsParams && typeof cloudsParams.alphaTest === 'number') ? cloudsParams.alphaTest : 0.0;
     const cloudMaterial = useMemo(() => {
-        return new THREE.MeshStandardMaterial({
+        return new THREE.MeshBasicMaterial({
             color: 0xffffff,
             transparent: true,
             opacity: initialCloudOpacity,
-            side: THREE.DoubleSide, // Helps with volume feel
-            alphaTest: initialCloudAlphaTest, // <--- CRITICAL FIX FOR BLACK ARTIFACTS
-            depthWrite: false, // Standard rendering helper
-            roughness: 0.9,
+            side: THREE.DoubleSide,
+            alphaTest: initialCloudAlphaTest,
+            depthWrite: false,
+            wireframe: false,
         });
     }, [initialCloudOpacity, initialCloudAlphaTest]);
 
@@ -119,9 +156,19 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, onTexturesLoaded
 
             // Apply texture to Clouds
             if (cloudsAlpha) {
+                console.log('Clouds texture loaded:', cloudsAlpha);
                 setupTexture(cloudsAlpha as THREE.Texture, false);
+                // Keep 1:1 unwrap; use alphaMap only so color stays white
+                cloudsAlpha.wrapS = ClampToEdgeWrapping;
+                cloudsAlpha.wrapT = ClampToEdgeWrapping;
+                cloudsAlpha.repeat.set(1.0, 1.0);
+                cloudsAlpha.offset.set(0.0, 0.0);
+                cloudsAlpha.colorSpace = LinearSRGBColorSpace;
+                cloudMaterial.map = null;
                 cloudMaterial.alphaMap = cloudsAlpha as THREE.Texture;
                 cloudMaterial.needsUpdate = true;
+            } else {
+                console.warn('Clouds texture failed to load');
             }
 
             setReady(true);
@@ -136,12 +183,30 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, onTexturesLoaded
 
     useFrame((_, delta) => {
         if (planetRef.current) {
-            planetRef.current.rotation.y += delta * 0.005; // Slow rotation
+            planetRef.current.rotation.y += delta * 0.001; // Slow rotation
         }
         // Rotate clouds slightly faster for realism
         if (cloudsRef.current) {
-            cloudsRef.current.rotation.y += delta * 0.002;
+            cloudsRef.current.rotation.y += delta * 0.0012; // Spin slightly faster than the ground
         }
+
+        // Update Cloud Shadows
+        if (surfaceShaderUniformsRef.current && cloudsRef.current && planetRef.current) {
+            const uniforms = surfaceShaderUniformsRef.current;
+            const cloudRot = cloudsRef.current.rotation.y;
+            const planetRot = planetRef.current.rotation.y;
+
+            // Calculate offset based on rotation difference
+            // UV x wraps 0..1, Rotation wraps 0..2PI
+            const offset = (cloudRot - planetRot) / (2 * Math.PI);
+            uniforms.cloudShadowOffset.value = -offset;
+
+            // Ensure texture is passed to shader
+            if (!uniforms.cloudsMap.value && cloudMaterial.alphaMap) {
+                uniforms.cloudsMap.value = cloudMaterial.alphaMap;
+            }
+        }
+
         if (planetBodyRef.current && planetRef.current) {
             const p = new THREE.Vector3().fromArray(position);
             planetBodyRef.current.setTranslation({ x: p.x, y: p.y, z: p.z }, true);
@@ -184,16 +249,14 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, onTexturesLoaded
                 <Sphere args={[size, 128, 128]} castShadow receiveShadow>
                     <primitive object={earthMaterial} attach="material" />
                 </Sphere>
-            </group>
-            {/* CLOUDS */}
-            {/* Increased size slightly (1.02) to prevent z-fighting artifacts in the BVH */}
-            {ready && ((cloudsParams?.enabled ?? true)) && (
-                <group ref={cloudsRef}>
-                    <Sphere args={[size * 1.02, 128, 128]}>
+                {/* CLOUDS */}
+                {/* Slightly larger to avoid z-fighting with the surface */}
+                {ready && ((cloudsParams?.enabled ?? true)) && (
+                    <Sphere ref={cloudsRef} args={[size * 1.02, 128, 128]}>
                         <primitive object={cloudMaterial} attach="material" />
                     </Sphere>
-                </group>
-            )}
+                )}
+            </group>
 
             {/* ATMOSPHERE */}
             {atmosphereEnabled && (

@@ -153,7 +153,7 @@ export const PlanetEditor: React.FC = () => {
       camera.updateProjectionMatrix();
       appliedRef.current = true;
       onApplied();
-    }, [state, state.size.width, state.size.height, radius, center, includePlanet, recenterKey]);
+    }, [state, state.size.width, state.size.height, radius, center, includePlanet, recenterKey, onApplied]);
 
     useFrame(() => {
       if (appliedRef.current) return;
