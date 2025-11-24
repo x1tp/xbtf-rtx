@@ -8,15 +8,31 @@ import { InstancedMesh, TextureLoader, SRGBColorSpace, LinearSRGBColorSpace, Rep
 import * as THREE from 'three';
 import { ensureRapier, getWorld, getWorldSync } from '../physics/RapierWorld';
 import type RAPIERType from '@dimforge/rapier3d-compat';
+import { DEFAULT_SECTOR_CONFIG } from '../config/sector';
 
 export const PlanetEditor: React.FC = () => {
-  const [size, setSize] = useState(10000);
-  const [positionX, setPositionX] = useState(0);
-  const [positionY, setPositionY] = useState(0);
-  const [positionZ, setPositionZ] = useState(0);
-  const [sunX, setSunX] = useState(5000);
-  const [sunY, setSunY] = useState(2000);
-  const [sunZ, setSunZ] = useState(5000);
+  const initCfg = useMemo(() => {
+    try {
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem('sector:config') : null;
+      if (!raw) return DEFAULT_SECTOR_CONFIG;
+      const parsed = JSON.parse(raw);
+      return {
+        sun: { ...DEFAULT_SECTOR_CONFIG.sun, ...(parsed.sun || {}) },
+        planet: { ...DEFAULT_SECTOR_CONFIG.planet, ...(parsed.planet || {}) },
+        station: { ...DEFAULT_SECTOR_CONFIG.station, ...(parsed.station || {}) },
+        asteroids: { ...DEFAULT_SECTOR_CONFIG.asteroids, ...(parsed.asteroids || {}) }
+      };
+    } catch {
+      return DEFAULT_SECTOR_CONFIG;
+    }
+  }, []);
+  const [size, setSize] = useState(initCfg.planet.size);
+  const [positionX, setPositionX] = useState(initCfg.planet.position[0]);
+  const [positionY, setPositionY] = useState(initCfg.planet.position[1]);
+  const [positionZ, setPositionZ] = useState(initCfg.planet.position[2]);
+  const [sunX, setSunX] = useState(initCfg.sun.position[0]);
+  const [sunY, setSunY] = useState(initCfg.sun.position[1]);
+  const [sunZ, setSunZ] = useState(initCfg.sun.position[2]);
   const [cloudsEnabled, setCloudsEnabled] = useState(true);
   const [cloudOpacity, setCloudOpacity] = useState(0.9);
   const [cloudAlphaTest, setCloudAlphaTest] = useState(0.3);
@@ -30,16 +46,39 @@ export const PlanetEditor: React.FC = () => {
   const [innerColor, setInnerColor] = useState('#7fc0ff');
   const [outerColor, setOuterColor] = useState('#b2e0ff');
   const [showGrid, setShowGrid] = useState(true);
+  const [includePlanetInFit, setIncludePlanetInFit] = useState(false);
+  const [fitReq, setFitReq] = useState<'none' | 'stations' | 'planet'>('none');
+  const [rimMode, setRimMode] = useState<'normal' | 'hide' | 'shrink'>('normal');
+  const [rimScale, setRimScale] = useState(1.02);
+  const saveConfig = () => {
+    const cfg = {
+      sun: { position: [sunX, sunY, sunZ], size: DEFAULT_SECTOR_CONFIG.sun.size, color: DEFAULT_SECTOR_CONFIG.sun.color, intensity: DEFAULT_SECTOR_CONFIG.sun.intensity },
+      planet: { position: [positionX, positionY, positionZ], size },
+      station: DEFAULT_SECTOR_CONFIG.station,
+      asteroids: DEFAULT_SECTOR_CONFIG.asteroids
+    };
+    if (typeof window !== 'undefined') window.localStorage.setItem('sector:config', JSON.stringify(cfg));
+  };
+  const resetToSceneDefaults = () => {
+    setPositionX(DEFAULT_SECTOR_CONFIG.planet.position[0]);
+    setPositionY(DEFAULT_SECTOR_CONFIG.planet.position[1]);
+    setPositionZ(DEFAULT_SECTOR_CONFIG.planet.position[2]);
+    setSize(DEFAULT_SECTOR_CONFIG.planet.size);
+    setSunX(DEFAULT_SECTOR_CONFIG.sun.position[0]);
+    setSunY(DEFAULT_SECTOR_CONFIG.sun.position[1]);
+    setSunZ(DEFAULT_SECTOR_CONFIG.sun.position[2]);
+  };
 
-  const FitCamera = ({ radius, center }: { radius: number; center: [number, number, number] }) => {
+  const FitCamera = ({ radius, center, includePlanet, recenterKey, onApplied }: { radius: number; center: [number, number, number]; includePlanet: boolean; recenterKey: 'none' | 'stations' | 'planet'; onApplied: () => void }) => {
     const state = useThree();
+    const appliedRef = useRef(false);
     useEffect(() => {
       const camera = state.camera as unknown as { position: { set: (x: number, y: number, z: number) => void }; zoom: number; updateProjectionMatrix: () => void; lookAt: (x: number, y: number, z: number) => void };
       const controls = (state as unknown as { controls?: { target?: { set: (x: number, y: number, z: number) => void }; update?: () => void } }).controls;
       const scene = state.scene;
       const targets: THREE.Object3D[] = [];
-      const p = scene.getObjectByName('PlanetGroup'); if (p) targets.push(p);
       const s = scene.getObjectByName('Station'); if (s) targets.push(s);
+      const p = scene.getObjectByName('PlanetGroup'); if ((includePlanet || recenterKey === 'planet') && p) targets.push(p);
       const a = scene.getObjectByName('AsteroidField') as unknown as (InstancedMesh & { userData: { positions?: THREE.Vector3[]; scales?: number[] } }) | null;
       const bbox = new Box3();
       let haveAny = false;
@@ -63,7 +102,7 @@ export const PlanetEditor: React.FC = () => {
         const ab = new Box3(new Vector3(minX, minY, minZ), new Vector3(maxX, maxY, maxZ));
         if (!haveAny) { bbox.copy(ab); haveAny = true; } else { bbox.union(ab); }
       }
-      if (!haveAny) {
+      if (!haveAny || recenterKey === 'planet') {
         const cx = center[0], cy = center[1], cz = center[2];
         camera.position.set(cx, Math.max(radius * 2, 2000), cz);
         if (controls && controls.target && typeof controls.target.set === 'function') {
@@ -76,13 +115,34 @@ export const PlanetEditor: React.FC = () => {
         const zoom = Math.min(w / target, h / target);
         camera.zoom = zoom;
         camera.updateProjectionMatrix();
+        appliedRef.current = true;
+        onApplied();
         return;
       }
-      const centerVec = bbox.getCenter(new Vector3());
+      let centerVec = bbox.getCenter(new Vector3());
       const sizeVec = bbox.getSize(new Vector3());
       const w = state.size.width, h = state.size.height;
       const maxDim = Math.max(sizeVec.x, sizeVec.z) * 1.2;
       const zoom = Math.min(w / maxDim, h / maxDim);
+      const halfW = w / (2 * zoom);
+      const halfH = h / (2 * zoom);
+      const planetCenter = new Vector3(center[0], center[1], center[2]);
+      const r = radius;
+      const dx = centerVec.x - planetCenter.x;
+      const dz = centerVec.z - planetCenter.z;
+      const dLen = Math.sqrt(dx * dx + dz * dz);
+      const rectRadius = Math.sqrt(halfW * halfW + halfH * halfH);
+      const margin = Math.max(500, r * 0.02);
+      const includeP = includePlanet;
+      if (!includeP && dLen < r + rectRadius + margin) {
+        const dir = new Vector3(dx, 0, dz).normalize();
+        const need = r + rectRadius + margin - dLen;
+        if (isFinite(need) && isFinite(dir.x) && isFinite(dir.z)) {
+          centerVec = centerVec.clone().add(dir.multiplyScalar(need));
+        } else {
+          centerVec = centerVec.clone().add(new Vector3(r + rectRadius + margin, 0, 0));
+        }
+      }
       camera.position.set(centerVec.x, Math.max(sizeVec.y * 1.5, 2000), centerVec.z);
       if (controls && controls.target && typeof controls.target.set === 'function') {
         controls.target.set(centerVec.x, centerVec.y, centerVec.z);
@@ -91,7 +151,75 @@ export const PlanetEditor: React.FC = () => {
       camera.lookAt(centerVec.x, centerVec.y, centerVec.z);
       camera.zoom = zoom;
       camera.updateProjectionMatrix();
-    }, [state, state.size.width, state.size.height, radius, center]);
+      appliedRef.current = true;
+      onApplied();
+    }, [state, state.size.width, state.size.height, radius, center, includePlanet, recenterKey]);
+
+    useFrame(() => {
+      if (appliedRef.current) return;
+      const camera = state.camera as unknown as { position: { set: (x: number, y: number, z: number) => void }; zoom: number; updateProjectionMatrix: () => void; lookAt: (x: number, y: number, z: number) => void };
+      const controls = (state as unknown as { controls?: { target?: { set: (x: number, y: number, z: number) => void }; update?: () => void } }).controls;
+      const scene = state.scene;
+      const s = scene.getObjectByName('Station');
+      const p = scene.getObjectByName('PlanetGroup');
+      const a = scene.getObjectByName('AsteroidField') as unknown as (InstancedMesh & { userData: { positions?: THREE.Vector3[]; scales?: number[] } }) | null;
+      if (!s && !a && !(includePlanet && p)) return;
+      const bbox = new Box3();
+      let haveAny = false;
+      if (s) { bbox.setFromObject(s); haveAny = true; }
+      if (includePlanet && p) { const pb = new Box3().setFromObject(p); if (!haveAny) { bbox.copy(pb); haveAny = true; } else { bbox.union(pb); } }
+      if (a && a.userData && a.userData.positions && a.userData.scales && a.userData.positions.length > 0) {
+        let minX = Infinity, minY = Infinity, minZ = Infinity;
+        let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+        for (let i = 0; i < a.userData.positions.length; i++) {
+          const v = a.userData.positions[i];
+          const r = (a.userData.scales[i] || 0);
+          if (v.x - r < minX) minX = v.x - r;
+          if (v.y - r < minY) minY = v.y - r;
+          if (v.z - r < minZ) minZ = v.z - r;
+          if (v.x + r > maxX) maxX = v.x + r;
+          if (v.y + r > maxY) maxY = v.y + r;
+          if (v.z + r > maxZ) maxZ = v.z + r;
+        }
+        const ab = new Box3(new Vector3(minX, minY, minZ), new Vector3(maxX, maxY, maxZ));
+        if (!haveAny) { bbox.copy(ab); haveAny = true; } else { bbox.union(ab); }
+      }
+      if (!haveAny) return;
+      let centerVec = bbox.getCenter(new Vector3());
+      const sizeVec = bbox.getSize(new Vector3());
+      const w = state.size.width, h = state.size.height;
+      const maxDim = Math.max(sizeVec.x, sizeVec.z) * 1.2;
+      const zoom = Math.min(w / maxDim, h / maxDim);
+      const halfW = w / (2 * zoom);
+      const halfH = h / (2 * zoom);
+      const planetCenter = new Vector3(center[0], center[1], center[2]);
+      const r = radius;
+      const dx = centerVec.x - planetCenter.x;
+      const dz = centerVec.z - planetCenter.z;
+      const dLen = Math.sqrt(dx * dx + dz * dz);
+      const rectRadius = Math.sqrt(halfW * halfW + halfH * halfH);
+      const margin = Math.max(500, r * 0.02);
+      const includeP2 = includePlanet;
+      if (!includeP2 && dLen < r + rectRadius + margin) {
+        const dir = new Vector3(dx, 0, dz).normalize();
+        const need = r + rectRadius + margin - dLen;
+        if (isFinite(need) && isFinite(dir.x) && isFinite(dir.z)) {
+          centerVec = centerVec.clone().add(dir.multiplyScalar(need));
+        } else {
+          centerVec = centerVec.clone().add(new Vector3(r + rectRadius + margin, 0, 0));
+        }
+      }
+      camera.position.set(centerVec.x, Math.max(sizeVec.y * 1.5, 2000), centerVec.z);
+      if (controls && controls.target && typeof controls.target.set === 'function') {
+        controls.target.set(centerVec.x, centerVec.y, centerVec.z);
+        if (typeof controls.update === 'function') controls.update();
+      }
+      camera.lookAt(centerVec.x, centerVec.y, centerVec.z);
+      camera.zoom = zoom;
+      camera.updateProjectionMatrix();
+      appliedRef.current = true;
+      onApplied();
+    });
     return null;
   };
 
@@ -268,7 +396,7 @@ export const PlanetEditor: React.FC = () => {
             hdr={false}
             sunPosition={[sunX, sunY, sunZ]}
             atmosphereParams={{
-              radiusMul,
+              radiusMul: rimMode === 'shrink' ? rimScale : radiusMul,
               rimPower,
               rayleigh,
               noiseScale,
@@ -278,6 +406,7 @@ export const PlanetEditor: React.FC = () => {
               innerColor,
               outerColor,
             }}
+            atmosphereEnabled={rimMode !== 'hide'}
             cloudsParams={{ enabled: cloudsEnabled, opacity: cloudOpacity, alphaTest: cloudAlphaTest }}
           />
           <Asteroids count={500} range={400} />
@@ -293,7 +422,7 @@ export const PlanetEditor: React.FC = () => {
               infiniteGrid
             />
           )}
-          <FitCamera radius={size * radiusMul} center={[positionX, positionY, positionZ]} />
+          <FitCamera radius={size * radiusMul} center={[positionX, positionY, positionZ]} includePlanet={includePlanetInFit} recenterKey={fitReq} onApplied={() => setFitReq('none')} />
           <MapControls makeDefault enableRotate={false} minZoom={0.1} maxZoom={500} screenSpacePanning />
         </Suspense>
       </Canvas>
@@ -339,6 +468,28 @@ export const PlanetEditor: React.FC = () => {
           <input type="checkbox" checked={showGrid} onChange={(e) => setShowGrid(e.target.checked)} />
           Show Grid
         </label>
+        <label style={{ gridColumn: '1 / span 2', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <input type="checkbox" checked={includePlanetInFit} onChange={(e) => setIncludePlanetInFit(e.target.checked)} />
+          Include Planet in Fit
+        </label>
+        <div style={{ gridColumn: '1 / span 2', display: 'flex', gap: 8 }}>
+          <button onClick={() => { setFitReq('stations'); }} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Fit Station/Asteroids</button>
+          <button onClick={() => { setFitReq('planet'); }} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Fit Planet</button>
+        </div>
+        <div style={{ gridColumn: '1 / span 2', display: 'flex', gap: 8 }}>
+          <button onClick={saveConfig} style={{ padding: '6px 10px', border: '1px solid #4ad07d', background: '#0f2230', color: '#c3ffde' }}>Save Sector Config</button>
+          <button onClick={resetToSceneDefaults} style={{ padding: '6px 10px', border: '1px solid #bca14a', background: '#0f2230', color: '#ffeebf' }}>Reset to Scene Defaults</button>
+        </div>
+        <div>Atmos Rim Mode</div>
+        <select value={rimMode} onChange={(e) => setRimMode(e.target.value as 'normal' | 'hide' | 'shrink')}>
+          <option value="normal">Normal</option>
+          <option value="hide">Hide</option>
+          <option value="shrink">Shrink</option>
+        </select>
+        {rimMode === 'shrink' && <>
+          <div>Rim Scale</div>
+          <input type="range" min={1.0} max={1.06} step={0.001} value={rimScale} onChange={(e) => setRimScale(Number(e.target.value))} />
+        </>}
         <div>Cloud Opacity</div>
         <input type="range" min={0.0} max={1.0} step={0.01} value={cloudOpacity} onChange={(e) => setCloudOpacity(Number(e.target.value))} />
         <div>Cloud AlphaTest</div>

@@ -4,7 +4,7 @@ import { useGLTF } from '@react-three/drei';
 import type { GLTF } from 'three-stdlib';
 import { OBJLoader } from 'three-stdlib';
 import { MTLLoader } from 'three-stdlib';
-import { Group, MeshStandardMaterial, Mesh, SRGBColorSpace, LinearSRGBColorSpace, DoubleSide, Box3, Vector3, TextureLoader, BufferGeometry, Float32BufferAttribute, Texture, RepeatWrapping } from 'three';
+import { Group, MeshStandardMaterial, Mesh, SRGBColorSpace, LinearSRGBColorSpace, DoubleSide, Box3, Vector3, TextureLoader, BufferGeometry, Float32BufferAttribute, Texture, RepeatWrapping, Matrix4, Quaternion } from 'three';
 import { ensureRapier, getWorld, getWorldSync } from '../physics/RapierWorld';
 import type RAPIERType from '@dimforge/rapier3d-compat';
 
@@ -23,6 +23,7 @@ const DEFAULT_MODEL_PATH = '/models/X_beyond_the_frontier_1121121213_texture.glb
 export const Station: React.FC<StationProps> = ({ position, rotate = true, showLights = true, scale = 40, modelPath, rotationSpeed = 0.05, rotationAxis = 'y' }) => {
     const stationRef = useRef<Group | null>(null);
     const colliderBodiesRef = useRef<RAPIERType.RigidBody[]>([]);
+    const stationBodyRef = useRef<RAPIERType.RigidBody | null>(null);
     const isBod = !!modelPath && modelPath.toLowerCase().endsWith('.bod');
     const isObj = !!modelPath && modelPath.toLowerCase().endsWith('.obj');
     const gltf = useGLTF(DEFAULT_MODEL_PATH) as GLTF;
@@ -85,6 +86,14 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
             else if (rotationAxis === 'y') stationRef.current.rotation.y += d;
             else stationRef.current.rotation.z += d;
         }
+        if (stationBodyRef.current && stationRef.current) {
+            const pos = new Vector3();
+            const quat = new Quaternion();
+            stationRef.current.getWorldPosition(pos);
+            stationRef.current.getWorldQuaternion(quat);
+            stationBodyRef.current.setNextKinematicTranslation({ x: pos.x, y: pos.y, z: pos.z });
+            stationBodyRef.current.setNextKinematicRotation({ x: quat.x, y: quat.y, z: quat.z, w: quat.w });
+        }
     });
 
     useEffect(() => {
@@ -95,6 +104,84 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
                 colliderBodiesRef.current.forEach((b) => w.removeRigidBody(b));
             }
             colliderBodiesRef.current = [];
+            stationBodyRef.current = null;
+        };
+        const rebuildCollision = async (target: Group | null) => {
+            if (!target) return;
+            clearBodies();
+            const RAPIER = await ensureRapier();
+            if (cancelled) return;
+            const world = await getWorld();
+            if (cancelled) return;
+            target.updateWorldMatrix(true, true);
+            const stationMatrix = target.matrixWorld.clone();
+            const stationPos = new Vector3();
+            const stationQuat = new Quaternion();
+            stationMatrix.decompose(stationPos, stationQuat, new Vector3());
+            const stationTR = new Matrix4().compose(stationPos, stationQuat, new Vector3(1, 1, 1));
+            const invStationTR = stationTR.clone().invert();
+            const bodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased()
+                .setCcdEnabled(true)
+                .setTranslation(stationPos.x, stationPos.y, stationPos.z)
+                .setRotation({ x: stationQuat.x, y: stationQuat.y, z: stationQuat.z, w: stationQuat.w });
+            const body = world.createRigidBody(bodyDesc);
+            const verts: number[] = [];
+            const indices: number[] = [];
+            const v = new Vector3();
+            target.traverse((o) => {
+                const mesh = o as Mesh;
+                const g = mesh.geometry as BufferGeometry | undefined;
+                if (!g || !g.attributes?.position) return;
+                const pos = g.getAttribute('position');
+                const base = verts.length / 3;
+                for (let i = 0; i < pos.count; i++) {
+                    v.set(pos.getX(i), pos.getY(i), pos.getZ(i))
+                        .applyMatrix4(mesh.matrixWorld)
+                        .applyMatrix4(invStationTR);
+                    verts.push(v.x, v.y, v.z);
+                }
+                if (g.index) {
+                    const arr = g.index.array as unknown as number[];
+                    for (let i = 0; i < arr.length; i++) {
+                        indices.push(base + arr[i]);
+                    }
+                } else {
+                    for (let i = 0; i < pos.count; i += 3) {
+                        indices.push(base + i + 0, base + i + 1, base + i + 2);
+                    }
+                }
+            });
+            let collider: RAPIERType.Collider | null = null;
+            let used = 'none';
+            if (verts.length >= 9 && indices.length >= 3) {
+                const tri = RAPIER.ColliderDesc.trimesh(new Float32Array(verts), new Uint32Array(indices));
+                tri.setFriction(0.9).setRestitution(0.0);
+                collider = world.createCollider(tri, body);
+                used = 'trimesh';
+            }
+            if (!collider && verts.length >= 9) {
+                const hull = RAPIER.ColliderDesc.convexHull(new Float32Array(verts));
+                if (hull) {
+                    hull.setFriction(0.9).setRestitution(0.0);
+                    collider = world.createCollider(hull, body);
+                    used = 'hull';
+                }
+            }
+            if (!collider) {
+                const box = new Box3().setFromObject(target);
+                const size = box.getSize(new Vector3());
+                const he = size.multiplyScalar(0.5);
+                const collDesc = RAPIER.ColliderDesc.cuboid(he.x, he.y, he.z).setFriction(0.9).setRestitution(0.0);
+                collider = world.createCollider(collDesc, body);
+                used = 'box';
+            }
+            if (cancelled) {
+                world.removeRigidBody(body);
+                return;
+            }
+            stationBodyRef.current = body;
+            colliderBodiesRef.current = [body];
+            console.log('Station collider built:', used, 'verts:', verts.length / 3, 'tris:', indices.length / 3);
         };
         clearBodies();
         if (isBod && stationRef.current) {
@@ -202,6 +289,7 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
                 if (cancelled) return;
                 stationRef.current?.clear();
                 stationRef.current?.add(group);
+                void rebuildCollision(stationRef.current);
             })();
         }
         if (isObj && stationRef.current) {
@@ -249,6 +337,7 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
                     if (stationRef.current) {
                         stationRef.current.clear();
                         stationRef.current.add(obj);
+                        void rebuildCollision(stationRef.current);
                     }
                 });
             });
@@ -284,51 +373,7 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
                 if (Array.isArray(mat)) mat.forEach(apply); else if (mat) apply(mat as MeshStandardMaterial);
             });
             if (stationRef.current) {
-                (async () => {
-                    const RAPIER = await ensureRapier();
-                    if (cancelled) return;
-                    const world = await getWorld();
-                    if (cancelled) return;
-                    gltf.scene.updateWorldMatrix(true, true);
-                    const newBodies: RAPIERType.RigidBody[] = [];
-                    gltf.scene.traverse((o) => {
-                        const mesh = o as Mesh;
-                        const g = mesh.geometry as BufferGeometry;
-                        if (!g || !g.attributes?.position) return;
-                        const pos = g.getAttribute('position');
-                        const count = pos.count;
-                        const verts = new Float32Array(count * 3);
-                        const v = new Vector3();
-                        for (let i = 0; i < count; i++) {
-                            const x = pos.getX(i);
-                            const y = pos.getY(i);
-                            const z = pos.getZ(i);
-                            v.set(x, y, z).applyMatrix4(mesh.matrixWorld);
-                            verts[i * 3 + 0] = v.x;
-                            verts[i * 3 + 1] = v.y;
-                            verts[i * 3 + 2] = v.z;
-                        }
-                        let idx: Uint32Array | null = null;
-                        if (g.index) {
-                            idx = Uint32Array.from((g.index.array as unknown as number[]));
-                        } else {
-                            const triCount = Math.floor(verts.length / 3);
-                            idx = new Uint32Array(triCount);
-                            for (let i = 0; i < triCount; i++) idx[i] = i;
-                        }
-                        const bodyDesc = RAPIER.RigidBodyDesc.fixed();
-                        const body = world.createRigidBody(bodyDesc);
-                        newBodies.push(body);
-                        const collDesc = RAPIER.ColliderDesc.trimesh(verts, idx!);
-                        world.createCollider(collDesc, body);
-                        console.log('Station part collider created. Vertices:', verts.length / 3, 'Triangles:', idx!.length / 3);
-                    });
-                    if (cancelled) {
-                        newBodies.forEach((b) => world.removeRigidBody(b));
-                        return;
-                    }
-                    colliderBodiesRef.current = newBodies;
-                })();
+                void rebuildCollision(stationRef.current);
             }
         }
         return () => {

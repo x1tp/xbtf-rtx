@@ -12,8 +12,24 @@ import { ensureRapier, getWorld, getWorldSync } from './physics/RapierWorld';
 import type RAPIERType from '@dimforge/rapier3d-compat';
 
 interface SceneProps { hdr?: boolean }
+import { DEFAULT_SECTOR_CONFIG, type SectorConfig } from './config/sector';
 export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
-    const sunPosition: [number, number, number] = [5000, 2000, 5000];
+    const cfg: SectorConfig = React.useMemo(() => {
+        const raw = typeof window !== 'undefined' ? window.localStorage.getItem('sector:config') : null;
+        if (!raw) return DEFAULT_SECTOR_CONFIG;
+        try {
+            const parsed = JSON.parse(raw) as Partial<SectorConfig>;
+            return {
+                sun: parsed.sun ? { ...DEFAULT_SECTOR_CONFIG.sun, ...parsed.sun } : DEFAULT_SECTOR_CONFIG.sun,
+                planet: parsed.planet ? { ...DEFAULT_SECTOR_CONFIG.planet, ...parsed.planet } : DEFAULT_SECTOR_CONFIG.planet,
+                station: parsed.station ? { ...DEFAULT_SECTOR_CONFIG.station, ...parsed.station } : DEFAULT_SECTOR_CONFIG.station,
+                asteroids: parsed.asteroids ? { ...DEFAULT_SECTOR_CONFIG.asteroids, ...parsed.asteroids } : DEFAULT_SECTOR_CONFIG.asteroids
+            };
+        } catch {
+            return DEFAULT_SECTOR_CONFIG;
+        }
+    }, []);
+    const sunPosition: [number, number, number] = cfg.sun.position;
     const StarfieldSky: React.FC<{ density?: number; brightness?: number; milkyWayStrength?: number; orientation?: [number, number, number]; radius?: number; fadeMin?: number; fadeMax?: number; viewFadeMin?: number; viewFadeMax?: number }> = ({ density = 0.15, brightness = 0.5, milkyWayStrength = 0.22, orientation = [0.0, 0.25, 0.97], radius = 18000, fadeMin = 0.2, fadeMax = 0.95, viewFadeMin = 0.6, viewFadeMax = 0.85 }) => {
         const matRef = useRef<THREE.ShaderMaterial | null>(null);
         const { scene } = useThree();
@@ -183,15 +199,15 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
             <StarfieldSky density={0.02} brightness={0.7} milkyWayStrength={0.2} orientation={[0.0, 0.25, 0.97]} radius={18000} fadeMin={0.2} fadeMax={0.9} viewFadeMin={0.6} viewFadeMax={0.85} />
             <Environment preset="night" />
             {!hdr && <ambientLight intensity={0.05} />}
-            <Sun position={sunPosition} size={200} color="#ffddaa" intensity={5.0} hdr={hdr} />
+            <Sun position={sunPosition} size={cfg.sun.size} color={cfg.sun.color} intensity={cfg.sun.intensity} hdr={hdr} />
 
             {/* Player */}
             <Ship enableLights={!hdr} position={[0, 10, 450]} />
 
             {/* Environment Objects */}
-            <Planet position={[8000, 500, -10000]} size={10000} color="#4466aa" hdr={hdr} sunPosition={sunPosition} />
-            <Station position={[50, 0, -120]} showLights={!hdr} scale={40} modelPath={'/models/00001.obj'} rotationSpeed={-0.05} rotationAxis={'z'} />
-            <Asteroids count={500} range={400} />
+            <Planet position={cfg.planet.position} size={cfg.planet.size} color="#4466aa" hdr={hdr} sunPosition={sunPosition} />
+            <Station position={cfg.station.position} showLights={!hdr} scale={cfg.station.scale} modelPath={cfg.station.modelPath} rotationSpeed={cfg.station.rotationSpeed} rotationAxis={cfg.station.rotationAxis} />
+            <Asteroids count={cfg.asteroids.count} range={cfg.asteroids.range} />
 
 
         </>

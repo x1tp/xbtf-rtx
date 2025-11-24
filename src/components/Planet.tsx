@@ -1,11 +1,11 @@
 import React, { useMemo, useEffect, useState, useRef } from 'react';
 import { Sphere } from '@react-three/drei';
 import * as THREE from 'three';
-import { useGameStore } from '../store/gameStore';
-import { TextureLoader, SRGBColorSpace, LinearSRGBColorSpace, ClampToEdgeWrapping, RepeatWrapping, ShaderMaterial, AdditiveBlending, Color, Vector3 } from 'three';
+import { TextureLoader, SRGBColorSpace, LinearSRGBColorSpace, ClampToEdgeWrapping, RepeatWrapping } from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 import { ensureRapier, getWorld, getWorldSync } from '../physics/RapierWorld';
 import type RAPIERType from '@dimforge/rapier3d-compat';
+import { AtmosphereShader } from '../shaders/AtmosphereShader';
 
 type AtmosphereParams = {
     rimPower?: number;
@@ -34,11 +34,10 @@ interface PlanetProps {
     sunPosition?: [number, number, number];
     atmosphereParams?: AtmosphereParams;
     cloudsParams?: CloudsParams;
+    atmosphereEnabled?: boolean;
 }
 
-export const Planet: React.FC<PlanetProps> = ({ position, size, onTexturesLoaded, hdr = false, sunPosition = [5000, 2000, 5000], atmosphereParams, cloudsParams }) => {
-    const sunAdapt = useGameStore((state) => state.sunAdapt);
-    const sunIntensity = useGameStore((state) => state.sunIntensity);
+export const Planet: React.FC<PlanetProps> = ({ position, size, onTexturesLoaded, cloudsParams, atmosphereEnabled = true, sunPosition }) => {
 
     // 1. THE EARTH SURFACE MATERIAL
     // We removed clearcoat because it makes land look like plastic.
@@ -46,11 +45,12 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, onTexturesLoaded
     const earthMaterial = useMemo(() => {
         return new THREE.MeshPhysicalMaterial({
             color: new THREE.Color(0xffffff),
-            roughness: 0.9,
-            metalness: 0.02,
+            roughness: 1.0,
+            metalness: 0.0,
             ior: 1.5,
             sheen: 0.0,
             sheenRoughness: 1.0,
+            specularIntensity: 0.1,
         });
     }, []);
 
@@ -131,134 +131,9 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, onTexturesLoaded
 
     const planetRef = useRef<THREE.Group>(null);
     const cloudsRef = useRef<THREE.Mesh>(null);
-    const atmosphereRef = useRef<ShaderMaterial | null>(null);
     const planetBodyRef = useRef<RAPIERType.RigidBody | null>(null);
-    const sunDir = useMemo(() => {
-        const sun = new THREE.Vector3().fromArray(sunPosition);
-        const planet = new THREE.Vector3().fromArray(position);
-        return sun.sub(planet).normalize();
-    }, [position, sunPosition]);
 
-    const atmoDefaults: Required<AtmosphereParams> = {
-        rimPower: 2.6,
-        rayleigh: 1.8,
-        mie: 0.7,
-        forwardG: 0.6,
-        noiseScale: 0.8,
-        noiseAmp: 0.25,
-        radiusMul: hdr ? 1.015 : 1.03,
-        innerColor: '#7fc0ff',
-        outerColor: '#b2e0ff',
-        sunMaskMin: 0.45,
-        sunMaskMax: 0.95
-    };
-    const atmo = { ...atmoDefaults, ...(atmosphereParams || {}) };
-    const atmosphereMaterial = useMemo(() => {
-        return new ShaderMaterial({
-            transparent: true,
-            depthWrite: false,
-            blending: AdditiveBlending,
-            side: THREE.BackSide,
-            uniforms: {
-                uSunDir: { value: new Vector3() },
-                uInnerColor: { value: new Color(atmo.innerColor) },
-                uOuterColor: { value: new Color(atmo.outerColor) },
-                uTime: { value: 0.0 },
-                uRimPower: { value: atmo.rimPower },
-                uRayleigh: { value: atmo.rayleigh },
-                uMie: { value: atmo.mie },
-                uForwardG: { value: atmo.forwardG },
-                uNoiseScale: { value: atmo.noiseScale },
-                uNoiseAmp: { value: atmo.noiseAmp },
-                uSunMaskMin: { value: atmo.sunMaskMin },
-                uSunMaskMin: { value: atmo.sunMaskMin },
-                uSunMaskMax: { value: atmo.sunMaskMax },
-                uViewAdapt: { value: 0.0 },
-                uSunIntensity: { value: 0.0 }
-            },
-            vertexShader: `
-                varying vec3 vNormal;
-                varying vec3 vPos;
-                void main() {
-                    vec3 n = normalize(normalMatrix * normal);
-                    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-                    vNormal = n;
-                    vPos = position;
-                    gl_Position = projectionMatrix * mvPosition;
-                }
-            `,
-            fragmentShader: `
-                varying vec3 vNormal;
-                varying vec3 vPos;
-                uniform vec3 uSunDir;
-                uniform vec3 uInnerColor;
-                uniform vec3 uOuterColor;
-                uniform float uTime;
-                uniform float uRimPower;
-                uniform float uRayleigh;
-                uniform float uMie;
-                uniform float uForwardG;
-                uniform float uNoiseScale;
-                uniform float uNoiseAmp;
-                uniform float uSunMaskMin;
-                uniform float uSunMaskMax;
-                uniform float uViewAdapt;
-                uniform float uSunIntensity;
-                float hash(float n){return fract(sin(n)*43758.5453123);} 
-                float noise(vec3 x){
-                    vec3 p=floor(x);
-                    vec3 f=fract(x);
-                    f=f*f*(3.0-2.0*f);
-                    float n=p.x+p.y*57.0+113.0*p.z;
-                    return mix(mix(mix(hash(n+0.0),hash(n+1.0),f.x),mix(hash(n+57.0),hash(n+58.0),f.x),f.y),mix(mix(hash(n+113.0),hash(n+114.0),f.x),mix(hash(n+170.0),hash(n+171.0),f.x),f.y),f.z);
-                }
-                void main(){
-                    vec3 n=normalize(vNormal);
-                    vec3 s=normalize(uSunDir);
-                    float ndotl=clamp(dot(n,s),0.0,1.0);
-                    float sunRamp=pow(ndotl,uRayleigh);
-                    float term=1.0-abs(ndotl);
-                    float rim=pow(clamp(term,0.0,1.0),uRimPower)*ndotl;
-                    float n3=noise(vPos*uNoiseScale+vec3(0.0,0.0,uTime*1.5));
-                    float rimMod=rim*(1.0+uNoiseAmp*(n3-0.5));
-                    float sunMask=smoothstep(uSunMaskMin,uSunMaskMax,ndotl);
-                    float glow=rimMod*0.9+sunRamp*0.6;
-                    float alpha=smoothstep(0.12,0.7,glow)*0.75*sunMask;
-                    vec3 base=mix(uInnerColor,uOuterColor,rim);
-                    vec3 col=base*(0.5+sunRamp*1.1)*sunMask;
-                    // Apply exposure adaptation: Initial Hit (Dark) -> Recovery (Brighter)
-                    float exposure = 1.0 - uSunIntensity * (0.95 - uViewAdapt * 0.5);
-                    col *= exposure;
-                    gl_FragColor=vec4(col*alpha,alpha);
-                }
-            `
-        });
-    }, [atmo.innerColor, atmo.outerColor, atmo.rimPower, atmo.rayleigh, atmo.mie, atmo.forwardG, atmo.noiseScale, atmo.noiseAmp, atmo.sunMaskMin, atmo.sunMaskMax]);
 
-    useEffect(() => {
-        if (atmosphereRef.current && atmosphereRef.current.uniforms) {
-            (atmosphereRef.current.uniforms.uSunDir as { value: Vector3 }).value.copy(sunDir);
-        }
-    }, [sunDir]);
-    useEffect(() => {
-        if (!atmosphereRef.current) return;
-        const u = atmosphereRef.current.uniforms;
-        (u.uRimPower as { value: number }).value = (atmosphereParams && atmosphereParams.rimPower !== undefined) ? atmosphereParams.rimPower : 2.6;
-        (u.uRayleigh as { value: number }).value = (atmosphereParams && atmosphereParams.rayleigh !== undefined) ? atmosphereParams.rayleigh : 1.8;
-        (u.uMie as { value: number }).value = (atmosphereParams && atmosphereParams.mie !== undefined) ? atmosphereParams.mie : 0.7;
-        (u.uForwardG as { value: number }).value = (atmosphereParams && atmosphereParams.forwardG !== undefined) ? atmosphereParams.forwardG : 0.6;
-        (u.uNoiseScale as { value: number }).value = (atmosphereParams && atmosphereParams.noiseScale !== undefined) ? atmosphereParams.noiseScale : 0.8;
-        (u.uNoiseAmp as { value: number }).value = (atmosphereParams && atmosphereParams.noiseAmp !== undefined) ? atmosphereParams.noiseAmp : 0.25;
-        (u.uSunMaskMin as { value: number }).value = (atmosphereParams && atmosphereParams.sunMaskMin !== undefined) ? atmosphereParams.sunMaskMin : 0.45;
-        (u.uSunMaskMax as { value: number }).value = (atmosphereParams && atmosphereParams.sunMaskMax !== undefined) ? atmosphereParams.sunMaskMax : 0.95;
-        (u.uInnerColor as { value: Color }).value.set((atmosphereParams && atmosphereParams.innerColor) || '#7fc0ff');
-        (u.uOuterColor as { value: Color }).value.set((atmosphereParams && atmosphereParams.outerColor) || '#b2e0ff');
-    }, [atmosphereParams]);
-    void cloudMaterial;
-    useEffect(() => {
-        atmosphereRef.current = atmosphereMaterial;
-    }, [atmosphereMaterial]);
-    const atmoTimeRef = useRef(0);
     useFrame((_, delta) => {
         if (planetRef.current) {
             planetRef.current.rotation.y += delta * 0.005; // Slow rotation
@@ -266,12 +141,6 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, onTexturesLoaded
         // Rotate clouds slightly faster for realism
         if (cloudsRef.current) {
             cloudsRef.current.rotation.y += delta * 0.002;
-        }
-        atmoTimeRef.current += delta;
-        if (atmosphereRef.current && atmosphereRef.current.uniforms && 'uTime' in atmosphereRef.current.uniforms) {
-            (atmosphereRef.current.uniforms.uTime as { value: number }).value = atmoTimeRef.current;
-            (atmosphereRef.current.uniforms.uViewAdapt as { value: number }).value = sunAdapt;
-            (atmosphereRef.current.uniforms.uSunIntensity as { value: number }).value = sunIntensity;
         }
         if (planetBodyRef.current && planetRef.current) {
             const p = new THREE.Vector3().fromArray(position);
@@ -325,9 +194,67 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, onTexturesLoaded
                     </Sphere>
                 </group>
             )}
-            <Sphere args={[size * ((atmosphereParams && atmosphereParams.radiusMul) !== undefined ? (atmosphereParams as Required<AtmosphereParams>).radiusMul! : (hdr ? 1.015 : 1.03)), 128, 128]}>
-                <primitive attach="material" object={atmosphereMaterial} />
-            </Sphere>
+
+            {/* ATMOSPHERE */}
+            {atmosphereEnabled && (
+                <Atmosphere size={size} sunPosition={sunPosition || [1000, 0, 0]} />
+            )}
         </group>
+    );
+};
+
+const Atmosphere: React.FC<{ size: number; sunPosition: [number, number, number] }> = ({ size, sunPosition }) => {
+    const { camera } = useThree();
+    const mesh = useRef<THREE.Mesh>(null);
+
+    const material = useMemo(() => {
+        return new THREE.ShaderMaterial({
+            uniforms: THREE.UniformsUtils.clone(AtmosphereShader.uniforms),
+            vertexShader: AtmosphereShader.vertexShader,
+            fragmentShader: AtmosphereShader.fragmentShader,
+            side: THREE.FrontSide,
+            blending: THREE.AdditiveBlending,
+            transparent: true,
+            depthWrite: false,
+        });
+    }, []);
+
+    useFrame(() => {
+        if (mesh.current) {
+            const uniforms = (mesh.current.material as THREE.ShaderMaterial).uniforms;
+
+            // Transform camera position to local space (Planet-centric)
+            uniforms.v3CameraPos.value.copy(camera.position);
+            mesh.current.worldToLocal(uniforms.v3CameraPos.value);
+
+            // Calculate sun direction in local space
+            const sunVec = new THREE.Vector3(...sunPosition);
+            mesh.current.worldToLocal(sunVec);
+            uniforms.v3LightPosition.value.copy(sunVec).normalize();
+
+            uniforms.fCameraHeight.value = uniforms.v3CameraPos.value.length();
+            uniforms.fCameraHeight2.value = uniforms.fCameraHeight.value * uniforms.fCameraHeight.value;
+
+            const innerRadius = size;
+            const outerRadius = size * 1.025;
+
+            uniforms.fInnerRadius.value = innerRadius;
+            uniforms.fInnerRadius2.value = innerRadius * innerRadius;
+            uniforms.fOuterRadius.value = outerRadius;
+            uniforms.fOuterRadius2.value = outerRadius * outerRadius;
+            uniforms.fScale.value = 1 / (outerRadius - innerRadius);
+
+            // Scale depth should be constant 0.25 to match the math for fScale = 1 / Thickness
+            // This ensures density drops by e^-4 at the top of the atmosphere
+            uniforms.fScaleDepth.value = 0.25;
+            uniforms.fScaleOverScaleDepth.value = uniforms.fScale.value / uniforms.fScaleDepth.value;
+        }
+    });
+
+    return (
+        <mesh ref={mesh}>
+            <sphereGeometry args={[size * 1.025, 128, 128]} />
+            <primitive object={material} attach="material" />
+        </mesh>
     );
 };
