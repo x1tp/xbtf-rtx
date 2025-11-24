@@ -1,4 +1,5 @@
 import React, { useMemo, useRef } from 'react';
+import { useGameStore } from '../store/gameStore';
 import { Mesh, ShaderMaterial, Color, AdditiveBlending, CanvasTexture, SpriteMaterial, SRGBColorSpace, Vector3 } from 'three';
 
 interface SunProps {
@@ -21,6 +22,20 @@ export const Sun: React.FC<SunProps> = ({
     lensFlares = true
 }) => {
     const meshRef = useRef<Mesh>(null);
+    const sunAdapt = useGameStore((state) => state.sunAdapt);
+    const sunIntensity = useGameStore((state) => state.sunIntensity);
+
+    // New Exposure Logic:
+    // 1. Initial hit (sunIntensity=1, sunAdapt=0): Exposure drops hard (0.05).
+    // 2. Adaptation (sunIntensity=1, sunAdapt->1): Exposure recovers (0.55).
+    // 3. Look away (sunIntensity=0): Exposure returns to 1.0 immediately.
+    const exposureFactor = 1.0 - sunIntensity * (0.95 - sunAdapt * 0.5);
+    const currentIntensity = (hdr ? hdrIntensity : intensity) * exposureFactor;
+
+    // Dynamic Sun Size (Glare):
+    // Starts big (Initial hit), shrinks as we adapt.
+    const dynamicSize = size * (1.0 + sunIntensity * (2.0 - sunAdapt * 2.0));
+
     const limbMaterial = useMemo(() => {
         const c = new Color(color);
         return new ShaderMaterial({
@@ -120,13 +135,13 @@ export const Sun: React.FC<SunProps> = ({
         <group position={position}>
             {/* Visual representation of the sun */}
             <mesh ref={meshRef} name="SunMesh">
-                <sphereGeometry args={[size, 32, 32]} />
+                <sphereGeometry args={[dynamicSize, 32, 32]} />
                 {hdr ? <primitive object={limbMaterial} attach="material" /> : (
                     <meshStandardMaterial color={color} emissive={color} emissiveIntensity={50} toneMapped={false} />
                 )}
             </mesh>
 
-            {hdr && <sprite scale={[size * 4, size * 4, 1]}>
+            {hdr && <sprite scale={[dynamicSize * 4, dynamicSize * 4, 1]}>
                 <primitive attach="material" object={haloMaterial} />
             </sprite>}
 
@@ -142,7 +157,7 @@ export const Sun: React.FC<SunProps> = ({
           at 'position', the light should be at 0,0,0 relative to the group.
        */}
             <directionalLight
-                intensity={hdr ? hdrIntensity : intensity}
+                intensity={currentIntensity}
                 color={color}
                 castShadow
                 shadow-mapSize-width={4096}

@@ -1,8 +1,9 @@
 import React, { useRef, useEffect } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { Vector3, Group, MathUtils, Quaternion, Box3, Quaternion as TQuaternion } from 'three';
+import { Vector3, Group, MathUtils, Quaternion, Box3, Quaternion as TQuaternion, Mesh, BufferGeometry, Matrix4 } from 'three';
 import { ensureRapier, getWorld, getWorldSync } from '../physics/RapierWorld';
 import type RAPIERType from '@dimforge/rapier3d-compat';
+type RapierExports = { ColliderDesc: { convexHull: (arr: Float32Array) => unknown } };
 import { useGameStore } from '../store/gameStore';
 import { ShipModel } from './ShipModel';
 
@@ -28,6 +29,7 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
     const shipColliderRef = useRef<RAPIERType.Collider | null>(null);
     const characterControllerRef = useRef<RAPIERType.KinematicCharacterController | null>(null);
     const initializedRef = useRef(false);
+    const hullColliderRef = useRef<RAPIERType.Collider | null>(null);
 
     // Input state
     const keys = useRef<{ [key: string]: boolean }>({});
@@ -97,12 +99,12 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
         if (shipRef.current) {
             const b = new Box3().setFromObject(shipRef.current);
             const s = b.getSize(new Vector3());
-            // Keep the collider modest so we don't collide with distant objects due to oversized meshes
-            const base = new Vector3(s.x * 0.5, s.y * 0.5, s.z * 0.5).multiplyScalar(0.3);
+            // Keep the collider modest but wide enough to cover the wings
+            const base = new Vector3(s.x * 0.5, s.y * 0.5, s.z * 0.5).multiplyScalar(0.55);
             shipHalfExtentsRef.current.set(
-                Math.max(1.2, base.x),
-                Math.max(0.6, base.y),
-                Math.max(2.0, base.z)
+                Math.max(2.4, base.x),
+                Math.max(0.9, base.y),
+                Math.max(3.0, base.z)
             );
         }
         (async () => {
@@ -113,34 +115,67 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
             const rbDesc = RAPIER.RigidBodyDesc.kinematicVelocityBased().setCcdEnabled(true);
             const body = world.createRigidBody(rbDesc);
             const he = shipHalfExtentsRef.current;
-            const collDesc = RAPIER.ColliderDesc.cuboid(he.x, he.y, he.z)
-                .setFriction(0.6)
-                .setRestitution(0.2);
-            const collider = world.createCollider(collDesc, body);
             const controller = world.createCharacterController(0.02);
             controller.setApplyImpulsesToDynamicBodies(true);
             if (cancelled) {
                 world.removeRigidBody(body);
                 return;
             }
+            // Try to build a hull collider; fall back to a modest cuboid if unavailable
             shipBodyRef.current = body;
+            let collider: RAPIERType.Collider | null = buildConvexHullCollider(RAPIER, world);
+            if (!collider) {
+                const collDesc = RAPIER.ColliderDesc.cuboid(he.x, he.y, he.z)
+                    .setFriction(0.6)
+                    .setRestitution(0.2);
+                collider = world.createCollider(collDesc, body);
+            }
             shipColliderRef.current = collider;
             characterControllerRef.current = controller;
-            console.log('Ship physics initialized. HalfExtents:', he);
+            console.log('Ship physics initialized. HalfExtents:', he, 'Hull:', !!hullColliderRef.current);
         })();
 
         return () => {
             cancelled = true;
-            if (shipBodyRef.current) {
-                const w = getWorldSync();
-                if (w) {
-                    w.removeRigidBody(shipBodyRef.current);
-                }
-                shipBodyRef.current = null;
-                shipColliderRef.current = null;
-                characterControllerRef.current = null;
+        if (shipBodyRef.current) {
+            const w = getWorldSync();
+            if (w) {
+                w.removeRigidBody(shipBodyRef.current);
             }
-        };
+            shipBodyRef.current = null;
+            shipColliderRef.current = null;
+            characterControllerRef.current = null;
+            hullColliderRef.current = null;
+        }
+    };
+
+    function buildConvexHullCollider(RAPIER: unknown, world: RAPIERType.World): RAPIERType.Collider | null {
+        if (!shipRef.current || !shipBodyRef.current) return null;
+        shipRef.current.updateWorldMatrix(true, true);
+        const shipInv = new Matrix4().copy(shipRef.current.matrixWorld).invert();
+        const verts: number[] = [];
+        const v = new Vector3();
+        shipRef.current.traverse((o) => {
+            const m = o as Mesh;
+            const g = m.geometry as BufferGeometry | undefined;
+            if (!g || !g.attributes?.position) return;
+            const pos = g.getAttribute('position');
+            for (let i = 0; i < pos.count; i++) {
+                v.set(pos.getX(i), pos.getY(i), pos.getZ(i))
+                    .applyMatrix4(m.matrixWorld)
+                    .applyMatrix4(shipInv); // convert to ship-local space for collider
+                verts.push(v.x, v.y, v.z);
+            }
+        });
+        if (verts.length < 9) return null;
+        const hullDescUnknown = (RAPIER as RapierExports).ColliderDesc.convexHull(new Float32Array(verts));
+        if (!hullDescUnknown) return null;
+        const hullDesc = hullDescUnknown as unknown as RAPIERType.ColliderDesc;
+        hullDesc.setFriction(0.6).setRestitution(0.2);
+        const hullCollider = world.createCollider(hullDesc, shipBodyRef.current);
+        hullColliderRef.current = hullCollider;
+        return hullCollider;
+    }
     }, [scene]);
 
     useFrame((state, delta) => {

@@ -11,6 +11,7 @@ import type { PerspectiveCamera, Scene as ThreeScene, Mesh, MeshStandardMaterial
 import { Box3, Vector3, Vector2, SRGBColorSpace, ACESFilmicToneMapping, PCFSoftShadowMap, Raycaster } from 'three';
 import { Station } from './components/Station';
 import { PhysicsStepper } from './physics/PhysicsStepper';
+import { PlanetEditor } from './admin/PlanetEditor';
 
 const SDR_EXPOSURE = 1.2;
 
@@ -36,6 +37,12 @@ function App() {
   if (path === '/admin') {
     return (
       <AdminHome />
+    );
+  }
+
+  if (path.startsWith('/admin/sector')) {
+    return (
+      <PlanetEditor />
     );
   }
 
@@ -405,21 +412,22 @@ function ShipEditorCanvas({ modelPath }: { modelPath?: string }) {
     </>
   );
 }
-function AdminHome() {
-  const [tab, setTab] = useState<'root' | 'ships'>('root');
-  const [model, setModel] = useState('/models/00000.obj');
-  if (tab === 'root') {
-    return (
-      <div style={{ width: '100vw', height: '100vh', background: '#0b1016', color: '#c3e7ff', fontFamily: 'monospace' }}>
-        <div style={{ padding: 20 }}>
-          <h2>Admin</h2>
-          <div style={{ display: 'flex', gap: 12 }}>
-            <button onClick={() => setTab('ships')} style={{ padding: '8px 12px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Edit Ships</button>
+  function AdminHome() {
+    const [tab, setTab] = useState<'root' | 'ships'>('root');
+    const [model, setModel] = useState('/models/00000.obj');
+    if (tab === 'root') {
+      return (
+        <div style={{ width: '100vw', height: '100vh', background: '#0b1016', color: '#c3e7ff', fontFamily: 'monospace' }}>
+          <div style={{ padding: 20 }}>
+            <h2>Admin</h2>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button onClick={() => setTab('ships')} style={{ padding: '8px 12px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Edit Ships</button>
+              <button onClick={() => { window.location.assign('/admin/sector'); }} style={{ padding: '8px 12px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Edit Sector</button>
+            </div>
           </div>
         </div>
-      </div>
-    );
-  }
+      );
+    }
   return (
     <div style={{ width: '100vw', height: '100vh', background: '#0b1016', color: '#c3e7ff', fontFamily: 'monospace' }}>
       <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 640 }}>

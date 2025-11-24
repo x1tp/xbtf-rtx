@@ -7,6 +7,12 @@ interface GameState {
   rotation: { x: number; y: number; z: number };
   position: { x: number; y: number; z: number };
   isDocked: boolean;
+  sunVisible: boolean;
+  sunAdapt: number;
+  sunIntensity: number;
+  setSunVisible: (v: boolean) => void;
+  setSunAdapt: (v: number) => void;
+  setSunIntensity: (v: number) => void;
 
   setThrottle: (throttle: number) => void;
   updateSpeed: (speed?: number) => void;
@@ -22,6 +28,9 @@ export const useGameStore = create<GameState>((set) => ({
   rotation: { x: 0, y: 0, z: 0 },
   position: { x: 0, y: 0, z: 0 },
   isDocked: false,
+  sunVisible: false,
+  sunAdapt: 0,
+  sunIntensity: 0,
 
   setThrottle: (val) => {
     const minReverse = -0.3; // allow gentle reverse
@@ -50,4 +59,7 @@ export const useGameStore = create<GameState>((set) => ({
 
   setRotation: (rot) => set({ rotation: rot }),
   setDocked: (docked) => set({ isDocked: docked, speed: 0, throttle: 0 }),
+  setSunVisible: (v) => set({ sunVisible: v }),
+  setSunAdapt: (v) => set({ sunAdapt: Math.max(0, Math.min(1, v)) }),
+  setSunIntensity: (v: number) => set({ sunIntensity: Math.max(0, Math.min(1, v)) }),
 }));
