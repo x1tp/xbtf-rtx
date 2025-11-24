@@ -4,15 +4,14 @@ import { Scene } from './Scene';
 import { Loader, ArcballControls, Grid, GizmoHelper, GizmoViewport, Text, OrthographicCamera, PerspectiveCamera as DreiPerspectiveCamera, Line, Environment } from '@react-three/drei';
 import { HUD } from './components/HUD';
 import { TradingInterface } from './components/TradingInterface';
-import { RTXEffects } from './components/RTXEffects';
-import { PathTracerOverlay } from './components/PathTracerOverlay';
+import { SimpleEffects } from './components/SimpleEffects';
+import { Cockpit } from './components/Cockpit';
 import type { PerspectiveCamera, Scene as ThreeScene, Mesh, MeshStandardMaterial, WebGLRenderer } from 'three';
-import { Box3, Vector3, SRGBColorSpace, ACESFilmicToneMapping, PCFSoftShadowMap } from 'three';
+import { Box3, Vector3, Vector2, SRGBColorSpace, ACESFilmicToneMapping, PCFSoftShadowMap, Raycaster } from 'three';
 import { Station } from './components/Station';
 import { PhysicsStepper } from './physics/PhysicsStepper';
 
 const SDR_EXPOSURE = 1.2;
-const HDR_EXPOSURE = 0.9;
 
 function App() {
   const sceneRef = useRef<ThreeScene | null>(null);
@@ -21,38 +20,29 @@ function App() {
   const params = new URLSearchParams(window.location.search);
   const isViewer = params.get('viewer') === 'station';
   const modelParam = params.get('model') || null;
-
-  function detectFloatSupport() {
-    const canvas = document.createElement('canvas');
-    const gl = canvas.getContext('webgl2');
-    if (!gl) return { supported: false, reason: 'WebGL2 not available' };
-    const hasFloat = Boolean(gl.getExtension('EXT_color_buffer_float'));
-    if (!hasFloat) return { supported: false, reason: 'Missing EXT_color_buffer_float' };
-    return { supported: true, reason: null };
-  }
-
-  const det = detectFloatSupport();
-  const [pathTracerEnabled, setPathTracerEnabled] = useState(false);
-  const [ptDepsKey, setPtDepsKey] = useState(0);
-  const [ptStatus, setPtStatus] = useState<'idle' | 'ready' | 'unsupported' | 'error'>(
-    det.supported ? 'idle' : 'unsupported'
-  );
-  const [ptMessage, setPtMessage] = useState<string | null>(det.reason);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'KeyR' && ptStatus !== 'unsupported') {
-        setPathTracerEnabled((prev) => !prev);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [ptStatus]);
+  const adminMode = params.get('admin') === 'ship';
+  const adminModel = params.get('model') || '/models/00000.obj';
+  const path = window.location.pathname;
 
   if (isViewer) {
     return (
       <div style={{ width: '100vw', height: '100vh', background: '#e9eef5' }}>
         <ViewerCanvas modelPath={modelParam || undefined} />
+      </div>
+    );
+  }
+
+  if (path === '/admin') {
+    return (
+      <AdminHome />
+    );
+  }
+
+  if (adminMode || path.startsWith('/admin/ship')) {
+    const modelFromPath = new URLSearchParams(window.location.search).get('model') || adminModel;
+    return (
+      <div style={{ width: '100vw', height: '100vh', background: '#0b1016' }}>
+        <ShipEditorCanvas modelPath={modelFromPath} />
       </div>
     );
   }
@@ -65,35 +55,20 @@ function App() {
         onCreated={({ gl, scene, camera }) => {
           gl.outputColorSpace = SRGBColorSpace;
           gl.toneMapping = ACESFilmicToneMapping;
-          gl.toneMappingExposure = pathTracerEnabled ? HDR_EXPOSURE : SDR_EXPOSURE;
+          gl.toneMappingExposure = SDR_EXPOSURE;
           gl.shadowMap.enabled = true;
           gl.shadowMap.type = PCFSoftShadowMap;
           glRef.current = gl as WebGLRenderer;
           sceneRef.current = scene;
           cameraRef.current = camera as PerspectiveCamera;
-          setPtDepsKey((k) => k + 1);
         }}
       >
         <Suspense fallback={null}>
-          <Scene hdr={pathTracerEnabled} />
-          <RTXEffects enabled={!pathTracerEnabled} />
+          <Scene hdr={false} />
+          <SimpleEffects />
           <PhysicsStepper />
         </Suspense>
       </Canvas>
-      <ExposureSync enabled={pathTracerEnabled} glRef={glRef} />
-      <PathTracerOverlay
-        enabled={pathTracerEnabled}
-        sceneRef={sceneRef}
-        cameraRef={cameraRef}
-        depsKey={ptDepsKey}
-        onStatus={(status, message) => {
-          setPtStatus(status);
-          setPtMessage(message ?? null);
-          if (status === 'unsupported' || status === 'error') {
-            setPathTracerEnabled(false);
-          }
-        }}
-      />
       <Loader />
       <HUD />
       <TradingInterface />
@@ -110,66 +85,10 @@ function App() {
         <p>W/S (Hold): Throttle</p>
         <p>Arrows: Orbit camera</p>
         <p>[ / ]: Camera distance</p>
-        <p>R: Toggle RTX</p>
         <p>C: Dock (when close to station)</p>
-      </div>
-      <div style={{
-        position: 'absolute',
-        top: 20,
-        right: 20,
-        color: '#c3e7ff',
-        fontFamily: 'monospace',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '8px',
-        width: '220px'
-      }}>
-        <button
-          onClick={() => {
-            if (ptStatus === 'unsupported') return;
-            setPtMessage(null);
-            setPathTracerEnabled((prev) => !prev);
-          }}
-          disabled={ptStatus === 'unsupported'}
-          style={{
-            padding: '8px 10px',
-            background:
-              ptStatus === 'ready' && pathTracerEnabled
-                ? 'linear-gradient(90deg, #3fb6ff, #00ffa6)'
-                : '#0f2230',
-            border: '1px solid #3fb6ff',
-            color: ptStatus === 'ready' && pathTracerEnabled ? '#001216' : '#c3e7ff',
-            fontWeight: 700,
-            cursor: ptStatus === 'unsupported' ? 'not-allowed' : 'pointer',
-            textTransform: 'uppercase',
-            letterSpacing: '0.08em',
-            borderRadius: '4px',
-            boxShadow: ptStatus === 'ready' && pathTracerEnabled ? '0 0 10px #3fb6ff' : 'none'
-          }}
-        >
-          {ptStatus === 'unsupported'
-            ? 'Path Tracer: unavailable'
-            : pathTracerEnabled
-              ? 'Path Tracer: ON'
-              : 'Path Tracer: OFF'}
-        </button>
-        <div style={{ fontSize: '12px', lineHeight: 1.4, color: '#8ab6d6' }}>
-          Experimental path tracer (WebGL2 + float targets). Ship controls pause while active so the view stays stable;
-          stop moving for a moment to let it converge. Disables the faux RTX post.
-          {ptMessage ? ` - ${ptMessage}` : ''}
-        </div>
       </div>
     </div>
   );
-}
-
-function ExposureSync({ enabled, glRef }: { enabled: boolean; glRef: React.MutableRefObject<WebGLRenderer | null> }) {
-  useEffect(() => {
-    const gl = glRef.current;
-    if (!gl) return;
-    gl.toneMappingExposure = enabled ? HDR_EXPOSURE : SDR_EXPOSURE;
-  }, [enabled, glRef]);
-  return null;
 }
 
 export default App;
@@ -213,7 +132,7 @@ function ViewerCanvas({ modelPath }: { modelPath?: string }) {
       if (Array.isArray(mat)) mat.forEach((mm) => (mm.wireframe = wireframe)); else (mat as MeshStandardMaterial).wireframe = wireframe;
     });
   }, [wireframe]);
-  const CameraController = () => {
+  const CameraController = ({ frameIndex, view, ortho, center, dims }: { frameIndex: number; view: 'iso' | 'front' | 'right' | 'top'; ortho: boolean; center: [number, number, number]; dims: [number, number, number] }) => {
     const state = useThree();
     const camera = state.camera as PerspectiveCamera;
     type ControlsLike = { setTarget?: (x: number, y: number, z: number) => void; target?: { set: (x: number, y: number, z: number) => void }; update?: () => void };
@@ -241,7 +160,7 @@ function ViewerCanvas({ modelPath }: { modelPath?: string }) {
         }
         if (typeof controls.update === 'function') controls.update();
       }
-    }, [frameIndex, view, ortho]);
+    }, [frameIndex, view, ortho, camera, controls, center, dims]);
     return null;
   };
   return (
@@ -292,7 +211,7 @@ function ViewerCanvas({ modelPath }: { modelPath?: string }) {
             minDistance={2}
             maxDistance={500}
           />
-          <CameraController />
+          <CameraController frameIndex={frameIndex} view={view} ortho={ortho} center={center} dims={dims} />
         </Suspense>
       </Canvas>
       <div style={{
@@ -350,5 +269,115 @@ function Dimensions({ center, dims }: { center: [number, number, number]; dims: 
       <Line points={[[cx - hx - px, cy + hy + py, cz - hz], [cx - hx - px, cy + hy + py, cz + hz]]} color="#ff8c3f" lineWidth={2} dashed dashSize={0.3} gapSize={0.2} />
       <Text position={[cx - hx - px - 0.5, cy + hy + py, cz]} fontSize={0.6} color="#c3e7ff">{dz.toFixed(2)}</Text>
     </>
+  );
+}
+function ShipEditorCanvas({ modelPath }: { modelPath?: string }) {
+  const key = 'ship:engineMarkers:' + (modelPath || '/models/00000.obj');
+  const rawInit = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
+  let initialMarkers: { x: number; y: number; z: number }[] = [];
+  if (rawInit) {
+    try {
+      const parsed = JSON.parse(rawInit) as { positions?: { x: number; y: number; z: number }[] };
+      initialMarkers = parsed.positions || [];
+    } catch { initialMarkers = []; }
+  }
+  const [markers, setMarkers] = useState<{ x: number; y: number; z: number }[]>(initialMarkers);
+  const [status, setStatus] = useState<string | null>(initialMarkers.length > 0 ? `Loaded ${initialMarkers.length} markers` : null);
+  const sceneRef = useRef<ThreeScene | null>(null);
+  const cameraRef = useRef<PerspectiveCamera | null>(null);
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      const s = sceneRef.current;
+      const c = cameraRef.current;
+      if (!s || !c) return;
+      const x = (e.clientX / window.innerWidth) * 2 - 1;
+      const y = -(e.clientY / window.innerHeight) * 2 + 1;
+      const rc = new Raycaster();
+      rc.setFromCamera(new Vector2(x, y), c);
+      const target = s.getObjectByName('CockpitEditor');
+      if (!target) return;
+      const hits = rc.intersectObject(target, true);
+      if (hits.length > 0) {
+        const p = hits[0].point.clone();
+        const parent = target.parent || s;
+        parent.worldToLocal(p);
+        setMarkers((m) => [...m, { x: p.x, y: p.y, z: p.z }]);
+      }
+    };
+    window.addEventListener('mousedown', onDown);
+    return () => window.removeEventListener('mousedown', onDown);
+  }, []);
+  useEffect(() => {
+    if (!status) return;
+    const t = setTimeout(() => setStatus(null), 2000);
+    return () => clearTimeout(t);
+  }, [status]);
+  return (
+    <>
+      <Canvas
+        onCreated={({ scene, camera }) => {
+          sceneRef.current = scene;
+          cameraRef.current = camera as PerspectiveCamera;
+        }}
+      >
+        <Suspense fallback={null}>
+          <color attach="background" args={["#0b1016"]} />
+          <hemisphereLight args={["#bcdfff", "#223344", 0.6]} />
+          <directionalLight position={[10, 12, 10]} intensity={1.4} color="#ffffff" />
+          <ambientLight intensity={0.2} />
+          <Cockpit enableLights={false} editorMode name="CockpitEditor" modelPath={modelPath} />
+          {markers.map((m, i) => (
+            <mesh key={i} position={[m.x, m.y, m.z]}>
+              <sphereGeometry args={[0.25, 16, 16]} />
+              <meshBasicMaterial color="#76baff" />
+            </mesh>
+          ))}
+          <ArcballControls makeDefault enablePan enableZoom dampingFactor={0.08} minDistance={2} maxDistance={500} />
+        </Suspense>
+      </Canvas>
+      <div style={{ position: 'absolute', top: 20, left: 20, display: 'flex', gap: '8px', fontFamily: 'monospace' }}>
+        <button onClick={() => { try { window.localStorage.setItem(key, JSON.stringify({ positions: markers })); setStatus(`Saved ${markers.length} markers`); } catch { setStatus('Save failed'); } }} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Save</button>
+        <button onClick={() => { setMarkers([]); window.localStorage.removeItem(key); setStatus('Cleared'); }} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Clear</button>
+        <button onClick={() => { navigator.clipboard.writeText(JSON.stringify({ positions: markers })); }} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Copy JSON</button>
+        {status && <span style={{ marginLeft: 8, color: '#8ab6d6' }}>{status}</span>}
+      </div>
+    </>
+  );
+}
+function AdminHome() {
+  const [tab, setTab] = useState<'root' | 'ships'>('root');
+  const [model, setModel] = useState('/models/00000.obj');
+  if (tab === 'root') {
+    return (
+      <div style={{ width: '100vw', height: '100vh', background: '#0b1016', color: '#c3e7ff', fontFamily: 'monospace' }}>
+        <div style={{ padding: 20 }}>
+          <h2>Admin</h2>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <button onClick={() => setTab('ships')} style={{ padding: '8px 12px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Edit Ships</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div style={{ width: '100vw', height: '100vh', background: '#0b1016', color: '#c3e7ff', fontFamily: 'monospace' }}>
+      <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 640 }}>
+        <h2>Select Ship</h2>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>Model path</span>
+          <input value={model} onChange={(e) => setModel(e.target.value)} placeholder="/models/00000.obj" style={{ flex: 1, padding: '6px 10px', background: '#0f2230', border: '1px solid #3fb6ff', color: '#c3e7ff' }} />
+        </label>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => { window.location.href = `/admin/ship?model=${encodeURIComponent(model)}`; }} style={{ padding: '8px 12px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Open Editor</button>
+          <button onClick={() => setTab('root')} style={{ padding: '8px 12px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Back</button>
+        </div>
+        <div style={{ marginTop: 16 }}>
+          <div style={{ marginBottom: 8, color: '#8ab6d6' }}>Quick picks</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => setModel('/models/00000.obj')} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>00000.obj</button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

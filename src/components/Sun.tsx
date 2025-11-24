@@ -76,7 +76,7 @@ export const Sun: React.FC<SunProps> = ({
         const tex = new CanvasTexture(canvas);
         tex.colorSpace = SRGBColorSpace;
         return new SpriteMaterial({ map: tex, transparent: true, depthWrite: false, blending: AdditiveBlending });
-    }, [color]);
+    }, []);
 
     const flareMaterial = useMemo(() => {
         const s = 256;
@@ -101,7 +101,7 @@ export const Sun: React.FC<SunProps> = ({
             blending: AdditiveBlending,
             opacity: hdr ? 0.75 : 0.5
         });
-    }, [color, hdr]);
+    }, [hdr]);
 
     const flareOffsets = useMemo(() => {
         const dir = new Vector3().fromArray(position).normalize().multiplyScalar(-1);

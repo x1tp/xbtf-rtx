@@ -7,7 +7,7 @@ let initPromise: Promise<void> | null = null;
 export async function ensureRapier(): Promise<typeof RAPIER> {
   if (initDone) return RAPIER;
   if (!initPromise) {
-    initPromise = RAPIER.init().then(() => { initDone = true; });
+    initPromise = (RAPIER as unknown as { init: (opts?: Record<string, unknown>) => Promise<void> }).init({}).then(() => { initDone = true; });
   }
   await initPromise;
   return RAPIER;

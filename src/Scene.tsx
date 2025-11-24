@@ -23,7 +23,7 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
             <Ship enableLights={!hdr} position={[0, 10, 450]} />
 
             {/* Environment Objects */}
-            <Planet position={[3000, 500, -6000]} size={4000} color="#4466aa" hdr={hdr} sunPosition={sunPosition} />
+            <Planet position={[8000, 500, -10000]} size={10000} color="#4466aa" hdr={hdr} sunPosition={sunPosition} />
             <Station position={[50, 0, -120]} showLights={!hdr} scale={40} modelPath={'/models/00001.obj'} rotationSpeed={-0.05} rotationAxis={'z'} />
             <AsteroidField count={500} range={400} />
 
