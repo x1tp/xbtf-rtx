@@ -16,6 +16,10 @@ export const PhysicsStepper: FC = () => {
     const w = worldRef.current;
     if (!w) return;
     w.step();
+    // Log every 60 frames (approx 1 sec)
+    if (performance.now() % 1000 < 20) {
+      console.log('Physics step. Bodies:', w.bodies.len());
+    }
   }, 1000);
 
   return null;

@@ -1,11 +1,10 @@
 import React, { useRef, useEffect } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { Vector3, Group, MathUtils, Quaternion, Box3, Raycaster, Matrix3, Quaternion as TQuaternion } from 'three';
-import type { InstancedMesh } from 'three';
-import { ensureRapier, getWorld } from '../physics/RapierWorld';
+import { Vector3, Group, MathUtils, Quaternion, Box3, Quaternion as TQuaternion } from 'three';
+import { ensureRapier, getWorld, getWorldSync } from '../physics/RapierWorld';
 import type RAPIERType from '@dimforge/rapier3d-compat';
 import { useGameStore } from '../store/gameStore';
-import { Cockpit } from './Cockpit';
+import { ShipModel } from './ShipModel';
 
 interface ShipProps {
     enableLights?: boolean;
@@ -26,6 +25,8 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
     const stationRadiusRef = useRef(0);
     const shipHalfExtentsRef = useRef(new Vector3(1, 1, 1));
     const shipBodyRef = useRef<RAPIERType.RigidBody | null>(null);
+    const shipColliderRef = useRef<RAPIERType.Collider | null>(null);
+    const characterControllerRef = useRef<RAPIERType.KinematicCharacterController | null>(null);
     const initializedRef = useRef(false);
 
     // Input state
@@ -80,6 +81,7 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
     }, []);
 
     useEffect(() => {
+        let cancelled = false;
         const planet = scene.getObjectByName('PlanetGroup');
         if (planet) {
             const b = new Box3().setFromObject(planet);
@@ -95,20 +97,50 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
         if (shipRef.current) {
             const b = new Box3().setFromObject(shipRef.current);
             const s = b.getSize(new Vector3());
-            shipHalfExtentsRef.current.set(s.x * 0.5, s.y * 0.5, s.z * 0.5).multiplyScalar(0.9);
+            // Keep the collider modest so we don't collide with distant objects due to oversized meshes
+            const base = new Vector3(s.x * 0.5, s.y * 0.5, s.z * 0.5).multiplyScalar(0.3);
+            shipHalfExtentsRef.current.set(
+                Math.max(1.2, base.x),
+                Math.max(0.6, base.y),
+                Math.max(2.0, base.z)
+            );
         }
         (async () => {
             const RAPIER = await ensureRapier();
+            if (cancelled) return;
             const world = await getWorld();
-            const rbDesc = RAPIER.RigidBodyDesc.kinematicVelocityBased();
+            if (cancelled) return;
+            const rbDesc = RAPIER.RigidBodyDesc.kinematicVelocityBased().setCcdEnabled(true);
             const body = world.createRigidBody(rbDesc);
             const he = shipHalfExtentsRef.current;
             const collDesc = RAPIER.ColliderDesc.cuboid(he.x, he.y, he.z)
                 .setFriction(0.6)
                 .setRestitution(0.2);
-            world.createCollider(collDesc, body);
+            const collider = world.createCollider(collDesc, body);
+            const controller = world.createCharacterController(0.02);
+            controller.setApplyImpulsesToDynamicBodies(true);
+            if (cancelled) {
+                world.removeRigidBody(body);
+                return;
+            }
             shipBodyRef.current = body;
+            shipColliderRef.current = collider;
+            characterControllerRef.current = controller;
+            console.log('Ship physics initialized. HalfExtents:', he);
         })();
+
+        return () => {
+            cancelled = true;
+            if (shipBodyRef.current) {
+                const w = getWorldSync();
+                if (w) {
+                    w.removeRigidBody(shipBodyRef.current);
+                }
+                shipBodyRef.current = null;
+                shipColliderRef.current = null;
+                characterControllerRef.current = null;
+            }
+        };
     }, [scene]);
 
     useFrame((state, delta) => {
@@ -182,74 +214,44 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
         const origin = ship.position.clone();
         const dest = origin.clone().add(move);
 
-        const stationObj = scene.getObjectByName('Station') as Group | null;
         let collided = false;
-        if (stationObj && move.lengthSq() > 0) {
-            const dir = move.clone().normalize();
-            const rc = new Raycaster(origin, dir, 0, move.length() + 2);
-            const hits = rc.intersectObject(stationObj, true);
-            if (hits.length > 0) {
-                const hit = hits[0];
-                const n = hit.face?.normal?.clone() || dir.clone().multiplyScalar(-1);
-                const wn = n.clone().applyMatrix3(new Matrix3().getNormalMatrix(hit.object.matrixWorld)).normalize();
-                const invQ = ship.quaternion.clone().invert();
-                const nLocal = wn.clone().applyQuaternion(invQ as unknown as TQuaternion);
-                const he = shipHalfExtentsRef.current;
-                const support = Math.abs(nLocal.x) * he.x + Math.abs(nLocal.y) * he.y + Math.abs(nLocal.z) * he.z;
-                const separation = support + 0.5;
-                const adjusted = hit.point.clone().add(wn.clone().multiplyScalar(separation));
-                ship.position.copy(adjusted);
-                const vn = wn.clone().multiplyScalar(velocity.dot(wn));
-                velocity.sub(vn).multiplyScalar(0.85);
-                collided = true;
+        if (shipBodyRef.current) {
+            const b = shipBodyRef.current;
+            const p = ship.position;
+            const q = ship.quaternion;
+            // Keep Rapier body in sync with the visual ship before collision tests
+            b.setTranslation({ x: p.x, y: p.y, z: p.z }, true);
+            b.setRotation({ x: q.x, y: q.y, z: q.z, w: q.w }, true);
+        }
+
+        if (move.lengthSq() > 0 && characterControllerRef.current && shipColliderRef.current) {
+            const desired = { x: move.x, y: move.y, z: move.z };
+            const start = performance.now();
+            characterControllerRef.current.computeColliderMovement(shipColliderRef.current, desired);
+            const end = performance.now();
+            if (end - start > 4) {
+                console.warn('Slow collision check:', end - start, 'ms');
+            }
+            const result = characterControllerRef.current.computedMovement();
+
+            // Debug log every 60 frames if moving
+            if (state.clock.elapsedTime % 1 < 0.02) {
+                // console.log('Movement:', desired, result);
+            }
+
+            if (result.x !== 0 || result.y !== 0 || result.z !== 0) {
+                const newPos = origin.clone().add(new Vector3(result.x, result.y, result.z));
+                ship.position.copy(newPos);
+                collided = (Math.abs(result.x - move.x) + Math.abs(result.y - move.y) + Math.abs(result.z - move.z)) > 1e-6;
+                if (collided) {
+                    console.log('Ship collided!', result, move);
+                    const n = new Vector3(move.x - result.x, move.y - result.y, move.z - result.z).normalize();
+                    const vn = n.clone().multiplyScalar(velocity.dot(n));
+                    velocity.sub(vn).multiplyScalar(0.9);
+                }
             }
         }
 
-        if (!collided) {
-            const ast = scene.getObjectByName('AsteroidField') as Group | null;
-            type AsteroidUserData2 = { positions?: Vector3[]; scales?: number[] };
-            const astMesh2 = ast as InstancedMesh | null;
-            const ud2 = astMesh2 ? (astMesh2.userData as AsteroidUserData2) : undefined;
-            const positions2 = ud2?.positions;
-            const scales2 = ud2?.scales;
-            if (positions2 && scales2 && move.lengthSq() > 0) {
-                const dir = move.clone().normalize();
-                const moveLen = move.length();
-                let tHit = Infinity;
-                let contactNormal: Vector3 | null = null;
-                for (let i = 0; i < positions2.length; i++) {
-                    const c = positions2[i];
-                    const r = scales2[i] ?? 1;
-                    const L = origin.clone().sub(c);
-                    const nApprox = L.length() > 0 ? L.clone().normalize() : dir.clone().multiplyScalar(-1);
-                    const invQ = ship.quaternion.clone().invert();
-                    const nLocal = nApprox.clone().applyQuaternion(invQ as unknown as TQuaternion);
-                    const he = shipHalfExtentsRef.current;
-                    const support = Math.abs(nLocal.x) * he.x + Math.abs(nLocal.y) * he.y + Math.abs(nLocal.z) * he.z;
-                    const radius = r + support;
-                    const b = L.dot(dir);
-                    const c0 = L.dot(L) - radius * radius;
-                    const disc = b * b - c0;
-                    if (disc >= 0) {
-                        const t = -b - Math.sqrt(disc);
-                        if (t >= 0 && t <= moveLen && t < tHit) {
-                            tHit = t;
-                            const contact = origin.clone().add(dir.clone().multiplyScalar(t));
-                            contactNormal = contact.clone().sub(c).normalize();
-                        }
-                    }
-                }
-                if (tHit !== Infinity && contactNormal) {
-                    const epsilon = 0.05;
-                    const newPos = origin.clone().add(dir.clone().multiplyScalar(Math.max(0, tHit - epsilon)));
-                    ship.position.copy(newPos);
-                    const n = contactNormal.clone().normalize();
-                    const vn = n.clone().multiplyScalar(velocity.dot(n));
-                    velocity.sub(vn).multiplyScalar(0.9);
-                    collided = true;
-                }
-            }
-        }
 
         if (!collided) {
             ship.position.copy(dest);
@@ -273,19 +275,7 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
             }
         }
 
-        const st = scene.getObjectByName('Station') as Group | null;
-        if (st) {
-            const c = new Vector3();
-            st.getWorldPosition(c);
-            const v2 = ship.position.clone().sub(c);
-            const d2 = v2.length();
-            const rr = stationRadiusRef.current;
-            if (rr > 0 && d2 < rr) {
-                const n2 = v2.normalize();
-                ship.position.copy(c.clone().add(n2.multiplyScalar(rr)));
-                velocity.multiplyScalar(0.6);
-            }
-        }
+        // Station sphere fallback removed (physics colliders present)
 
         // Update HUD speed readout based on actual velocity magnitude
         updateSpeed(velocity.length());
@@ -344,7 +334,7 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
 
     return (
         <group ref={shipRef} name="PlayerShip" position={position}>
-            <Cockpit enableLights={enableLights} />
+            <ShipModel enableLights={enableLights} />
             {/* External ship model could go here, but invisible from inside */}
         </group>
     );

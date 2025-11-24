@@ -16,7 +16,9 @@ export async function ensureRapier(): Promise<typeof RAPIER> {
 export async function getWorld(): Promise<RAPIER.World> {
   if (world) return world;
   await ensureRapier();
-  world = new RAPIER.World({ x: 0, y: 0, z: 0 });
+  if (!world) {
+    world = new RAPIER.World({ x: 0, y: 0, z: 0 });
+  }
   return world;
 }
 

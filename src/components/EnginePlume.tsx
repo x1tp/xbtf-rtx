@@ -163,9 +163,9 @@ export const EnginePlume: FC<EnginePlumeProps> = ({
       // Ship points -Z. So we want plume to point +Z (backwards).
       // So rotation should be identity or adjusted if parent is rotated.
       // The prop passed is rotation={[0, Math.PI, 0]} in usage usually?
-      // Let's look at usage in Cockpit.tsx:
-      // <EnginePlume ... rotation={[0, Math.PI, 0]} /> is NOT passed in Cockpit.tsx.
-      // Cockpit.tsx passes position, length, radius etc.
+      // Let's look at usage in ShipModel.tsx:
+      // <EnginePlume ... rotation={[0, Math.PI, 0]} /> is NOT passed in ShipModel.tsx.
+      // ShipModel.tsx passes position, length, radius etc.
       // The OLD EnginePlume had `rotation={[0, Math.PI, 0]}` hardcoded in the return JSX.
       // And it used BoxGeometry(1,1,1).
 

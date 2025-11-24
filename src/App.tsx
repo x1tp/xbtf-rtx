@@ -1,12 +1,13 @@
 import { Suspense, useRef, useState, useEffect } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { Scene } from './Scene';
-import { Loader, ArcballControls, Grid, GizmoHelper, GizmoViewport, Text, OrthographicCamera, PerspectiveCamera as DreiPerspectiveCamera, Line, Environment } from '@react-three/drei';
+import { Loader, ArcballControls, Grid, GizmoHelper, GizmoViewport, Text, OrthographicCamera, PerspectiveCamera as DreiPerspectiveCamera, Line, Environment, TransformControls } from '@react-three/drei';
+import type { ArcballControls as ArcballControlsImpl } from 'three-stdlib';
 import { HUD } from './components/HUD';
 import { TradingInterface } from './components/TradingInterface';
 import { SimpleEffects } from './components/SimpleEffects';
-import { Cockpit } from './components/Cockpit';
-import type { PerspectiveCamera, Scene as ThreeScene, Mesh, MeshStandardMaterial, WebGLRenderer } from 'three';
+import { ShipModel } from './components/ShipModel';
+import type { PerspectiveCamera, Scene as ThreeScene, Mesh, MeshStandardMaterial, WebGLRenderer, Object3D } from 'three';
 import { Box3, Vector3, Vector2, SRGBColorSpace, ACESFilmicToneMapping, PCFSoftShadowMap, Raycaster } from 'three';
 import { Station } from './components/Station';
 import { PhysicsStepper } from './physics/PhysicsStepper';
@@ -285,8 +286,17 @@ function ShipEditorCanvas({ modelPath }: { modelPath?: string }) {
   const [status, setStatus] = useState<string | null>(initialMarkers.length > 0 ? `Loaded ${initialMarkers.length} markers` : null);
   const sceneRef = useRef<ThreeScene | null>(null);
   const cameraRef = useRef<PerspectiveCamera | null>(null);
+  const arcballRef = useRef<ArcballControlsImpl | null>(null);
+  const markerRefs = useRef<Record<number, Object3D | null>>({});
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [selectedObject, setSelectedObject] = useState<Object3D | null>(null);
+  const isTransformingRef = useRef(false);
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
+      if (e.button !== 2) return; // only right click adds markers
+      if (isTransformingRef.current) return;
+      const targetEl = e.target as HTMLElement | null;
+      if (targetEl && targetEl.closest('.ship-editor-ui')) return;
       const s = sceneRef.current;
       const c = cameraRef.current;
       if (!s || !c) return;
@@ -294,19 +304,39 @@ function ShipEditorCanvas({ modelPath }: { modelPath?: string }) {
       const y = -(e.clientY / window.innerHeight) * 2 + 1;
       const rc = new Raycaster();
       rc.setFromCamera(new Vector2(x, y), c);
-      const target = s.getObjectByName('CockpitEditor');
+      const markerObjects = Object.values(markerRefs.current).filter(Boolean) as Object3D[];
+      const markerHits = markerObjects.length > 0 ? rc.intersectObjects(markerObjects, true) : [];
+      if (markerHits.length > 0) return;
+          const target = s.getObjectByName('ShipModelEditor');
       if (!target) return;
       const hits = rc.intersectObject(target, true);
       if (hits.length > 0) {
         const p = hits[0].point.clone();
         const parent = target.parent || s;
         parent.worldToLocal(p);
-        setMarkers((m) => [...m, { x: p.x, y: p.y, z: p.z }]);
+        setMarkers((m) => {
+          const next = [...m, { x: p.x, y: p.y, z: p.z }];
+          setSelectedIndex(next.length - 1);
+          return next;
+        });
       }
     };
+    const preventContextMenu = (e: MouseEvent) => {
+      const targetEl = e.target as HTMLElement | null;
+      if (targetEl && targetEl.closest('.ship-editor-ui')) return;
+      e.preventDefault();
+    };
     window.addEventListener('mousedown', onDown);
-    return () => window.removeEventListener('mousedown', onDown);
+    window.addEventListener('contextmenu', preventContextMenu);
+    return () => {
+      window.removeEventListener('mousedown', onDown);
+      window.removeEventListener('contextmenu', preventContextMenu);
+    };
   }, []);
+  useEffect(() => {
+    void selectedIndex;
+    void markers.length;
+  }, [markers.length, selectedIndex]);
   useEffect(() => {
     if (!status) return;
     const t = setTimeout(() => setStatus(null), 2000);
@@ -325,20 +355,51 @@ function ShipEditorCanvas({ modelPath }: { modelPath?: string }) {
           <hemisphereLight args={["#bcdfff", "#223344", 0.6]} />
           <directionalLight position={[10, 12, 10]} intensity={1.4} color="#ffffff" />
           <ambientLight intensity={0.2} />
-          <Cockpit enableLights={false} editorMode name="CockpitEditor" modelPath={modelPath} />
+          <ShipModel enableLights={false} editorMode name="ShipModelEditor" modelPath={modelPath} markerOverrides={markers} />
           {markers.map((m, i) => (
-            <mesh key={i} position={[m.x, m.y, m.z]}>
-              <sphereGeometry args={[0.25, 16, 16]} />
-              <meshBasicMaterial color="#76baff" />
-            </mesh>
+            <group
+              key={i}
+              ref={(ref) => { markerRefs.current[i] = ref; }}
+              position={[m.x, m.y, m.z]}
+              onClick={(e) => { e.stopPropagation(); setSelectedIndex(i); setSelectedObject(markerRefs.current[i] || null); }}
+            >
+              <mesh>
+                <sphereGeometry args={[0.25, 16, 16]} />
+                <meshBasicMaterial color={selectedIndex === i ? "#9bffb0" : "#76baff"} />
+              </mesh>
+              <mesh>
+                <boxGeometry args={[1, 1, 1]} />
+                <meshBasicMaterial color={selectedIndex === i ? "#7bffb0" : "#3fb6ff"} wireframe opacity={0.35} transparent />
+              </mesh>
+              <mesh onPointerDown={(e) => { e.stopPropagation(); setSelectedIndex(i); }}>
+                <boxGeometry args={[1.4, 1.4, 1.4]} />
+                <meshBasicMaterial transparent opacity={0.01} />
+              </mesh>
+            </group>
           ))}
-          <ArcballControls makeDefault enablePan enableZoom dampingFactor={0.08} minDistance={2} maxDistance={500} />
+          {selectedObject && (
+            <TransformControls
+              object={selectedObject || undefined}
+              mode="translate"
+              size={0.75}
+              onMouseDown={() => { isTransformingRef.current = true; if (arcballRef.current) arcballRef.current.enabled = false; }}
+              onMouseUp={() => { isTransformingRef.current = false; if (arcballRef.current) arcballRef.current.enabled = true; }}
+              onObjectChange={() => {
+                const obj = selectedObject;
+                if (!obj) return;
+                const { x, y, z } = obj.position;
+                setMarkers((m) => m.map((mm, idx) => (idx === selectedIndex ? { x, y, z } : mm)));
+              }}
+            />
+          )}
+          <ArcballControls ref={arcballRef} makeDefault enablePan enableZoom dampingFactor={0.08} minDistance={2} maxDistance={500} />
         </Suspense>
       </Canvas>
-      <div style={{ position: 'absolute', top: 20, left: 20, display: 'flex', gap: '8px', fontFamily: 'monospace' }}>
+      <div className="ship-editor-ui" style={{ position: 'absolute', top: 20, left: 20, display: 'flex', gap: '8px', fontFamily: 'monospace', alignItems: 'center', background: 'rgba(12,22,32,0.8)', padding: '8px 10px', borderRadius: 6, border: '1px solid #184b6a' }}>
         <button onClick={() => { try { window.localStorage.setItem(key, JSON.stringify({ positions: markers })); setStatus(`Saved ${markers.length} markers`); } catch { setStatus('Save failed'); } }} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Save</button>
-        <button onClick={() => { setMarkers([]); window.localStorage.removeItem(key); setStatus('Cleared'); }} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Clear</button>
+        <button onClick={() => { setMarkers([]); setSelectedIndex(null); setSelectedObject(null); window.localStorage.removeItem(key); setStatus('Cleared'); }} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Clear</button>
         <button onClick={() => { navigator.clipboard.writeText(JSON.stringify({ positions: markers })); }} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Copy JSON</button>
+        <span style={{ color: '#8ab6d6', fontSize: 13 }}>Right-click the hull to add markers. Left-click a marker to select and drag it.</span>
         {status && <span style={{ marginLeft: 8, color: '#8ab6d6' }}>{status}</span>}
       </div>
     </>

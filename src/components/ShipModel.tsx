@@ -7,14 +7,15 @@ import { AdditiveBlending, Box3, CanvasTexture, Color, Group, SpriteMaterial, Ve
 import { useGameStore } from '../store/gameStore';
 
 
-interface CockpitProps {
+interface ShipModelProps {
     enableLights?: boolean;
     editorMode?: boolean;
     name?: string;
     modelPath?: string;
+    markerOverrides?: { x: number; y: number; z: number }[];
 }
 
-export const Cockpit: FC<CockpitProps> = ({ enableLights = true, name = 'Cockpit', modelPath }) => {
+export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'ShipModel', modelPath, editorMode = false, markerOverrides }) => {
     const objPath = modelPath || '/models/00000.obj';
     const mtlPath = objPath.endsWith('.obj') ? objPath.replace('.obj', '.mtl') : '/models/00000.mtl';
     const materials = useLoader(MTLLoader, mtlPath);
@@ -33,18 +34,19 @@ export const Cockpit: FC<CockpitProps> = ({ enableLights = true, name = 'Cockpit
         return [] as { x: number; y: number; z: number }[];
     }, [objPath]);
     const markers = useMemo(() => {
+        if (markerOverrides) return markerOverrides;
         if (initialMarkers.length > 0) return initialMarkers;
         const box = new Box3().setFromObject(obj);
         const size = box.getSize(new Vector3());
         const center = box.getCenter(new Vector3());
         const zBack = box.max.z - size.z * 0.08; // near the rear so exhaust trails behind
-        const y = center.y - size.y * 0.12;
-        const spread = Math.max(size.x * 0.18, 0.6);
+        const y = center.y - size.y * 0.04;
+        const spread = Math.max(size.x * 0.28, 0.6);
         return [
             { x: center.x - spread, y, z: zBack },
             { x: center.x + spread, y, z: zBack }
         ];
-    }, [initialMarkers, obj]);
+    }, [initialMarkers, markerOverrides, obj]);
     const glowTex = useMemo(() => {
         const c = document.createElement('canvas');
         c.width = 128; c.height = 128;
@@ -70,6 +72,13 @@ export const Cockpit: FC<CockpitProps> = ({ enableLights = true, name = 'Cockpit
         const speedFactor = state.maxSpeed > 0 ? Math.min(1, state.speed / state.maxSpeed) : 0;
         return Math.max(throttle, speedFactor);
     };
+    useEffect(() => {
+        if (!editorMode) return;
+        const store = useGameStore.getState();
+        const prev = store.throttle;
+        store.setThrottle(0.75);
+        return () => store.setThrottle(prev);
+    }, [editorMode]);
     useFrame(() => {
         const k = computeEnginePower();
         const lx = 1.0 + 0.8 * k;
@@ -92,10 +101,10 @@ export const Cockpit: FC<CockpitProps> = ({ enableLights = true, name = 'Cockpit
         <group position={[0, -0.3, 0.0]} name={name}>
             <primitive object={obj} />
             {markers.map((m, i) => (
-                <group key={`fx-${i}`} ref={(g) => { groupsRef.current[i] = g; }} frustumCulled={false}>
-                    <EnginePlume position={[m.x, m.y, m.z]} length={3.8} radius={0.58} color="#9bd0ff" density={1.05} steps={72} glow={5.0} noiseScale={2.4} shock={1.2} />
-                    <EnginePlume position={[m.x, m.y, m.z]} length={5.0} radius={1.35} color="#76baff" density={0.6} steps={52} glow={3.0} noiseScale={1.7} shock={0.7} />
-                    <sprite name="EngineGlow" position={[m.x, m.y, m.z]} scale={[1.2, 1.2, 1]} frustumCulled={false}>
+                <group key={`fx-${i}`} ref={(g) => { groupsRef.current[i] = g; }} frustumCulled={false} position={[m.x, m.y, m.z]}>
+                    <EnginePlume position={[0, 0, 0]} length={3.8} radius={0.58} color="#9bd0ff" density={1.05} steps={72} glow={5.0} noiseScale={2.4} shock={1.2} />
+                    <EnginePlume position={[0, 0, 0]} length={5.0} radius={1.35} color="#76baff" density={0.6} steps={52} glow={3.0} noiseScale={1.7} shock={0.7} />
+                    <sprite name="EngineGlow" position={[0, 0, 0]} scale={[1.2, 1.2, 1]} frustumCulled={false}>
                         <primitive object={spriteMat} attach="material" />
                     </sprite>
                 </group>

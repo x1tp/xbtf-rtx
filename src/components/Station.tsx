@@ -5,7 +5,8 @@ import type { GLTF } from 'three-stdlib';
 import { OBJLoader } from 'three-stdlib';
 import { MTLLoader } from 'three-stdlib';
 import { Group, MeshStandardMaterial, Mesh, SRGBColorSpace, LinearSRGBColorSpace, DoubleSide, Box3, Vector3, TextureLoader, BufferGeometry, Float32BufferAttribute, Texture, RepeatWrapping } from 'three';
-import { ensureRapier, getWorld } from '../physics/RapierWorld';
+import { ensureRapier, getWorld, getWorldSync } from '../physics/RapierWorld';
+import type RAPIERType from '@dimforge/rapier3d-compat';
 
 interface StationProps {
     position: [number, number, number];
@@ -21,6 +22,7 @@ const DEFAULT_MODEL_PATH = '/models/X_beyond_the_frontier_1121121213_texture.glb
 
 export const Station: React.FC<StationProps> = ({ position, rotate = true, showLights = true, scale = 40, modelPath, rotationSpeed = 0.05, rotationAxis = 'y' }) => {
     const stationRef = useRef<Group | null>(null);
+    const colliderBodiesRef = useRef<RAPIERType.RigidBody[]>([]);
     const isBod = !!modelPath && modelPath.toLowerCase().endsWith('.bod');
     const isObj = !!modelPath && modelPath.toLowerCase().endsWith('.obj');
     const gltf = useGLTF(DEFAULT_MODEL_PATH) as GLTF;
@@ -86,10 +88,20 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
     });
 
     useEffect(() => {
+        let cancelled = false;
+        const clearBodies = () => {
+            const w = getWorldSync();
+            if (w && colliderBodiesRef.current.length > 0) {
+                colliderBodiesRef.current.forEach((b) => w.removeRigidBody(b));
+            }
+            colliderBodiesRef.current = [];
+        };
+        clearBodies();
         if (isBod && stationRef.current) {
             (async () => {
                 const res = await fetch(modelPath as string);
                 const text = await res.text();
+                if (cancelled) return;
                 const lines = text.split(/\r?\n/);
                 const materials = new Map<number, number>();
                 for (const line of lines) {
@@ -167,6 +179,7 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
                     if (dot < 0) entry.uvs.push(uv[0], uv[1], uv[4], uv[5], uv[2], uv[3]); else entry.uvs.push(uv[0], uv[1], uv[2], uv[3], uv[4], uv[5]);
                     acc.set(mat, entry);
                 }
+                if (cancelled) return;
                 for (const [matId, texId] of materials.entries()) {
                     const entry = acc.get(matId);
                     if (!entry || entry.positions.length === 0) continue;
@@ -186,6 +199,7 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
                     mesh.receiveShadow = true;
                     group.add(mesh);
                 }
+                if (cancelled) return;
                 stationRef.current?.clear();
                 stationRef.current?.add(group);
             })();
@@ -194,10 +208,12 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
             const mtlUrl = (modelPath as string).replace(/\.obj$/i, '.mtl');
             const mtlLoader = new MTLLoader();
             mtlLoader.load(mtlUrl, (materials) => {
+                if (cancelled) return;
                 materials.preload();
                 const loader = new OBJLoader();
                 loader.setMaterials(materials);
                 loader.load(modelPath as string, (obj) => {
+                    if (cancelled) return;
                     const aniso = gl?.capabilities?.getMaxAnisotropy?.() ?? 4;
                     obj.traverse((o) => {
                         const mesh = o as Mesh;
@@ -229,114 +245,96 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
                         const mat = mesh.material as MeshStandardMaterial | MeshStandardMaterial[] | null | undefined;
                         if (Array.isArray(mat)) mat.forEach(apply); else if (mat) apply(mat as MeshStandardMaterial);
                     });
+                    if (cancelled) return;
                     if (stationRef.current) {
                         stationRef.current.clear();
                         stationRef.current.add(obj);
-                        (async () => {
-                            const RAPIER = await ensureRapier();
-                            const world = await getWorld();
-                            obj.updateWorldMatrix(true, true);
-                            obj.traverse((o) => {
-                                const mesh = o as Mesh;
-                                const g = mesh.geometry as BufferGeometry;
-                                if (!g || !g.attributes?.position) return;
-                                const pos = g.getAttribute('position');
-                                const count = pos.count;
-                                const verts = new Float32Array(count * 3);
-                                const v = new Vector3();
-                                for (let i = 0; i < count; i++) {
-                                    const x = pos.getX(i);
-                                    const y = pos.getY(i);
-                                    const z = pos.getZ(i);
-                                    v.set(x, y, z).applyMatrix4(mesh.matrixWorld);
-                                    verts[i * 3 + 0] = v.x;
-                                    verts[i * 3 + 1] = v.y;
-                                    verts[i * 3 + 2] = v.z;
-                                }
-                                let idx: Uint32Array | null = null;
-                                if (g.index) {
-                                    idx = Uint32Array.from((g.index.array as unknown as number[]));
-                                } else {
-                                    const triCount = Math.floor(verts.length / 3);
-                                    idx = new Uint32Array(triCount);
-                                    for (let i = 0; i < triCount; i++) idx[i] = i;
-                                }
-                                const bodyDesc = RAPIER.RigidBodyDesc.fixed();
-                                const body = world.createRigidBody(bodyDesc);
-                                const collDesc = RAPIER.ColliderDesc.trimesh(verts, idx!);
-                                world.createCollider(collDesc, body);
-                            });
-                        })();
                     }
                 });
             });
         }
-        const aniso = gl?.capabilities?.getMaxAnisotropy?.() ?? 4;
-        if (!isBod) gltf.scene.traverse((o) => {
-            const mesh = o as Mesh;
-            const mat = mesh.material as MeshStandardMaterial | MeshStandardMaterial[] | null | undefined;
-            mesh.castShadow = true;
-            mesh.receiveShadow = true;
-            const bbox = new Box3().setFromObject(mesh);
-            const size = bbox.getSize(new Vector3());
-            const maxd = Math.max(size.x, size.y, size.z);
-            const mind = Math.min(size.x, size.y, size.z);
-            if (mind < maxd * 0.002) {
-                mesh.visible = false;
-                return;
-            }
-            const apply = (m: MeshStandardMaterial) => {
-                m.side = DoubleSide;
-                if (m.map) { m.map.colorSpace = SRGBColorSpace; m.map.anisotropy = aniso; }
-                if (m.emissiveMap) { m.emissiveMap.colorSpace = SRGBColorSpace; m.emissiveMap.anisotropy = aniso; }
-                if (m.normalMap) { m.normalMap.colorSpace = LinearSRGBColorSpace; m.normalMap.anisotropy = aniso; }
-                if (m.roughnessMap) { m.roughnessMap.colorSpace = LinearSRGBColorSpace; m.roughnessMap.anisotropy = aniso; }
-                if (m.metalnessMap) { m.metalnessMap.colorSpace = LinearSRGBColorSpace; m.metalnessMap.anisotropy = aniso; }
-                m.needsUpdate = true;
-            };
-            const g = mesh.geometry as unknown as { attributes?: Record<string, unknown>; computeVertexNormals?: () => void };
-            if (g && g.attributes && !('normal' in g.attributes) && typeof g.computeVertexNormals === 'function') {
-                g.computeVertexNormals();
-            }
-            if (Array.isArray(mat)) mat.forEach(apply); else if (mat) apply(mat as MeshStandardMaterial);
-        });
-        if (!isBod && stationRef.current) {
-            (async () => {
-                const RAPIER = await ensureRapier();
-                const world = await getWorld();
-                gltf.scene.updateWorldMatrix(true, true);
-                gltf.scene.traverse((o) => {
-                    const mesh = o as Mesh;
-                    const g = mesh.geometry as BufferGeometry;
-                    if (!g || !g.attributes?.position) return;
-                    const pos = g.getAttribute('position');
-                    const count = pos.count;
-                    const verts = new Float32Array(count * 3);
-                    const v = new Vector3();
-                    for (let i = 0; i < count; i++) {
-                        const x = pos.getX(i);
-                        const y = pos.getY(i);
-                        const z = pos.getZ(i);
-                        v.set(x, y, z).applyMatrix4(mesh.matrixWorld);
-                        verts[i * 3 + 0] = v.x;
-                        verts[i * 3 + 1] = v.y;
-                        verts[i * 3 + 2] = v.z;
+        if (!isBod && !isObj) {
+            const aniso = gl?.capabilities?.getMaxAnisotropy?.() ?? 4;
+            gltf.scene.traverse((o) => {
+                const mesh = o as Mesh;
+                const mat = mesh.material as MeshStandardMaterial | MeshStandardMaterial[] | null | undefined;
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                const bbox = new Box3().setFromObject(mesh);
+                const size = bbox.getSize(new Vector3());
+                const maxd = Math.max(size.x, size.y, size.z);
+                const mind = Math.min(size.x, size.y, size.z);
+                if (mind < maxd * 0.002) {
+                    mesh.visible = false;
+                    return;
+                }
+                const apply = (m: MeshStandardMaterial) => {
+                    m.side = DoubleSide;
+                    if (m.map) { m.map.colorSpace = SRGBColorSpace; m.map.anisotropy = aniso; }
+                    if (m.emissiveMap) { m.emissiveMap.colorSpace = SRGBColorSpace; m.emissiveMap.anisotropy = aniso; }
+                    if (m.normalMap) { m.normalMap.colorSpace = LinearSRGBColorSpace; m.normalMap.anisotropy = aniso; }
+                    if (m.roughnessMap) { m.roughnessMap.colorSpace = LinearSRGBColorSpace; m.roughnessMap.anisotropy = aniso; }
+                    if (m.metalnessMap) { m.metalnessMap.colorSpace = LinearSRGBColorSpace; m.metalnessMap.anisotropy = aniso; }
+                    m.needsUpdate = true;
+                };
+                const g = mesh.geometry as unknown as { attributes?: Record<string, unknown>; computeVertexNormals?: () => void };
+                if (g && g.attributes && !('normal' in g.attributes) && typeof g.computeVertexNormals === 'function') {
+                    g.computeVertexNormals();
+                }
+                if (Array.isArray(mat)) mat.forEach(apply); else if (mat) apply(mat as MeshStandardMaterial);
+            });
+            if (stationRef.current) {
+                (async () => {
+                    const RAPIER = await ensureRapier();
+                    if (cancelled) return;
+                    const world = await getWorld();
+                    if (cancelled) return;
+                    gltf.scene.updateWorldMatrix(true, true);
+                    const newBodies: RAPIERType.RigidBody[] = [];
+                    gltf.scene.traverse((o) => {
+                        const mesh = o as Mesh;
+                        const g = mesh.geometry as BufferGeometry;
+                        if (!g || !g.attributes?.position) return;
+                        const pos = g.getAttribute('position');
+                        const count = pos.count;
+                        const verts = new Float32Array(count * 3);
+                        const v = new Vector3();
+                        for (let i = 0; i < count; i++) {
+                            const x = pos.getX(i);
+                            const y = pos.getY(i);
+                            const z = pos.getZ(i);
+                            v.set(x, y, z).applyMatrix4(mesh.matrixWorld);
+                            verts[i * 3 + 0] = v.x;
+                            verts[i * 3 + 1] = v.y;
+                            verts[i * 3 + 2] = v.z;
+                        }
+                        let idx: Uint32Array | null = null;
+                        if (g.index) {
+                            idx = Uint32Array.from((g.index.array as unknown as number[]));
+                        } else {
+                            const triCount = Math.floor(verts.length / 3);
+                            idx = new Uint32Array(triCount);
+                            for (let i = 0; i < triCount; i++) idx[i] = i;
+                        }
+                        const bodyDesc = RAPIER.RigidBodyDesc.fixed();
+                        const body = world.createRigidBody(bodyDesc);
+                        newBodies.push(body);
+                        const collDesc = RAPIER.ColliderDesc.trimesh(verts, idx!);
+                        world.createCollider(collDesc, body);
+                        console.log('Station part collider created. Vertices:', verts.length / 3, 'Triangles:', idx!.length / 3);
+                    });
+                    if (cancelled) {
+                        newBodies.forEach((b) => world.removeRigidBody(b));
+                        return;
                     }
-                    let idx: Uint32Array | null = null;
-                    if (g.index) {
-                        idx = Uint32Array.from((g.index.array as unknown as number[]));
-                    } else {
-                        const triCount = Math.floor(verts.length / 3);
-                        idx = new Uint32Array(triCount);
-                        for (let i = 0; i < triCount; i++) idx[i] = i;
-                    }
-                    const bodyDesc = RAPIER.RigidBodyDesc.fixed();
-                    const body = world.createRigidBody(bodyDesc);
-                    const collDesc = RAPIER.ColliderDesc.trimesh(verts, idx!);
-                    world.createCollider(collDesc, body);
-                });
-            })();
+                    colliderBodiesRef.current = newBodies;
+                })();
+            }
         }
+        return () => {
+            cancelled = true;
+            clearBodies();
+        };
     }, [gltf, gl, isBod, isObj, modelPath]);
 
     return (

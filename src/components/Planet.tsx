@@ -3,7 +3,7 @@ import { Sphere } from '@react-three/drei';
 import * as THREE from 'three';
 import { TextureLoader, SRGBColorSpace, LinearSRGBColorSpace, ClampToEdgeWrapping, RepeatWrapping, ShaderMaterial, AdditiveBlending, Color, Vector3 } from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
-import { ensureRapier, getWorld } from '../physics/RapierWorld';
+import { ensureRapier, getWorld, getWorldSync } from '../physics/RapierWorld';
 import type RAPIERType from '@dimforge/rapier3d-compat';
 
 interface PlanetProps {
@@ -108,6 +108,7 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, onTexturesLoaded
 
     const planetRef = useRef<THREE.Group>(null);
     const cloudsRef = useRef<THREE.Mesh>(null);
+    const atmosphereRef = useRef<ShaderMaterial | null>(null);
     const planetBodyRef = useRef<RAPIERType.RigidBody | null>(null);
     const sunDir = useMemo(() => {
         const sun = new THREE.Vector3().fromArray(sunPosition);
@@ -115,58 +116,94 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, onTexturesLoaded
         return sun.sub(planet).normalize();
     }, [position, sunPosition]);
 
-    // Atmosphere shell sticks to the planet (no billboarding) using a rim + sun-facing term
     const atmosphereMaterial = useMemo(() => {
         return new ShaderMaterial({
             transparent: true,
             depthWrite: false,
             blending: AdditiveBlending,
+            side: THREE.BackSide,
             uniforms: {
                 uSunDir: { value: new Vector3() },
                 uInnerColor: { value: new Color('#7fc0ff') },
-                uOuterColor: { value: new Color('#b2e0ff') }
+                uOuterColor: { value: new Color('#b2e0ff') },
+                uTime: { value: 0.0 },
+                uRimPower: { value: 2.6 },
+                uRayleigh: { value: 1.8 },
+                uMie: { value: 0.7 },
+                uForwardG: { value: 0.6 },
+                uNoiseScale: { value: 0.8 },
+                uNoiseAmp: { value: 0.25 }
             },
             vertexShader: `
                 varying vec3 vNormal;
                 varying vec3 vViewDir;
+                varying vec3 vPos;
                 void main() {
                     vec3 n = normalize(normalMatrix * normal);
                     vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
                     vNormal = n;
                     vViewDir = normalize(-mvPosition.xyz);
+                    vPos = position;
                     gl_Position = projectionMatrix * mvPosition;
                 }
             `,
             fragmentShader: `
                 varying vec3 vNormal;
                 varying vec3 vViewDir;
+                varying vec3 vPos;
                 uniform vec3 uSunDir;
                 uniform vec3 uInnerColor;
                 uniform vec3 uOuterColor;
-                void main() {
-                    vec3 n = normalize(vNormal);
-                    vec3 v = normalize(vViewDir);
-                    float ndotl = clamp(dot(n, normalize(uSunDir)), 0.0, 1.0);
-                    float viewDot = clamp(dot(n, v), 0.0, 1.0);
-                    float rim = pow(1.0 - viewDot, 3.0);
-                    float sunRamp = pow(ndotl, 1.4);
-
-                    float glow = rim * 0.55 + sunRamp * 0.4;
-                    // Push alpha to fade earlier and softer to avoid a hard ring
-                    float alpha = smoothstep(0.08, 0.3, glow) * 0.45;
-
-                    vec3 col = mix(uInnerColor, uOuterColor, rim) * (alpha * 1.2);
-                    gl_FragColor = vec4(col, alpha);
+                uniform float uTime;
+                uniform float uRimPower;
+                uniform float uRayleigh;
+                uniform float uMie;
+                uniform float uForwardG;
+                uniform float uNoiseScale;
+                uniform float uNoiseAmp;
+                float hash(float n){return fract(sin(n)*43758.5453123);} 
+                float noise(vec3 x){
+                    vec3 p=floor(x);
+                    vec3 f=fract(x);
+                    f=f*f*(3.0-2.0*f);
+                    float n=p.x+p.y*57.0+113.0*p.z;
+                    return mix(mix(mix(hash(n+0.0),hash(n+1.0),f.x),mix(hash(n+57.0),hash(n+58.0),f.x),f.y),mix(mix(hash(n+113.0),hash(n+114.0),f.x),mix(hash(n+170.0),hash(n+171.0),f.x),f.y),f.z);
+                }
+                void main(){
+                    vec3 n=normalize(vNormal);
+                    vec3 v=normalize(vViewDir);
+                    vec3 s=normalize(uSunDir);
+                    float ndotl=clamp(dot(n,s),0.0,1.0);
+                    float viewDot=clamp(dot(n,v),0.0,1.0);
+                    float rim=pow(1.0-viewDot,uRimPower);
+                    float sunRamp=pow(ndotl,uRayleigh);
+                    float cosTheta=clamp(dot(v,s),-1.0,1.0);
+                    float g=uForwardG;
+                    float hg=(1.0-g*g)/pow(1.0+g*g-2.0*g*cosTheta,1.5);
+                    float n3=noise(vPos*uNoiseScale+vec3(0.0,0.0,uTime*1.5));
+                    float rimMod=rim*(1.0+uNoiseAmp*(n3-0.5));
+                    float sunMask=smoothstep(0.15,0.5,ndotl);
+                    float mie=(hg*uMie)*rim*sunMask;
+                    float rimSun=rimMod*sunMask;
+                    float glow=rimSun*0.8+sunRamp*0.5+mie*0.4;
+                    float alpha=smoothstep(0.12,0.65,glow)*0.7*sunMask;
+                    vec3 base=mix(uInnerColor,uOuterColor,rim);
+                    vec3 col=base*(0.6+sunRamp*0.9)+uOuterColor*mie*0.5;
+                    gl_FragColor=vec4(col*alpha,alpha);
                 }
             `
         });
     }, []);
 
     useEffect(() => {
-        if (atmosphereMaterial && atmosphereMaterial.uniforms) {
-            atmosphereMaterial.uniforms.uSunDir.value.copy(sunDir);
+        if (atmosphereRef.current && atmosphereRef.current.uniforms) {
+            (atmosphereRef.current.uniforms.uSunDir as { value: Vector3 }).value.copy(sunDir);
         }
-    }, [atmosphereMaterial, sunDir]);
+    }, [sunDir]);
+    useEffect(() => {
+        atmosphereRef.current = atmosphereMaterial;
+    }, [atmosphereMaterial]);
+    const atmoTimeRef = useRef(0);
     useFrame((_, delta) => {
         if (planetRef.current) {
             planetRef.current.rotation.y += delta * 0.005; // Slow rotation
@@ -175,6 +212,10 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, onTexturesLoaded
         if (cloudsRef.current) {
             cloudsRef.current.rotation.y += delta * 0.002;
         }
+        atmoTimeRef.current += delta;
+        if (atmosphereRef.current && atmosphereRef.current.uniforms && 'uTime' in atmosphereRef.current.uniforms) {
+            (atmosphereRef.current.uniforms.uTime as { value: number }).value = atmoTimeRef.current;
+        }
         if (planetBodyRef.current && planetRef.current) {
             const p = new THREE.Vector3().fromArray(position);
             planetBodyRef.current.setTranslation({ x: p.x, y: p.y, z: p.z }, true);
@@ -182,15 +223,32 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, onTexturesLoaded
     });
 
     useEffect(() => {
+        let cancelled = false;
         (async () => {
             const RAPIER = await ensureRapier();
+            if (cancelled) return;
             const world = await getWorld();
+            if (cancelled) return;
             const bodyDesc = RAPIER.RigidBodyDesc.fixed();
             const body = world.createRigidBody(bodyDesc);
             const collDesc = RAPIER.ColliderDesc.ball(size);
             world.createCollider(collDesc, body);
+            if (cancelled) {
+                world.removeRigidBody(body);
+                return;
+            }
             planetBodyRef.current = body;
         })();
+        return () => {
+            cancelled = true;
+            if (planetBodyRef.current) {
+                const w = getWorldSync();
+                if (w) {
+                    w.removeRigidBody(planetBodyRef.current);
+                }
+                planetBodyRef.current = null;
+            }
+        };
     }, [size]);
 
     return (
@@ -210,11 +268,9 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, onTexturesLoaded
                     </Sphere>
                 </group>
             )}
-            {hdr && (
-                <Sphere args={[size * 1.015, 128, 128]}>
-                    <primitive attach="material" object={atmosphereMaterial} />
-                </Sphere>
-            )}
+            <Sphere args={[size * (hdr ? 1.015 : 1.03), 128, 128]}>
+                <primitive attach="material" object={atmosphereMaterial} />
+            </Sphere>
         </group>
     );
 };
