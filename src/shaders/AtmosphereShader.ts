@@ -42,6 +42,7 @@ export const AtmosphereShader = {
     varying vec3 v3Direction;
     varying vec3 c0;
     varying vec3 c1;
+    varying float vSunDot;
 
     float scale(float fCos) {
       float x = 1.0 - fCos;
@@ -123,6 +124,7 @@ export const AtmosphereShader = {
         v3SamplePoint += v3SampleRay;
       }
 
+      vSunDot = clamp(dot(normalize(position), normalize(v3LightPosition)), 0.0, 1.0);
       c0 = v3FrontColor * (v3InvWavelength * fKrESun);
       c1 = v3FrontColor * fKmESun;
       v3Direction = v3CameraPos - v3Pos;
@@ -138,6 +140,7 @@ export const AtmosphereShader = {
     varying vec3 v3Direction;
     varying vec3 c0;
     varying vec3 c1;
+    varying float vSunDot;
 
     // Mie phase function
     float getMiePhase(float fCos, float fCos2, float g, float g2) {
@@ -154,6 +157,10 @@ export const AtmosphereShader = {
       float fCos2 = fCos * fCos;
       
       vec3 color = getRayleighPhase(fCos2) * c0 + getMiePhase(fCos, fCos2, g, g2) * c1;
+      
+      // Fade the atmosphere hard on the night side; keep only a hairline rim near the terminator
+      float sunLit = smoothstep(0.0, 0.15, vSunDot);
+      color *= mix(0.01, 1.0, sunLit);
       
       // Tone mapping
       color = vec3(1.0) - exp(-color);

@@ -1,9 +1,9 @@
 import type { FC } from 'react';
 import { useEffect, useMemo, useRef } from 'react';
-import { useLoader, useFrame } from '@react-three/fiber';
+import { useLoader, useFrame, useThree } from '@react-three/fiber';
 import { OBJLoader, MTLLoader } from 'three-stdlib';
 import { EnginePlume } from './EnginePlume';
-import { AdditiveBlending, Box3, CanvasTexture, Color, Group, SpriteMaterial, Vector3 } from 'three';
+import { AdditiveBlending, Box3, CanvasTexture, Color, Group, SpriteMaterial, Vector3, Texture, LinearMipmapLinearFilter, LinearFilter, SRGBColorSpace, LinearSRGBColorSpace } from 'three';
 import { useGameStore } from '../store/gameStore';
 
 
@@ -23,6 +23,38 @@ export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'Shi
         materials.preload();
         loader.setMaterials(materials);
     });
+    const { gl } = useThree();
+    useEffect(() => {
+        const maxAniso = gl?.capabilities?.getMaxAnisotropy?.() ?? 4;
+        const applyTextureSettings = (tex?: Texture | null, isColor?: boolean) => {
+            if (!tex) return;
+            const apply = () => {
+                tex.colorSpace = isColor ? SRGBColorSpace : LinearSRGBColorSpace;
+                tex.anisotropy = maxAniso;
+                tex.generateMipmaps = true;
+                tex.minFilter = LinearMipmapLinearFilter;
+                tex.magFilter = LinearFilter;
+                tex.needsUpdate = true;
+            };
+            // If the image isn't ready yet, wait for the texture's first upload.
+            if (!tex.image) {
+                const onUpdate = () => {
+                    tex.removeEventListener?.('update', onUpdate);
+                    apply();
+                };
+                tex.addEventListener?.('update', onUpdate);
+                return;
+            }
+            apply();
+        };
+        materials.preload();
+        Object.values(materials.materials).forEach((mat) => {
+            const m = mat as unknown as { map?: Texture | null; bumpMap?: Texture | null; normalMap?: Texture | null; emissiveMap?: Texture | null };
+            applyTextureSettings(m.map, true);
+            applyTextureSettings(m.emissiveMap, true);
+            applyTextureSettings(m.bumpMap ?? m.normalMap, false);
+        });
+    }, [gl, materials]);
     const initialMarkers = useMemo(() => {
         const rawInit = typeof window !== 'undefined' ? window.localStorage.getItem('ship:engineMarkers:' + objPath) : null;
         if (rawInit) {

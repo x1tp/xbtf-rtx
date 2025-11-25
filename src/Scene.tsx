@@ -6,7 +6,8 @@ import { Ship } from './components/Ship';
 import { Planet } from './components/Planet';
 import { Station } from './components/Station';
 import { Sun } from './components/Sun';
-import { InstancedMesh, TextureLoader, SRGBColorSpace, LinearSRGBColorSpace, RepeatWrapping, BackSide } from 'three';
+import { Dust } from './components/Dust';
+import { InstancedMesh, TextureLoader, SRGBColorSpace, LinearSRGBColorSpace, RepeatWrapping, BackSide, LinearMipmapLinearFilter, LinearFilter } from 'three';
 import * as THREE from 'three';
 import { ensureRapier, getWorld, getWorldSync } from './physics/RapierWorld';
 import type RAPIERType from '@dimforge/rapier3d-compat';
@@ -30,8 +31,9 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
         }
     }, []);
     const sunPosition: [number, number, number] = cfg.sun.position;
-    const StarfieldSky: React.FC<{ density?: number; brightness?: number; milkyWayStrength?: number; orientation?: [number, number, number]; radius?: number; fadeMin?: number; fadeMax?: number; viewFadeMin?: number; viewFadeMax?: number }> = ({ density = 0.15, brightness = 0.5, milkyWayStrength = 0.22, orientation = [0.0, 0.25, 0.97], radius = 18000, fadeMin = 0.2, fadeMax = 0.95, viewFadeMin = 0.6, viewFadeMax = 0.85 }) => {
+    const StarfieldSky: React.FC<{ density?: number; brightness?: number; milkyWayStrength?: number; orientation?: [number, number, number]; radius?: number; fadeMin?: number; fadeMax?: number; viewFadeMin?: number; viewFadeMax?: number }> = ({ density = 0.15, brightness = 0.5, milkyWayStrength = 0.22, orientation = [0.0, 0.25, 0.97], radius = 2000000, fadeMin = 0.2, fadeMax = 0.95, viewFadeMin = 0.6, viewFadeMax = 0.85 }) => {
         const matRef = useRef<THREE.ShaderMaterial | null>(null);
+        const skyRef = useRef<THREE.Mesh | null>(null);
         const { scene } = useThree();
         const rayRef = useRef(new THREE.Raycaster());
         const uniforms = useMemo(() => ({
@@ -89,6 +91,10 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
             useGameStore.getState().setSunAdapt(adaptRef.current);
             useGameStore.getState().setSunIntensity(target);
             (m.uniforms as unknown as { uViewAdapt: { value: number } }).uViewAdapt.value = adaptRef.current;
+            const sky = skyRef.current;
+            if (sky) {
+                sky.position.copy(camPos);
+            }
         });
         const vertexShader = `
           varying vec3 vDir;
@@ -185,7 +191,7 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
           }
         `;
         return (
-            <mesh name="StarfieldSky" scale={[1, 1, 1]} frustumCulled={false}>
+            <mesh ref={skyRef} name="StarfieldSky" scale={[1, 1, 1]} frustumCulled={false}>
                 <sphereGeometry args={[radius, 64, 64]} />
                 <shaderMaterial ref={matRef} side={BackSide} vertexShader={vertexShader} fragmentShader={fragmentShader} uniforms={uniforms} depthWrite={false} toneMapped={false} />
             </mesh>
@@ -196,7 +202,7 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
             <color attach="background" args={['#000005']} />
 
             {/* Environment */}
-            <StarfieldSky density={0.02} brightness={0.7} milkyWayStrength={0.2} orientation={[0.0, 0.25, 0.97]} radius={18000} fadeMin={0.2} fadeMax={0.9} viewFadeMin={0.6} viewFadeMax={0.85} />
+            <StarfieldSky density={0.02} brightness={0.7} milkyWayStrength={0.2} orientation={[0.0, 0.25, 0.97]} radius={2000000} fadeMin={0.2} fadeMax={0.9} viewFadeMin={0.6} viewFadeMax={0.85} />
             <Environment preset="night" />
             {!hdr && <ambientLight intensity={0.05} />}
             <Sun position={sunPosition} size={cfg.sun.size} color={cfg.sun.color} intensity={cfg.sun.intensity} hdr={hdr} />
@@ -207,30 +213,39 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
             {/* Environment Objects */}
             <Planet position={cfg.planet.position} size={cfg.planet.size} color="#4466aa" hdr={hdr} sunPosition={sunPosition} />
             <Station position={cfg.station.position} showLights={!hdr} scale={cfg.station.scale} modelPath={cfg.station.modelPath} rotationSpeed={cfg.station.rotationSpeed} rotationAxis={cfg.station.rotationAxis} />
-            <Asteroids count={cfg.asteroids.count} range={cfg.asteroids.range} />
-
+            <Asteroids count={cfg.asteroids.count} range={cfg.asteroids.range} center={cfg.asteroids.center} />
+            <Dust count={5000} range={cfg.asteroids.range} center={cfg.asteroids.center} color="#aaccff" size={0.8} opacity={0.15} />
 
         </>
     );
 };
 
-interface AsteroidsProps { count: number; range: number }
-const Asteroids: React.FC<AsteroidsProps> = ({ count, range }) => {
+interface AsteroidsProps { count: number; range: number; center: [number, number, number] }
+const Asteroids: React.FC<AsteroidsProps> = ({ count, range, center }) => {
     const meshRef = useRef<InstancedMesh>(null);
     const positionsRef = useRef<THREE.Vector3[]>([]);
     const velocitiesRef = useRef<THREE.Vector3[]>([]);
     const scalesRef = useRef<number[]>([]);
     const bodiesRef = useRef<RAPIERType.RigidBody[]>([]);
+    const { gl } = useThree();
+    const maxAniso = useMemo(() => gl.capabilities?.getMaxAnisotropy?.() ?? 4, [gl]);
     type AsteroidUserData = { positions: THREE.Vector3[]; velocities: THREE.Vector3[]; scales: number[] };
     const mobileThreshold = 10.0;
 
     const [particles] = useState(() => {
         const temp: { position: [number, number, number]; scale: number }[] = [];
+        const desiredLarge = Math.max(3, Math.floor(count * 0.08));
+        const largeCount = Math.min(count, desiredLarge);
+        const largeIndices = new Set<number>();
+        while (largeIndices.size < largeCount) {
+            largeIndices.add(Math.floor(Math.random() * count));
+        }
         for (let i = 0; i < count; i++) {
-            const x = (Math.random() - 0.5) * range;
-            const y = (Math.random() - 0.5) * range;
-            const z = (Math.random() - 0.5) * range;
-            const scale = 0.8 + Math.random() * 4.2;
+            const x = (Math.random() - 0.5) * range + center[0];
+            const y = (Math.random() - 0.5) * range + center[1];
+            const z = (Math.random() - 0.5) * range + center[2];
+            const isLarge = largeIndices.has(i);
+            const scale = isLarge ? 12 + Math.random() * 10 : 0.8 + Math.random() * 4.2;
             temp.push({ position: [x, y, z], scale });
         }
         return temp;
@@ -361,16 +376,27 @@ const Asteroids: React.FC<AsteroidsProps> = ({ count, range }) => {
         ];
         Promise.all(paths.map((p) => loader.loadAsync(p).catch(() => null))).then(([map, rough, metal, normal]) => {
             if (!matRef.current) return;
-            const aniso = 4;
-            if (map) { map.colorSpace = SRGBColorSpace; map.wrapS = RepeatWrapping; map.wrapT = RepeatWrapping; map.anisotropy = aniso; matRef.current.map = map as THREE.Texture; }
-            if (rough) { rough.colorSpace = LinearSRGBColorSpace; rough.wrapS = RepeatWrapping; rough.wrapT = RepeatWrapping; rough.anisotropy = aniso; matRef.current.roughnessMap = rough as THREE.Texture; }
-            if (metal) { metal.colorSpace = LinearSRGBColorSpace; metal.wrapS = RepeatWrapping; metal.wrapT = RepeatWrapping; metal.anisotropy = aniso; matRef.current.metalnessMap = metal as THREE.Texture; }
-            if (normal) { normal.colorSpace = LinearSRGBColorSpace; normal.wrapS = RepeatWrapping; normal.wrapT = RepeatWrapping; normal.anisotropy = aniso; matRef.current.normalMap = normal as THREE.Texture; }
+            const aniso = Math.max(1, maxAniso || 1);
+            const setupTexture = (t: THREE.Texture | null, isColor: boolean) => {
+                if (!t) return;
+                t.colorSpace = isColor ? SRGBColorSpace : LinearSRGBColorSpace;
+                t.wrapS = RepeatWrapping;
+                t.wrapT = RepeatWrapping;
+                t.anisotropy = aniso;
+                t.generateMipmaps = true;
+                t.minFilter = LinearMipmapLinearFilter;
+                t.magFilter = LinearFilter;
+                t.needsUpdate = true;
+            };
+            if (map) { setupTexture(map as THREE.Texture, true); matRef.current.map = map as THREE.Texture; }
+            if (rough) { setupTexture(rough as THREE.Texture, false); matRef.current.roughnessMap = rough as THREE.Texture; }
+            if (metal) { setupTexture(metal as THREE.Texture, false); matRef.current.metalnessMap = metal as THREE.Texture; }
+            if (normal) { setupTexture(normal as THREE.Texture, false); matRef.current.normalMap = normal as THREE.Texture; }
             matRef.current.roughness = 0.9;
             matRef.current.metalness = 0.02;
             matRef.current.needsUpdate = true;
         });
-    }, []);
+    }, [maxAniso]);
 
     return (
         <instancedMesh ref={meshRef} name="AsteroidField" args={[undefined, undefined, count]} castShadow receiveShadow>

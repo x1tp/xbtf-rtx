@@ -1,19 +1,21 @@
 import { Suspense, useRef, useState, useEffect } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { Scene } from './Scene';
-import { Loader, ArcballControls, Grid, GizmoHelper, GizmoViewport, Text, OrthographicCamera, PerspectiveCamera as DreiPerspectiveCamera, Line, Environment, TransformControls } from '@react-three/drei';
+import { ArcballControls, Grid, GizmoHelper, GizmoViewport, Text, OrthographicCamera, PerspectiveCamera as DreiPerspectiveCamera, Line, Environment, TransformControls, useProgress } from '@react-three/drei';
+import { Perf } from 'r3f-perf';
 import type { ArcballControls as ArcballControlsImpl } from 'three-stdlib';
 import { HUD } from './components/HUD';
 import { TradingInterface } from './components/TradingInterface';
 import { SimpleEffects } from './components/SimpleEffects';
 import { ShipModel } from './components/ShipModel';
 import type { PerspectiveCamera, Scene as ThreeScene, Mesh, MeshStandardMaterial, WebGLRenderer, Object3D } from 'three';
-import { Box3, Vector3, Vector2, SRGBColorSpace, ACESFilmicToneMapping, PCFSoftShadowMap, Raycaster } from 'three';
+import { Box3, Vector3, Vector2, SRGBColorSpace, NoToneMapping, PCFSoftShadowMap, Raycaster } from 'three';
 import { Station } from './components/Station';
 import { PhysicsStepper } from './physics/PhysicsStepper';
 import { PlanetEditor } from './admin/PlanetEditor';
+import { getPhysicsMetrics } from './physics/RapierWorld';
 
-const SDR_EXPOSURE = 1.2;
+
 
 function App() {
   const sceneRef = useRef<ThreeScene | null>(null);
@@ -59,11 +61,11 @@ function App() {
     <div style={{ width: '100vw', height: '100vh', background: 'black' }}>
       <Canvas
         shadows
-        camera={{ fov: 75, near: 0.1, far: 20000 }}
+        gl={{ logarithmicDepthBuffer: true }}
+        camera={{ fov: 75, near: 1, far: 600000000000 }}
         onCreated={({ gl, scene, camera }) => {
           gl.outputColorSpace = SRGBColorSpace;
-          gl.toneMapping = ACESFilmicToneMapping;
-          gl.toneMappingExposure = SDR_EXPOSURE;
+          gl.toneMapping = NoToneMapping;
           gl.shadowMap.enabled = true;
           gl.shadowMap.type = PCFSoftShadowMap;
           glRef.current = gl as WebGLRenderer;
@@ -75,11 +77,13 @@ function App() {
           <Scene hdr={false} />
           <SimpleEffects />
           <PhysicsStepper />
+          <Perf position="top-right" />
         </Suspense>
       </Canvas>
-      <Loader />
+      <SmartLoader />
       <HUD />
       <TradingInterface />
+      <PerfOverlay glRef={glRef} sceneRef={sceneRef} />
       <div style={{
         position: 'absolute',
         top: 20,
@@ -250,7 +254,7 @@ function ViewerCanvas({ modelPath }: { modelPath?: string }) {
           <input type="checkbox" checked={wireframe} onChange={(e) => setWireframe(e.target.checked)} /> Wireframe
         </label>
       </div>
-      <Loader />
+      <SmartLoader />
     </>
   );
 }
@@ -314,7 +318,7 @@ function ShipEditorCanvas({ modelPath }: { modelPath?: string }) {
       const markerObjects = Object.values(markerRefs.current).filter(Boolean) as Object3D[];
       const markerHits = markerObjects.length > 0 ? rc.intersectObjects(markerObjects, true) : [];
       if (markerHits.length > 0) return;
-          const target = s.getObjectByName('ShipModelEditor');
+      const target = s.getObjectByName('ShipModelEditor');
       if (!target) return;
       const hits = rc.intersectObject(target, true);
       if (hits.length > 0) {
@@ -412,22 +416,22 @@ function ShipEditorCanvas({ modelPath }: { modelPath?: string }) {
     </>
   );
 }
-  function AdminHome() {
-    const [tab, setTab] = useState<'root' | 'ships'>('root');
-    const [model, setModel] = useState('/models/00000.obj');
-    if (tab === 'root') {
-      return (
-        <div style={{ width: '100vw', height: '100vh', background: '#0b1016', color: '#c3e7ff', fontFamily: 'monospace' }}>
-          <div style={{ padding: 20 }}>
-            <h2>Admin</h2>
-            <div style={{ display: 'flex', gap: 12 }}>
-              <button onClick={() => setTab('ships')} style={{ padding: '8px 12px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Edit Ships</button>
-              <button onClick={() => { window.location.assign('/admin/sector'); }} style={{ padding: '8px 12px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Edit Sector</button>
-            </div>
+function AdminHome() {
+  const [tab, setTab] = useState<'root' | 'ships'>('root');
+  const [model, setModel] = useState('/models/00000.obj');
+  if (tab === 'root') {
+    return (
+      <div style={{ width: '100vw', height: '100vh', background: '#0b1016', color: '#c3e7ff', fontFamily: 'monospace' }}>
+        <div style={{ padding: 20 }}>
+          <h2>Admin</h2>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <button onClick={() => setTab('ships')} style={{ padding: '8px 12px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Edit Ships</button>
+            <button onClick={() => { window.location.assign('/admin/sector'); }} style={{ padding: '8px 12px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Edit Sector</button>
           </div>
         </div>
-      );
-    }
+      </div>
+    );
+  }
   return (
     <div style={{ width: '100vw', height: '100vh', background: '#0b1016', color: '#c3e7ff', fontFamily: 'monospace' }}>
       <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 640 }}>
@@ -447,6 +451,93 @@ function ShipEditorCanvas({ modelPath }: { modelPath?: string }) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function PerfOverlay({ glRef, sceneRef }: { glRef: React.RefObject<WebGLRenderer | null>; sceneRef: React.RefObject<ThreeScene | null> }) {
+  const [fps, setFps] = useState(0);
+  const [frameMs, setFrameMs] = useState(0);
+  const [calls, setCalls] = useState(0);
+  const [tris, setTris] = useState(0);
+  const [geoms, setGeoms] = useState(0);
+  const [tex, setTex] = useState(0);
+  const [progs, setProgs] = useState(0);
+  const [physMs, setPhysMs] = useState(0);
+  const [bodies, setBodies] = useState(0);
+  const [colliders, setColliders] = useState(0);
+  const [heap, setHeap] = useState(0);
+  const [topMeshes, setTopMeshes] = useState<{ name: string; tris: number }[]>([]);
+  useEffect(() => {
+    let last = performance.now();
+    let rafId = 0 as number;
+    const tick = () => {
+      const now = performance.now();
+      const dt = now - last;
+      last = now;
+      if (dt > 0) setFps(1000 / dt);
+      setFrameMs(dt);
+      const gl = glRef.current;
+      if (gl) {
+        const info = (gl.info as unknown as { render?: { calls?: number; triangles?: number }; memory?: { geometries?: number; textures?: number }; programs?: unknown[] });
+        setCalls(info.render?.calls || 0);
+        setTris(info.render?.triangles || 0);
+        setGeoms(info.memory?.geometries || 0);
+        setTex(info.memory?.textures || 0);
+        setProgs(Array.isArray(info.programs) ? info.programs.length : 0);
+      }
+      const scene = sceneRef.current;
+      if (scene && now % 1000 < 16) {
+        const arr: { name: string; tris: number }[] = [];
+        scene.traverse((o) => {
+          const m = o as unknown as { geometry?: unknown; name?: string };
+          const g = m.geometry as unknown as { getIndex?: () => { count: number } | null; getAttribute?: (k: string) => { count: number } | null };
+          if (!g) return;
+          const idx = g.getIndex ? g.getIndex() : null;
+          const pos = g.getAttribute ? g.getAttribute('position') : null;
+          let t = 0;
+          if (idx && typeof idx.count === 'number') t = Math.floor(idx.count / 3);
+          else if (pos && typeof pos.count === 'number') t = Math.floor(pos.count / 3);
+          if (t > 0) arr.push({ name: o.name || (m.name || 'Mesh'), tris: t });
+        });
+        arr.sort((a, b) => b.tris - a.tris);
+        setTopMeshes(arr.slice(0, 5));
+      }
+      const phys = getPhysicsMetrics();
+      setPhysMs(phys.lastStepMs || 0);
+      setBodies(phys.bodies || 0);
+      setColliders(phys.colliders || 0);
+      const mem = (performance as unknown as { memory?: { usedJSHeapSize?: number } }).memory;
+      setHeap(mem && mem.usedJSHeapSize ? mem.usedJSHeapSize / (1024 * 1024) : 0);
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => { cancelAnimationFrame(rafId); };
+  }, [glRef, sceneRef]);
+  return (
+    <div style={{ position: 'absolute', bottom: 20, right: 20, color: '#c3e7ff', fontFamily: 'monospace', background: 'rgba(12,22,32,0.8)', padding: 12, border: '1px solid #184b6a', borderRadius: 6 }}>
+      <div>FPS {fps.toFixed(0)} | Frame {frameMs.toFixed(1)} ms</div>
+      <div>Calls {calls} | Tris {tris}</div>
+      <div>Geom {geoms} | Tex {tex} | Prog {progs}</div>
+      <div>Physics {physMs.toFixed(2)} ms | Bodies {bodies} | Colliders {colliders}</div>
+      {heap > 0 && <div>Heap {heap.toFixed(1)} MB</div>}
+      {topMeshes.length > 0 && (
+        <div style={{ marginTop: 8 }}>
+          {topMeshes.map((m, i) => (
+            <div key={i}>{m.name}: {m.tris}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SmartLoader() {
+  const { active, progress } = useProgress();
+  if (!active || progress <= 0) return null;
+  return (
+    <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', color: '#c3e7ff', fontFamily: 'monospace' }}>
+      Loading {progress.toFixed(2)}%
     </div>
   );
 }

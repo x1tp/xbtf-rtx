@@ -25,6 +25,13 @@ export const Sun: React.FC<SunProps> = ({
     const sunAdapt = useGameStore((state) => state.sunAdapt);
     const sunIntensity = useGameStore((state) => state.sunIntensity);
 
+    // Direction from origin toward the sun; used for lighting and flares
+    const sunDir = useMemo(() => {
+        const v = new Vector3(...position);
+        if (v.lengthSq() < 1e-6) return new Vector3(1, 0, 0);
+        return v.normalize();
+    }, [position]);
+
     // New Exposure Logic:
     // 1. Initial hit (sunIntensity=1, sunAdapt=0): Exposure drops hard (0.05).
     // 2. Adaptation (sunIntensity=1, sunAdapt->1): Exposure recovers (0.55).
@@ -119,7 +126,7 @@ export const Sun: React.FC<SunProps> = ({
     }, [hdr]);
 
     const flareOffsets = useMemo(() => {
-        const dir = new Vector3().fromArray(position).normalize().multiplyScalar(-1);
+        const dir = sunDir.clone().multiplyScalar(-1);
         return [
             { scale: size * 0.55, offset: size * 0.6 },
             { scale: size * 0.25, offset: size * 1.8 },
@@ -129,41 +136,47 @@ export const Sun: React.FC<SunProps> = ({
             scale: entry.scale,
             pos: dir.clone().multiplyScalar(entry.offset)
         }));
-    }, [position, size]);
+    }, [sunDir, size]);
+
+    // Keep the light close enough for stable shadows, but aligned with the sun direction
+    const lightDistance = 150000;
+    const lightPosition = sunDir.clone().multiplyScalar(lightDistance);
 
     return (
-        <group position={position}>
-            {/* Visual representation of the sun */}
-            <mesh ref={meshRef} name="SunMesh">
-                <sphereGeometry args={[dynamicSize, 32, 32]} />
-                {hdr ? <primitive object={limbMaterial} attach="material" /> : (
-                    <meshStandardMaterial color={color} emissive={color} emissiveIntensity={50} toneMapped={false} />
-                )}
-            </mesh>
+        <>
+            <group position={position}>
+                {/* Visual representation of the sun */}
+                <mesh ref={meshRef} name="SunMesh">
+                    <sphereGeometry args={[dynamicSize, 32, 32]} />
+                    {hdr ? <primitive object={limbMaterial} attach="material" /> : (
+                        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={50} toneMapped={false} />
+                    )}
+                </mesh>
 
-            {hdr && <sprite scale={[dynamicSize * 4, dynamicSize * 4, 1]}>
-                <primitive attach="material" object={haloMaterial} />
-            </sprite>}
+                {hdr && <sprite scale={[dynamicSize * 4, dynamicSize * 4, 1]}>
+                    <primitive attach="material" object={haloMaterial} />
+                </sprite>}
 
-            {/* Simple lens flare sprites aligned toward the scene origin; gives sun streaks without a heavy post effect */}
-            {lensFlares && flareOffsets.map((entry, idx) => (
-                <sprite key={idx} position={entry.pos} scale={[entry.scale, entry.scale, 1]}>
-                    <primitive attach="material" object={flareMaterial} />
-                </sprite>
-            ))}
+                {/* Simple lens flare sprites aligned toward the scene origin; gives sun streaks without a heavy post effect */}
+                {lensFlares && flareOffsets.map((entry, idx) => (
+                    <sprite key={idx} position={entry.pos} scale={[entry.scale, entry.scale, 1]}>
+                        <primitive attach="material" object={flareMaterial} />
+                    </sprite>
+                ))}
 
-            {/* Light source */}
-            {/* We position the light at the sun's position, but since we are inside a group
-          at 'position', the light should be at 0,0,0 relative to the group.
-       */}
+                {/* Add a glow effect using a sprite or another larger inverted sphere if needed later */}
+            </group>
+
+            {/* Directional light, kept near the scene but aligned with the sun */}
             <directionalLight
+                position={lightPosition.toArray() as [number, number, number]}
                 intensity={currentIntensity}
                 color={color}
                 castShadow
                 shadow-mapSize-width={4096}
                 shadow-mapSize-height={4096}
                 shadow-camera-near={1}
-                shadow-camera-far={100000}
+                shadow-camera-far={400000}
                 shadow-camera-left={-10000}
                 shadow-camera-right={10000}
                 shadow-camera-top={10000}
@@ -172,8 +185,6 @@ export const Sun: React.FC<SunProps> = ({
                 shadow-normalBias={0.02}
                 shadow-radius={2}
             />
-
-            {/* Add a glow effect using a sprite or another larger inverted sphere if needed later */}
-        </group>
+        </>
     );
 };

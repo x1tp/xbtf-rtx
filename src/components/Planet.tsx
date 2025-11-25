@@ -86,6 +86,19 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, onTexturesLoaded
                 #endif
                 `
             );
+
+            shader.fragmentShader = shader.fragmentShader.replace(
+                '#include <output_fragment>',
+                `
+                // Soft horizon haze to hide low-res detail at glancing angles
+                vec3 viewDir = normalize(-vViewPosition);
+                float viewDot = clamp(dot(normal, viewDir), 0.0, 1.0);
+                float horizonHaze = pow(1.0 - viewDot, 1.5);
+                vec3 hazeTint = vec3(0.55, 0.63, 0.78);
+                diffuseColor.rgb = mix(diffuseColor.rgb, hazeTint, horizonHaze * 0.32);
+                #include <output_fragment>
+                `
+            );
         };
 
         return mat;
@@ -96,7 +109,7 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, onTexturesLoaded
     const initialCloudOpacity = (cloudsParams && typeof cloudsParams.opacity === 'number') ? cloudsParams.opacity : 0.8;
     const initialCloudAlphaTest = (cloudsParams && typeof cloudsParams.alphaTest === 'number') ? cloudsParams.alphaTest : 0.0;
     const cloudMaterial = useMemo(() => {
-        return new THREE.MeshBasicMaterial({
+        return new THREE.MeshStandardMaterial({
             color: 0xffffff,
             transparent: true,
             opacity: initialCloudOpacity,
@@ -104,6 +117,9 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, onTexturesLoaded
             alphaTest: initialCloudAlphaTest,
             depthWrite: false,
             wireframe: false,
+            metalness: 0.0,
+            roughness: 1.0,
+            envMapIntensity: 0.0
         });
     }, [initialCloudOpacity, initialCloudAlphaTest]);
 
@@ -164,7 +180,8 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, onTexturesLoaded
                 cloudsAlpha.repeat.set(1.0, 1.0);
                 cloudsAlpha.offset.set(0.0, 0.0);
                 cloudsAlpha.colorSpace = LinearSRGBColorSpace;
-                cloudMaterial.map = null;
+                // Use the same texture for color + alpha so lighting falls off on the night side
+                cloudMaterial.map = cloudsAlpha as THREE.Texture;
                 cloudMaterial.alphaMap = cloudsAlpha as THREE.Texture;
                 cloudMaterial.needsUpdate = true;
             } else {

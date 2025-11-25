@@ -3,6 +3,9 @@ import RAPIER from '@dimforge/rapier3d-compat';
 let world: RAPIER.World | null = null;
 let initDone = false;
 let initPromise: Promise<void> | null = null;
+let lastStepMs = 0;
+let bodiesLen = 0;
+let collidersLen = 0;
 
 export async function ensureRapier(): Promise<typeof RAPIER> {
   if (initDone) return RAPIER;
@@ -28,5 +31,13 @@ export function getWorldSync(): RAPIER.World | null {
 
 export async function stepWorld(): Promise<void> {
   const w = await getWorld();
+  const s = performance.now();
   w.step();
+  lastStepMs = performance.now() - s;
+  bodiesLen = typeof w.bodies?.len === 'function' ? w.bodies.len() : bodiesLen;
+  collidersLen = typeof w.colliders?.len === 'function' ? w.colliders.len() : collidersLen;
+}
+
+export function getPhysicsMetrics(): { lastStepMs: number; bodies: number; colliders: number } {
+  return { lastStepMs, bodies: bodiesLen, colliders: collidersLen };
 }

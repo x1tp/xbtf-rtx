@@ -4,7 +4,7 @@ import { useGLTF } from '@react-three/drei';
 import type { GLTF } from 'three-stdlib';
 import { OBJLoader } from 'three-stdlib';
 import { MTLLoader } from 'three-stdlib';
-import { Group, MeshStandardMaterial, Mesh, SRGBColorSpace, LinearSRGBColorSpace, DoubleSide, Box3, Vector3, TextureLoader, BufferGeometry, Float32BufferAttribute, Texture, RepeatWrapping, Matrix4, Quaternion } from 'three';
+import { Group, MeshStandardMaterial, Mesh, SRGBColorSpace, LinearSRGBColorSpace, DoubleSide, Box3, Vector3, TextureLoader, BufferGeometry, Float32BufferAttribute, Texture, RepeatWrapping, Matrix4, Quaternion, LinearMipmapLinearFilter, LinearFilter } from 'three';
 import { ensureRapier, getWorld, getWorldSync } from '../physics/RapierWorld';
 import type RAPIERType from '@dimforge/rapier3d-compat';
 
@@ -19,6 +19,91 @@ interface StationProps {
 }
 
 const DEFAULT_MODEL_PATH = '/models/X_beyond_the_frontier_1121121213_texture.glb';
+
+type ParallaxOpts = { heightMap?: Texture | null; scale?: number; minLayers?: number; maxLayers?: number };
+const applyParallaxToMaterial = (mat: MeshStandardMaterial, opts: ParallaxOpts) => {
+    const heightMap = opts.heightMap || null;
+    if (!heightMap || (mat as unknown as { __parallaxApplied?: boolean }).__parallaxApplied) return;
+    const scale = opts.scale ?? 0.04;
+    const minLayers = opts.minLayers ?? 10.0;
+    const maxLayers = opts.maxLayers ?? 25.0;
+    heightMap.colorSpace = LinearSRGBColorSpace;
+    heightMap.minFilter = LinearMipmapLinearFilter;
+    heightMap.magFilter = LinearFilter;
+    heightMap.anisotropy = Math.max(heightMap.anisotropy, 4);
+    heightMap.generateMipmaps = true;
+    if (heightMap.image) heightMap.needsUpdate = true;
+    mat.onBeforeCompile = (shader) => {
+        shader.uniforms.parallaxMap = { value: heightMap };
+        shader.uniforms.parallaxScale = { value: scale };
+        shader.uniforms.parallaxMinLayers = { value: minLayers };
+        shader.uniforms.parallaxMaxLayers = { value: maxLayers };
+        shader.vertexShader = shader.vertexShader.replace(
+            '#include <uv_pars_vertex>',
+            `#include <uv_pars_vertex>
+             varying vec3 vViewDir;`
+        );
+        shader.vertexShader = shader.vertexShader.replace(
+            '#include <project_vertex>',
+            `#include <project_vertex>
+             vViewDir = vViewPosition;`
+        );
+        shader.fragmentShader = shader.fragmentShader.replace(
+            '#include <uv_pars_fragment>',
+            `#include <uv_pars_fragment>
+             uniform sampler2D parallaxMap;
+             uniform float parallaxScale;
+             uniform float parallaxMinLayers;
+             uniform float parallaxMaxLayers;
+             varying vec3 vViewDir;
+
+             vec2 parallaxOcclusionMap(vec2 uv, vec3 viewDir) {
+                 vec3 v = normalize(viewDir);
+                 float ndotv = abs(v.z);
+                 float numLayers = mix(parallaxMaxLayers, parallaxMinLayers, ndotv);
+                 float layerDepth = 1.0 / numLayers;
+                 vec2 delta = (v.xy / max(v.z, 0.001)) * parallaxScale / numLayers;
+                 float currentDepth = 0.0;
+                 float mapDepth = texture2D(parallaxMap, uv).r;
+                 vec2 uvOffset = uv;
+                 while (currentDepth < mapDepth) {
+                     uvOffset -= delta;
+                     mapDepth = texture2D(parallaxMap, uvOffset).r;
+                     currentDepth += layerDepth;
+                 }
+                 return uvOffset;
+             }`
+        );
+        shader.fragmentShader = shader.fragmentShader.replace(
+            '#include <uv_fragment>',
+            `#include <uv_fragment>
+             if (parallaxScale > 0.0) {
+                 vec2 puv = parallaxOcclusionMap(vUv, vViewDir);
+                 vUv = puv;
+                 #ifdef USE_MAP
+                     vMapUv = puv;
+                 #endif
+                 #ifdef USE_NORMALMAP
+                     vNormalMapUv = puv;
+                 #endif
+                 #ifdef USE_EMISSIVEMAP
+                     vEmissiveMapUv = puv;
+                 #endif
+                 #ifdef USE_ROUGHNESSMAP
+                     vRoughnessMapUv = puv;
+                 #endif
+                 #ifdef USE_METALNESSMAP
+                     vMetalnessMapUv = puv;
+                 #endif
+                 #ifdef USE_AOMAP
+                     vAoMapUv = puv;
+                 #endif
+             }`
+        );
+    };
+    (mat as unknown as { __parallaxApplied?: boolean }).__parallaxApplied = true;
+    mat.needsUpdate = true;
+};
 
 export const Station: React.FC<StationProps> = ({ position, rotate = true, showLights = true, scale = 40, modelPath, rotationSpeed = 0.05, rotationAxis = 'y' }) => {
     const stationRef = useRef<Group | null>(null);
@@ -69,13 +154,15 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
     };
     const loadTexById = (loader: TextureLoader, url: string | null, aniso: number): Texture | null => {
         if (!url) return null;
-        const map = loader.load(url);
-        map.colorSpace = SRGBColorSpace;
-        map.anisotropy = aniso;
-        map.flipY = false;
-        map.wrapS = RepeatWrapping;
-        map.wrapT = RepeatWrapping;
-        map.needsUpdate = true;
+        const map = loader.load(url, (tex) => {
+            tex.colorSpace = SRGBColorSpace;
+            tex.anisotropy = aniso;
+            tex.flipY = false;
+            tex.wrapS = RepeatWrapping;
+            tex.wrapT = RepeatWrapping;
+            tex.generateMipmaps = true;
+            tex.needsUpdate = true;
+        });
         return map;
     };
 
@@ -359,6 +446,7 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
                             if (typeof m.roughness === 'number') m.roughness = Math.max(m.roughness ?? 0.8, 0.9);
                             const n = m.name?.toLowerCase?.() || '';
                             if (n === 'mat_3') { m.transparent = true; m.opacity = 0.35; }
+                            applyParallaxToMaterial(m, { heightMap: m.roughnessMap || m.normalMap, scale: 0.045, minLayers: 12, maxLayers: 28 });
                             m.needsUpdate = true;
                         };
                         const g = mesh.geometry as unknown as { attributes?: Record<string, unknown>; computeVertexNormals?: () => void } | undefined;
@@ -388,6 +476,26 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
         if (!isBod && !isObj) {
             const aniso = gl?.capabilities?.getMaxAnisotropy?.() ?? 4;
             const tloader = new TextureLoader();
+            const configureTexture = (tex: Texture, linear: boolean) => {
+                tex.colorSpace = linear ? LinearSRGBColorSpace : SRGBColorSpace;
+                tex.anisotropy = aniso;
+                tex.flipY = false;
+                tex.generateMipmaps = true;
+                tex.needsUpdate = true;
+            };
+            const texCache = new Map<string, Promise<Texture | null>>();
+            const loadStationTexture = (url: string, linear: boolean) => {
+                if (!texCache.has(url)) {
+                    const p = tloader.loadAsync(url)
+                        .then((tex) => {
+                            configureTexture(tex, linear);
+                            return tex;
+                        })
+                        .catch(() => null);
+                    texCache.set(url, p);
+                }
+                return texCache.get(url)!;
+            };
             gltf.scene.traverse((o) => {
                 const mesh = o as Mesh;
                 const mat = mesh.material as MeshStandardMaterial | MeshStandardMaterial[] | null | undefined;
@@ -401,48 +509,56 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
                     mesh.visible = false;
                     return;
                 }
-                    const apply = (m: MeshStandardMaterial) => {
-                        m.side = DoubleSide;
-                        if (m.map) { m.map.colorSpace = SRGBColorSpace; m.map.anisotropy = aniso; }
-                        if (m.emissiveMap) { m.emissiveMap.colorSpace = SRGBColorSpace; m.emissiveMap.anisotropy = aniso; }
-                        if (m.normalMap) { m.normalMap.colorSpace = LinearSRGBColorSpace; m.normalMap.anisotropy = aniso; }
-                        if (m.roughnessMap) { m.roughnessMap.colorSpace = LinearSRGBColorSpace; m.roughnessMap.anisotropy = aniso; }
-                        if (m.metalnessMap) { m.metalnessMap.colorSpace = LinearSRGBColorSpace; m.metalnessMap.anisotropy = aniso; }
-                        const nm = m.name?.toLowerCase?.() || '';
-                        if (nm.includes('station_hull')) {
-                            const bc = tloader.load('/materials/station_hull/baseColor.png');
-                            bc.colorSpace = SRGBColorSpace; bc.anisotropy = aniso; bc.flipY = false;
-                            const rr = tloader.load('/materials/station_hull/roughness.png');
-                            rr.colorSpace = LinearSRGBColorSpace; rr.anisotropy = aniso; rr.flipY = false;
-                            const mm = tloader.load('/materials/station_hull/metallic.png');
-                            mm.colorSpace = LinearSRGBColorSpace; mm.anisotropy = aniso; mm.flipY = false;
-                            m.map = bc;
-                            m.roughnessMap = rr;
-                            m.metalnessMap = mm;
-                        } else if (nm.includes('station_brushed')) {
-                            const bc = tloader.load('/materials/station_brushed/baseColor.png');
-                            bc.colorSpace = SRGBColorSpace; bc.anisotropy = aniso; bc.flipY = false;
-                            const rr = tloader.load('/materials/station_brushed/roughness.png');
-                            rr.colorSpace = LinearSRGBColorSpace; rr.anisotropy = aniso; rr.flipY = false;
-                            const mm = tloader.load('/materials/station_brushed/metallic.png');
-                            mm.colorSpace = LinearSRGBColorSpace; mm.anisotropy = aniso; mm.flipY = false;
-                            m.map = bc;
-                            m.roughnessMap = rr;
-                            m.metalnessMap = mm;
-                        } else if (nm.includes('station_lights')) {
-                            const bc = tloader.load('/materials/station_lights/baseColor.png');
-                            bc.colorSpace = SRGBColorSpace; bc.anisotropy = aniso; bc.flipY = false;
-                            const em = tloader.load('/materials/station_lights/emissive.png');
-                            em.colorSpace = SRGBColorSpace; em.anisotropy = aniso; em.flipY = false;
-                            m.map = bc;
-                            m.emissiveMap = em;
-                        }
-                        if (m.normalMap && m.normalScale) m.normalScale.set(0.35, 0.35);
-                        if (typeof m.metalness === 'number') m.metalness = Math.min(m.metalness, 0.12);
-                        if (typeof m.roughness === 'number') m.roughness = Math.max(m.roughness, 0.9);
-                        if (m.aoMap) m.aoMapIntensity = 0.8;
-                        m.needsUpdate = true;
-                    };
+                const apply = (m: MeshStandardMaterial) => {
+                    m.side = DoubleSide;
+                    if (m.map) { m.map.colorSpace = SRGBColorSpace; m.map.anisotropy = aniso; }
+                    if (m.emissiveMap) { m.emissiveMap.colorSpace = SRGBColorSpace; m.emissiveMap.anisotropy = aniso; }
+                    if (m.normalMap) { m.normalMap.colorSpace = LinearSRGBColorSpace; m.normalMap.anisotropy = aniso; }
+                    if (m.roughnessMap) { m.roughnessMap.colorSpace = LinearSRGBColorSpace; m.roughnessMap.anisotropy = aniso; }
+                    if (m.metalnessMap) { m.metalnessMap.colorSpace = LinearSRGBColorSpace; m.metalnessMap.anisotropy = aniso; }
+                    const nm = m.name?.toLowerCase?.() || '';
+                    if (nm.includes('station_hull')) {
+                        Promise.all([
+                            loadStationTexture('/materials/station_hull/baseColor.png', false),
+                            loadStationTexture('/materials/station_hull/roughness.png', true),
+                            loadStationTexture('/materials/station_hull/metallic.png', true),
+                        ]).then(([bc, rr, mm]) => {
+                            if (cancelled) return;
+                            if (bc) m.map = bc;
+                            if (rr) m.roughnessMap = rr;
+                            if (mm) m.metalnessMap = mm;
+                            m.needsUpdate = true;
+                        });
+                    } else if (nm.includes('station_brushed')) {
+                        Promise.all([
+                            loadStationTexture('/materials/station_brushed/baseColor.png', false),
+                            loadStationTexture('/materials/station_brushed/roughness.png', true),
+                            loadStationTexture('/materials/station_brushed/metallic.png', true),
+                        ]).then(([bc, rr, mm]) => {
+                            if (cancelled) return;
+                            if (bc) m.map = bc;
+                            if (rr) m.roughnessMap = rr;
+                            if (mm) m.metalnessMap = mm;
+                            m.needsUpdate = true;
+                        });
+                    } else if (nm.includes('station_lights')) {
+                        Promise.all([
+                            loadStationTexture('/materials/station_lights/baseColor.png', false),
+                            loadStationTexture('/materials/station_lights/emissive.png', false),
+                        ]).then(([bc, em]) => {
+                            if (cancelled) return;
+                            if (bc) m.map = bc;
+                            if (em) m.emissiveMap = em;
+                            m.needsUpdate = true;
+                        });
+                    }
+                    if (m.normalMap && m.normalScale) m.normalScale.set(0.35, 0.35);
+                    if (typeof m.metalness === 'number') m.metalness = Math.min(m.metalness, 0.12);
+                    if (typeof m.roughness === 'number') m.roughness = Math.max(m.roughness, 0.9);
+                    if (m.aoMap) m.aoMapIntensity = 0.8;
+                    applyParallaxToMaterial(m, { heightMap: m.roughnessMap || m.normalMap, scale: 0.035, minLayers: 10, maxLayers: 24 });
+                    m.needsUpdate = true;
+                };
                 const g = mesh.geometry as unknown as { attributes?: Record<string, unknown>; computeVertexNormals?: () => void };
                 if (g && g.attributes && !('normal' in g.attributes) && typeof g.computeVertexNormals === 'function') {
                     g.computeVertexNormals();
