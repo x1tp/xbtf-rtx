@@ -2,7 +2,7 @@ import type { FC } from 'react';
 import { useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { EffectComposer, Bloom, ToneMapping } from '@react-three/postprocessing';
-import { ToneMappingMode, BlendFunction } from 'postprocessing';
+import { ToneMappingMode } from 'postprocessing';
 import { Mesh } from 'three';
 import { useGameStore } from '../store/gameStore';
 
@@ -49,11 +49,6 @@ export const SimpleEffects: FC = () => {
         if (Math.abs(targetExposure - exposure) > 0.001) setExposure(targetExposure);
         if (Math.abs(targetBloom - bloomIntensity) > 0.001) setBloomIntensity(targetBloom);
     });
-
-    const godRayExposure = 0.65 + sunAdapt * 1.1 + (sunVisible ? 0.35 : 0);
-    const godRayWeight = 1.1;
-    const godRayDecay = 0.93;
-    const godRayDensity = 0.96;
 
     return (
         <EffectComposer multisampling={0} enableNormalPass={false}>
