@@ -39,6 +39,8 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
     const orbitRef = useRef({ yaw: 0, pitch: -0.15, distance: 40, target: 'center' as 'center' | 'forward' });
     const lmbDownRef = useRef(false);
     const brakeRef = useRef(false);
+    const isTargetViewRef = useRef(false);
+    const targetOrbitRef = useRef({ yaw: 0, pitch: 0.2, distance: 800 });
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -46,6 +48,24 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
             if (e.code === 'KeyT') {
                 const o = orbitRef.current;
                 o.target = o.target === 'center' ? 'forward' : 'center';
+            }
+            if (e.code === 'F3') {
+                const target = useGameStore.getState().selectedTarget;
+                if (target) {
+                    isTargetViewRef.current = !isTargetViewRef.current;
+                    // Reset zoom when opening target view to a dynamic distance
+                    if (isTargetViewRef.current) {
+                        const tObj = scene.getObjectByName('Station'); // Currently only station or planet are targets
+                        let radius = 100;
+                        if (tObj) {
+                            const box = new Box3().setFromObject(tObj);
+                            const s = box.getSize(new Vector3());
+                            radius = Math.max(s.x, s.y, s.z) * 0.5;
+                        }
+                        // Start at 2.5x the radius for a good view
+                        targetOrbitRef.current.distance = radius * 2.5;
+                    }
+                }
             }
             if (e.code === 'KeyM') {
                 useGameStore.getState().toggleSectorMap();
@@ -69,6 +89,13 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
         const handleMouseMove = (e: MouseEvent) => {
             mouse.current.x = (e.clientX / window.innerWidth) * 2 - 1;
             mouse.current.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+            if (isTargetViewRef.current && lmbDownRef.current) {
+                const orbit = targetOrbitRef.current;
+                const sensitivity = 0.005;
+                orbit.yaw -= e.movementX * sensitivity;
+                orbit.pitch = MathUtils.clamp(orbit.pitch + e.movementY * sensitivity, -Math.PI / 2 + 0.1, Math.PI / 2 - 0.1);
+            }
         };
         const handleMouseDown = (e: MouseEvent) => {
             if (e.button === 0) lmbDownRef.current = true;
@@ -76,12 +103,20 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
         const handleMouseUp = (e: MouseEvent) => {
             if (e.button === 0) lmbDownRef.current = false;
         };
+        const handleWheel = (e: WheelEvent) => {
+            if (isTargetViewRef.current) {
+                const orbit = targetOrbitRef.current;
+                const zoomSpeed = 0.5;
+                orbit.distance = MathUtils.clamp(orbit.distance + e.deltaY * zoomSpeed, 20, 4000);
+            }
+        };
 
         window.addEventListener('keydown', handleKeyDown);
         window.addEventListener('keyup', handleKeyUp);
         window.addEventListener('mousemove', handleMouseMove);
         window.addEventListener('mousedown', handleMouseDown);
         window.addEventListener('mouseup', handleMouseUp);
+        window.addEventListener('wheel', handleWheel);
 
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
@@ -89,6 +124,7 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
             window.removeEventListener('mousemove', handleMouseMove);
             window.removeEventListener('mousedown', handleMouseDown);
             window.removeEventListener('mouseup', handleMouseUp);
+            window.removeEventListener('wheel', handleWheel);
         };
     }, []);
 
@@ -221,6 +257,38 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
                 camera.lookAt(lookTarget);
             }
         };
+
+        // Target view (F3)
+        if (isTargetViewRef.current) {
+            const target = useGameStore.getState().selectedTarget;
+            if (!target) {
+                isTargetViewRef.current = false;
+            } else {
+                const tPos = new Vector3(target.position[0], target.position[1], target.position[2]);
+                const orbit = targetOrbitRef.current;
+                const orbitYawSpeed = 1.8;
+                const orbitPitchSpeed = 1.2;
+                const zoomSpeed = 50;
+
+                if (keys.current['ArrowLeft']) orbit.yaw += orbitYawSpeed * delta;
+                if (keys.current['ArrowRight']) orbit.yaw -= orbitYawSpeed * delta;
+                if (keys.current['ArrowUp']) orbit.pitch = MathUtils.clamp(orbit.pitch - orbitPitchSpeed * delta, -Math.PI / 2 + 0.1, Math.PI / 2 - 0.1);
+                if (keys.current['ArrowDown']) orbit.pitch = MathUtils.clamp(orbit.pitch + orbitPitchSpeed * delta, -Math.PI / 2 + 0.1, Math.PI / 2 - 0.1);
+                if (keys.current['BracketLeft']) orbit.distance = MathUtils.clamp(orbit.distance - zoomSpeed * delta, 20, 2000);
+                if (keys.current['BracketRight']) orbit.distance = MathUtils.clamp(orbit.distance + zoomSpeed * delta, 20, 2000);
+
+                const qYaw = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), orbit.yaw);
+                const qPitch = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), orbit.pitch);
+                // Apply yaw first (horizontal), then pitch (vertical)
+                // Note: order matters for typical orbit camera feel
+                const offset = new Vector3(0, 0, orbit.distance).applyQuaternion(qPitch).applyQuaternion(qYaw);
+
+                const camPos = tPos.clone().add(offset);
+                camera.position.copy(camPos);
+                camera.lookAt(tPos);
+                return;
+            }
+        }
 
         // Skip all ship controls when sector map is open
         const sectorMapOpen = useGameStore.getState().sectorMapOpen;

@@ -396,14 +396,6 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
                         const mesh = o as Mesh;
                         mesh.castShadow = true;
                         mesh.receiveShadow = true;
-                        const bbox = new Box3().setFromObject(mesh);
-                        const size = bbox.getSize(new Vector3());
-                        const maxd = Math.max(size.x, size.y, size.z);
-                        const mind = Math.min(size.x, size.y, size.z);
-                        if (mind < maxd * 0.002) {
-                            mesh.visible = false;
-                            return;
-                        }
                         const apply = (m: MeshStandardMaterial) => {
                             m.side = DoubleSide;
                             if (m.map) { m.map.colorSpace = SRGBColorSpace; m.map.anisotropy = aniso; }
