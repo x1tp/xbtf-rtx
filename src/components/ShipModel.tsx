@@ -31,10 +31,17 @@ export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'Shi
             if (child instanceof Mesh) {
                 child.castShadow = true;
                 child.receiveShadow = true;
-                // Enable double-sided rendering to match Blender
+                // Recompute vertex normals for proper lighting
+                if (child.geometry) {
+                    child.geometry.computeVertexNormals();
+                }
+                // Enable double-sided rendering to match Blender's default behavior
                 if (child.material) {
                     const mats = Array.isArray(child.material) ? child.material : [child.material];
-                    mats.forEach((m: Material) => { (m as any).side = DoubleSide; });
+                    mats.forEach((m: Material) => {
+                        (m as any).side = DoubleSide;
+                        (m as any).needsUpdate = true;
+                    });
                 }
             }
         });

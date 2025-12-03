@@ -8,4 +8,4 @@ vt 0 0.5
 vt 0.5 0
 g B_butt
 usemtl mat_0
-f 1/1 4/2 3/3
+f 1/1 3/3 4/2
