@@ -1,4 +1,4 @@
-import { Suspense, useRef, useState, useEffect, useMemo } from 'react';
+import { Suspense, useRef, useState, useEffect } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { Scene } from './Scene';
 import { ArcballControls, Grid, GizmoHelper, GizmoViewport, Text, OrthographicCamera, PerspectiveCamera as DreiPerspectiveCamera, Line, Environment, TransformControls, useProgress } from '@react-three/drei';
@@ -21,6 +21,7 @@ import { ModelGrid } from './components/ModelGrid';
 import { SectorMap2D } from './components/SectorMap2D';
 import { OffScreenArrow } from './components/NavigationIndicator';
 import { SEIZEWELL_BLUEPRINT } from './config/seizewell';
+import { useGameStore } from './store/gameStore';
 
 function App() {
   const sceneRef = useRef<ThreeScene | null>(null);
@@ -32,19 +33,18 @@ function App() {
   const adminMode = params.get('admin') === 'ship';
   const adminModel = params.get('model') || '/models/00000.obj';
   const path = window.location.pathname;
+  const setNavObjects = useGameStore((s) => s.setNavObjects);
 
-  // Calculate sector map objects (moved from Scene.tsx to be outside Canvas)
-  const sectorObjects = useMemo(() => {
-      const layout = SEIZEWELL_BLUEPRINT;
-      if (!layout) return [];
-      const spacing = 30;
-      const place = (p: [number, number, number]): [number, number, number] => [p[0] * spacing, p[1] * spacing, p[2] * spacing];
-      const objects: { name: string; position: [number, number, number]; type: 'station' | 'gate' | 'ship' }[] = [];
-      for (const st of layout.stations) objects.push({ name: st.name, position: place(st.position), type: 'station' });
-      for (const g of layout.gates) objects.push({ name: g.name, position: place(g.position), type: 'gate' });
-      for (const s of layout.ships) objects.push({ name: s.name, position: place(s.position), type: 'ship' });
-      return objects;
-  }, []);
+  useEffect(() => {
+    const layout = SEIZEWELL_BLUEPRINT;
+    const spacing = 30;
+    const place = (p: [number, number, number]): [number, number, number] => [p[0] * spacing, p[1] * spacing, p[2] * spacing];
+    const objects: { name: string; position: [number, number, number]; type: 'station' | 'gate' | 'ship' }[] = [];
+    for (const st of layout.stations) objects.push({ name: st.name, position: place(st.position), type: 'station' });
+    for (const g of layout.gates) objects.push({ name: g.name, position: place(g.position), type: 'gate' });
+    for (const s of layout.ships) objects.push({ name: s.name, position: place(s.position), type: 'ship' });
+    setNavObjects(objects);
+  }, [setNavObjects]);
 
   if (isViewer) {
     return (
@@ -100,7 +100,7 @@ function App() {
       </Canvas>
       <SmartLoader />
       <HUD />
-      <SectorMap2D objects={sectorObjects} />
+      <SectorMap2D />
       <OffScreenArrow />
       <TradingInterface />
       <PerfOverlay glRef={glRef} sceneRef={sceneRef} />

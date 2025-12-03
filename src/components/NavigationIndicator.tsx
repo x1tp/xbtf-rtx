@@ -13,7 +13,7 @@ import { useGameStore } from '../store/gameStore';
 export const NavigationIndicator: React.FC = () => {
     const selectedTarget = useGameStore((s) => s.selectedTarget);
     const setNavIndicatorState = useGameStore((s) => s.setNavIndicatorState);
-    const { camera, size } = useThree();
+    const { camera, size, scene } = useThree();
     const stateRef = useRef({
         screenPos: new THREE.Vector2(),
         distance: 0,
@@ -30,11 +30,19 @@ export const NavigationIndicator: React.FC = () => {
         }
 
         const targetPos = stateRef.current.targetPos;
-        targetPos.set(
-            selectedTarget.position[0],
-            selectedTarget.position[1],
-            selectedTarget.position[2]
-        );
+        
+        // Try to get the actual 3D object position for smooth tracking
+        // Fall back to store position if object not found
+        const targetObj = scene.getObjectByName(selectedTarget.name);
+        if (targetObj) {
+            targetObj.getWorldPosition(targetPos);
+        } else {
+            targetPos.set(
+                selectedTarget.position[0],
+                selectedTarget.position[1],
+                selectedTarget.position[2]
+            );
+        }
 
         // Get camera position
         const camPos = new THREE.Vector3();
@@ -101,7 +109,7 @@ export const NavigationIndicator: React.FC = () => {
     if (!selectedTarget) return null;
 
     return (
-        <TargetBrackets stateRef={stateRef} targetPosition={selectedTarget.position} />
+        <TargetBrackets stateRef={stateRef} />
     );
 };
 
@@ -115,12 +123,18 @@ interface StateRef {
     };
 }
 
-const TargetBrackets: React.FC<{ stateRef: StateRef; targetPosition: [number, number, number] }> = ({ stateRef, targetPosition }) => {
+const TargetBrackets: React.FC<{ stateRef: StateRef }> = ({ stateRef }) => {
     const ref = useRef<HTMLDivElement>(null);
+    const groupRef = useRef<THREE.Group>(null);
     const selectedTarget = useGameStore((s) => s.selectedTarget);
 
     useFrame(() => {
         if (!ref.current) return;
+        
+        // Update the group position to follow the real-time target position
+        if (groupRef.current) {
+            groupRef.current.position.copy(stateRef.current.targetPos);
+        }
         
         if (!stateRef.current.isOnScreen) {
             ref.current.style.display = 'none';
@@ -138,13 +152,13 @@ const TargetBrackets: React.FC<{ stateRef: StateRef; targetPosition: [number, nu
     if (!selectedTarget) return null;
 
     return (
-        <Html
-            position={targetPosition}
-            center
-            style={{ pointerEvents: 'none' }}
-            zIndexRange={[100, 0]}
-            occlude={false}
-        >
+        <group ref={groupRef}>
+            <Html
+                center
+                style={{ pointerEvents: 'none' }}
+                zIndexRange={[100, 0]}
+                occlude={false}
+            >
             <div
                 ref={ref}
                 style={{
@@ -234,6 +248,7 @@ const TargetBrackets: React.FC<{ stateRef: StateRef; targetPosition: [number, nu
                 </div>
             </div>
         </Html>
+        </group>
     );
 };
 

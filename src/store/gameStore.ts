@@ -37,10 +37,13 @@ interface GameState {
   sectorMapOpen: boolean;
   selectedTarget: NavTarget | null;
   navIndicatorState: NavIndicatorState;
+  navObjects: NavTarget[];
   toggleSectorMap: () => void;
   setSectorMapOpen: (open: boolean) => void;
   setSelectedTarget: (target: NavTarget | null) => void;
   setNavIndicatorState: (state: NavIndicatorState) => void;
+  setNavObjects: (objects: NavTarget[]) => void;
+  upsertNavObject: (obj: NavTarget) => void;
 
   setThrottle: (throttle: number) => void;
   updateSpeed: (speed?: number) => void;
@@ -67,10 +70,27 @@ export const useGameStore = create<GameState>((set) => ({
   sectorMapOpen: false,
   selectedTarget: null,
   navIndicatorState: { screenX: 0, screenY: 0, distance: 0, isOnScreen: false, angle: 0 },
+  navObjects: [],
   toggleSectorMap: () => set((state) => ({ sectorMapOpen: !state.sectorMapOpen })),
   setSectorMapOpen: (open) => set({ sectorMapOpen: open }),
   setSelectedTarget: (target) => set({ selectedTarget: target }),
   setNavIndicatorState: (state) => set({ navIndicatorState: state }),
+  setNavObjects: (objects) => set({ navObjects: objects }),
+  upsertNavObject: (obj) =>
+    set((state) => {
+      const next = [...state.navObjects];
+      const idx = next.findIndex((o) => o.name === obj.name && o.type === obj.type);
+      if (idx >= 0) {
+        next[idx] = obj;
+      } else {
+        next.push(obj);
+      }
+      const selectedTarget =
+        state.selectedTarget && state.selectedTarget.name === obj.name && state.selectedTarget.type === obj.type
+          ? { ...state.selectedTarget, position: obj.position }
+          : state.selectedTarget;
+      return { navObjects: next, selectedTarget };
+    }),
 
   setThrottle: (val) => {
     const minReverse = -0.3; // allow gentle reverse

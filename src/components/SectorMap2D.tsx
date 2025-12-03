@@ -5,11 +5,11 @@ import type { NavTarget } from '../store/gameStore';
 interface SectorObject {
     name: string;
     position: [number, number, number];
-    type: 'station' | 'gate' | 'ship';
+    type: 'station' | 'gate' | 'ship' | 'planet' | 'asteroid';
 }
 
 interface SectorMapProps {
-    objects: SectorObject[];
+    objects?: SectorObject[];
     playerPosition?: [number, number, number];
 }
 
@@ -70,6 +70,7 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
     const setSelectedTarget = useGameStore((s) => s.setSelectedTarget);
     const selectedTarget = useGameStore((s) => s.selectedTarget);
     const storePosition = useGameStore((s) => s.position);
+    const storeObjects = useGameStore((s) => s.navObjects);
     
     const [activeTab, setActiveTab] = useState<TabType>('all');
     const [zoom, setZoom] = useState(1);
@@ -145,8 +146,10 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
         }
     };
 
+    const objectsList = objects ?? storeObjects;
+
     // Calculate bounds for auto-scaling based on current view
-    const allPositions = [...objects.map(o => o.position), currentPlayerPos];
+    const allPositions = [...objectsList.map(o => o.position), currentPlayerPos];
     const allCoords = allPositions.map(p => getAxisCoords(p));
     const minH = Math.min(...allCoords.map(c => c[0])) - 500;
     const maxH = Math.max(...allCoords.map(c => c[0])) + 500;
@@ -208,7 +211,7 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
     };
 
     // Filter objects by tab
-    const filteredObjects = objects.filter(o => {
+    const filteredObjects = objectsList.filter(o => {
         if (activeTab === 'all') return true;
         if (activeTab === 'ships') return o.type === 'ship';
         if (activeTab === 'stations') return o.type === 'station' || o.type === 'gate';

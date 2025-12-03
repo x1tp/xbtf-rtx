@@ -267,7 +267,16 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
             if (!target) {
                 isTargetViewRef.current = false;
             } else {
-                const tPos = new Vector3(target.position[0], target.position[1], target.position[2]);
+                // Try to get the actual 3D object position for smooth following
+                // Fall back to store position if object not found
+                let tPos: Vector3;
+                const targetObj = scene.getObjectByName(target.name);
+                if (targetObj) {
+                    tPos = new Vector3();
+                    targetObj.getWorldPosition(tPos);
+                } else {
+                    tPos = new Vector3(target.position[0], target.position[1], target.position[2]);
+                }
                 const orbit = targetOrbitRef.current;
                 const orbitYawSpeed = 1.8;
                 const orbitPitchSpeed = 1.2;

@@ -3,6 +3,7 @@ import { Environment } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useGameStore } from './store/gameStore';
 import { Ship } from './components/Ship';
+import { AIShip } from './components/AIShip';
 import { Planet } from './components/Planet';
 import { Station } from './components/Station';
 import { Sun } from './components/Sun';
@@ -16,6 +17,7 @@ import type RAPIERType from '@dimforge/rapier3d-compat';
 interface SceneProps { hdr?: boolean }
 import { DEFAULT_SECTOR_CONFIG, type SectorConfig } from './config/sector';
 import { SEIZEWELL_BLUEPRINT } from './config/seizewell';
+import { useAiNavigation } from './ai/useAiNavigation';
 export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
     const cfg: SectorConfig = React.useMemo(() => {
         const raw = typeof window !== 'undefined' ? window.localStorage.getItem('sector:config') : null;
@@ -36,8 +38,13 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
     const layout = useSeizewellLayout ? SEIZEWELL_BLUEPRINT : null;
     const spacing = 30; // spread layout objects apart to avoid overlaps
     const place = (p: [number, number, number]): [number, number, number] => [p[0] * spacing, p[1] * spacing, p[2] * spacing];
+    const placedShips = React.useMemo(
+        () => layout ? layout.ships.map((s) => ({ ...s, placedPosition: place(s.position) })) : [],
+        [layout, spacing]
+    );
     const initialShipPos: [number, number, number] = layout ? place(layout.playerStart || [0, 10, 450]) : [0, 10, 450];
     const [shipPos, setShipPos] = useState<[number, number, number]>(initialShipPos);
+    const navData = useAiNavigation(layout, spacing);
     useEffect(() => {
         setShipPos(layout ? place(layout.playerStart || [0, 10, 450]) : [0, 10, 450]);
     }, [layout]);
@@ -238,6 +245,8 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
                                 rotationSpeed={st.rotationSpeed ?? 0.04}
                                 rotationAxis={st.rotationAxis ?? 'y'}
                                 collisions={st.collisions ?? true}
+                                objectName={st.name}
+                                navRadius={(st.scale ?? 30) * 1.25}
                             />
                         ))}
                         {layout.gates.map((g) => (
@@ -252,19 +261,19 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
                                 rotationAxis={g.rotationAxis ?? 'y'}
                                 rotation={g.rotation ?? [0, Math.PI / 2, 0]}
                                 collisions={g.collisions ?? false}
+                                objectName={g.name}
+                                navRadius={(g.scale ?? 42) * 1.1}
                             />
                         ))}
-                        {layout.ships.map((s) => (
-                            <Station
+                        {placedShips.map((s) => (
+                            <AIShip
                                 key={s.name}
-                                position={place(s.position)}
-                                showLights={false}
-                                rotate={false}
-                                scale={s.scale ?? 20}
+                                name={s.name}
                                 modelPath={s.modelPath}
-                                rotationSpeed={s.rotationSpeed ?? 0}
-                                rotationAxis={s.rotationAxis ?? 'y'}
-                                collisions={s.collisions ?? false}
+                                position={s.placedPosition}
+                                navGraph={navData.graph}
+                                obstacles={navData.obstacles}
+                                maxSpeed={(s.scale ?? 24) * 1.2}
                             />
                         ))}
                     </>

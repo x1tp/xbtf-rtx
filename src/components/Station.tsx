@@ -18,6 +18,8 @@ interface StationProps {
     rotationAxis?: 'x' | 'y' | 'z';
     collisions?: boolean;
     rotation?: [number, number, number];
+    objectName?: string;
+    navRadius?: number;
 }
 
 const DEFAULT_MODEL_PATH = '/models/X_beyond_the_frontier_1121121213_texture.glb';
@@ -107,7 +109,7 @@ const applyParallaxToMaterial = (mat: MeshStandardMaterial, opts: ParallaxOpts) 
     mat.needsUpdate = true;
 };
 
-export const Station: React.FC<StationProps> = ({ position, rotate = true, showLights = true, scale = 40, modelPath, rotationSpeed = 0.05, rotationAxis = 'y', collisions = true, rotation = [0, 0, 0] }) => {
+export const Station: React.FC<StationProps> = ({ position, rotate = true, showLights = true, scale = 40, modelPath, rotationSpeed = 0.05, rotationAxis = 'y', collisions = true, rotation = [0, 0, 0], objectName, navRadius }) => {
     const stationRef = useRef<Group | null>(null);
     const colliderBodiesRef = useRef<RAPIERType.RigidBody[]>([]);
     const stationBodyRef = useRef<RAPIERType.RigidBody | null>(null);
@@ -573,8 +575,16 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
         };
     }, [collisions, gltf, gl, isBod, isObj, modelPath]);
 
+    const navSize = typeof navRadius === 'number' ? navRadius : scale * 1.2;
     return (
-        <group ref={stationRef} position={position} rotation={rotation as [number, number, number]} scale={[scale, scale, scale]} name="Station">
+        <group
+            ref={stationRef}
+            position={position}
+            rotation={rotation as [number, number, number]}
+            scale={[scale, scale, scale]}
+            name={objectName ?? 'Station'}
+            userData={{ navRadius: navSize }}
+        >
             {!isBod && !isObj && <primitive object={gltf.scene} />}
             {showLights && <pointLight position={[0, 10, 0]} intensity={2} color="cyan" distance={50} />}
             {showLights && <pointLight position={[0, -10, 0]} intensity={2} color="cyan" distance={50} />}
