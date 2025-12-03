@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useLoader, useFrame, useThree } from '@react-three/fiber';
 import { OBJLoader, MTLLoader } from 'three-stdlib';
 import { EnginePlume } from './EnginePlume';
-import { AdditiveBlending, Box3, CanvasTexture, Color, Group, SpriteMaterial, Vector3, Texture, LinearMipmapLinearFilter, LinearFilter, SRGBColorSpace, LinearSRGBColorSpace, Mesh, ClampToEdgeWrapping, TextureLoader } from 'three';
+import { AdditiveBlending, Box3, CanvasTexture, Color, Group, SpriteMaterial, Vector3, Texture, LinearMipmapLinearFilter, LinearFilter, SRGBColorSpace, LinearSRGBColorSpace, Mesh, ClampToEdgeWrapping, TextureLoader, DoubleSide, Material } from 'three';
 import { useGameStore } from '../store/gameStore';
 
 
@@ -31,6 +31,11 @@ export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'Shi
             if (child instanceof Mesh) {
                 child.castShadow = true;
                 child.receiveShadow = true;
+                // Enable double-sided rendering to match Blender
+                if (child.material) {
+                    const mats = Array.isArray(child.material) ? child.material : [child.material];
+                    mats.forEach((m: Material) => { (m as any).side = DoubleSide; });
+                }
             }
         });
     }, [obj]);
@@ -89,7 +94,9 @@ export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'Shi
             return replacement;
         };
         Object.values(materials.materials).forEach((mat) => {
-            const m = mat as unknown as { map?: Texture | null; bumpMap?: Texture | null; normalMap?: Texture | null; emissiveMap?: Texture | null };
+            const m = mat as unknown as { map?: Texture | null; bumpMap?: Texture | null; normalMap?: Texture | null; emissiveMap?: Texture | null; side?: number };
+            // Enable double-sided rendering to match Blender's default behavior
+            m.side = DoubleSide;
             tweakAndReplace(m.map, true).then((rep) => { if (rep) m.map = rep; });
             tweakAndReplace(m.emissiveMap, true).then((rep) => { if (rep) m.emissiveMap = rep; });
             const bump = m.bumpMap ?? m.normalMap;

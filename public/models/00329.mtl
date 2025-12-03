@@ -5,8 +5,9 @@ Ks 0 0 0
 
 newmtl mat_1
 Ka 0 0 0
-Kd 0 0 0
+Kd 1 1 1
 Ks 0 0 0
+map_Kd true/68.jpg
 
 newmtl mat_2
 Ka 1 1 1

@@ -1,0 +1,36 @@
+newmtl mat_0
+Ka 0 0 0
+Kd 1 1 1
+Ks 0 0 0
+map_Kd true/40.jpg
+
+newmtl mat_1
+Ka 0 0 0
+Kd 1 1 1
+Ks 0 0 0
+map_Kd true/37.jpg
+
+newmtl mat_2
+Ka 0 0 0
+Kd 1 1 1
+Ks 0 0 0
+map_Kd true/168.jpg
+
+newmtl mat_3
+Ka 0 0 0
+Kd 1 1 1
+Ks 0 0 0
+map_Kd true/38.jpg
+
+newmtl mat_4
+Ka 0 0 0
+Kd 1 1 1
+Ks 0 0 0
+map_Kd true/31.jpg
+
+newmtl mat_5
+Ka 0 0 0
+Kd 1 1 1
+Ks 0 0 0
+map_Kd true/39.jpg
+

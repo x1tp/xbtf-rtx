@@ -429,7 +429,7 @@ function parseBOD(text) {
   const materials = new Map();
   let size = 1;
   for (const line of lines) {
-    const m = line.match(/^\s*MATERIAL3:\s*(\d+)\s*;(\d+)(.*)/i);
+    const m = line.match(/^\s*(?:MATERIAL|MATERIAL2|MATERIAL3):\s*(\d+)\s*;(\d+)(.*)/i);
     if (m) {
       const matId = parseInt(m[1], 10);
       const texId = parseInt(m[2], 10);
@@ -438,7 +438,7 @@ function parseBOD(text) {
       materials.set(matId, { texId, vals });
       continue;
     }
-    // Legacy MATERIAL: lines don't carry a texture id; capture colors so we can build an MTL
+    // Legacy MATERIAL lines may omit texture id; capture colors for MTL
     const mLegacy = line.match(/^\s*MATERIAL:\s*(\d+)\s*;\s*([\d\-]+)?\s*;(.*)$/i);
     if (mLegacy) {
       const matId = parseInt(mLegacy[1], 10);
@@ -490,23 +490,18 @@ function parseBOD(text) {
     if (/^\s*-99\s*;/.test(ln)) {
       const parts = ln.split(';');
       const flag = parts[1] ? parts[1].trim() : '';
-      // If flag is all zeros (e.g. 0000000000000000), it marks the end of the body block.
-      // We stop here to avoid parsing lower LODs or subsequent bodies which would use wrong vertex indices.
+      // Zero flag marks end of body; stop to avoid lower LODs using wrong indices
       if (/^0+$/.test(flag)) break;
       endedParts.add(currentPart);
       continue;
     }
-    // Parse face definition
-    // Format: MatID; V1; V2; V3; Flags; Smooth; [UVs...]
-    // Remove comments first
+    // Face format: MatID; V1; V2; V3; Flags; Smooth; [UVs...]
     const cleanLn = ln.split('/')[0].trim();
     if (!cleanLn) continue;
 
     const parts = cleanLn.split(';').map(s => s.trim()).filter(s => s.length > 0);
-    // We need at least 6 parts: Mat, V1, V2, V3, Flags, Smooth
     if (parts.length < 6) continue;
 
-    // Ensure it starts with a number (Material ID)
     if (isNaN(parseInt(parts[0], 10))) continue;
 
     if (endedParts.has(currentPart)) continue;
@@ -515,8 +510,7 @@ function parseBOD(text) {
     const v1 = parseInt(parts[1], 10);
     const v2 = parseInt(parts[2], 10);
     const v3 = parseInt(parts[3], 10);
-    // parts[4] is flags, parts[5] is smooth
-
+    
     let uvs = [0, 0, 0, 0, 0, 0];
     if (parts.length >= 12) {
       uvs = [
@@ -566,81 +560,41 @@ function subdivideMesh(vertices, uvs, tris, level) {
       ];
       const newVIdx = currentVertices.length;
       currentVertices.push(midV);
-
-      // Interpolate UVs
-      // uv1 and uv2 are arrays [u, v]
-      // Wait, the input uvs structure in tris is [u1, v1, u2, v2, u3, v3]
-      // So we need to pass the specific pair.
-      // Actually, let's just handle UVs inside the loop for simplicity or pass them here.
-      // The UVs are stored per-triangle face in the original structure, not per-vertex globally.
-      // So we can't easily cache UVs if vertices are shared but UVs are not (seams).
-      // However, for this simple subdivision, we are splitting a single triangle.
-      // The new vertices will be used by the new sub-triangles.
-      // If we strictly split each triangle into 4, we don't strictly need to share the new mid-vertices between adjacent triangles
-      // UNLESS we want to keep the mesh connected.
-      // If we don't share, the vertex count explodes.
-      // But the original BOD format has separate UVs per face definition anyway.
-      // And the vertices are indexed.
-      // To keep it simple and avoid UV seam issues, let's just duplicate vertices for now (flat shading style logic)
-      // OR, better: we just return the index of the new spatial vertex.
-      // The UVs will be calculated per-triangle since they are face-varying.
-
       midPointCache.set(key, newVIdx);
       return newVIdx;
     }
 
     for (const t of currentTris) {
-      // t has { mat, v1, v2, v3, uvs: [u1, v1, u2, v2, u3, v3], part }
-      // v1, v2, v3 are indices into currentVertices
-
-      // UV pairs
       const uvA = [t.uvs[0], t.uvs[1]];
       const uvB = [t.uvs[2], t.uvs[3]];
       const uvC = [t.uvs[4], t.uvs[5]];
-
-      // Midpoints
       const a = t.v1;
-      const b = t.v2; // Note: v2 is the second vertex in definition. In my parser v1, v2, v3.
+      const b = t.v2;
       const c = t.v3;
-
-      // Get or create midpoint vertices
-      // Note: We are NOT passing UVs to getMidPoint because UVs are face-attributes here, not vertex attributes.
-      // We will compute the interpolated UVs for the new triangles locally.
       const ab = getMidPoint(a, b);
       const bc = getMidPoint(b, c);
       const ca = getMidPoint(c, a);
-
-      // Interpolate UVs for the midpoints
       const uvAB = [(uvA[0] + uvB[0]) * 0.5, (uvA[1] + uvB[1]) * 0.5];
       const uvBC = [(uvB[0] + uvC[0]) * 0.5, (uvB[1] + uvC[1]) * 0.5];
       const uvCA = [(uvC[0] + uvA[0]) * 0.5, (uvC[1] + uvA[1]) * 0.5];
-
-      // Create 4 new triangles
-      // T1: A, AB, CA
       newTris.push({
         mat: t.mat,
         v1: a, v2: ab, v3: ca,
         uvs: [...uvA, ...uvAB, ...uvCA],
         part: t.part
       });
-
-      // T2: AB, B, BC
       newTris.push({
         mat: t.mat,
         v1: ab, v2: b, v3: bc,
         uvs: [...uvAB, ...uvB, ...uvBC],
         part: t.part
       });
-
-      // T3: BC, C, CA
       newTris.push({
         mat: t.mat,
         v1: bc, v2: c, v3: ca,
         uvs: [...uvBC, ...uvC, ...uvCA],
         part: t.part
       });
-
-      // T4: AB, BC, CA (Center)
       newTris.push({
         mat: t.mat,
         v1: ab, v2: bc, v3: ca,
@@ -694,53 +648,22 @@ export async function convertBodToObj(bodFile, texDir, outName = 'model', outDir
   await fs.promises.writeFile(mtlPath, mtl, 'utf8');
   let objHeader = `mtllib ${outName}.mtl\n`;
 
-  // Apply tessellation if requested
   let finalVertices = bod.vertices;
   let finalTris = bod.tris;
 
   if (tessellationLevel > 0) {
-    // Pre-process tris to resolve 'useEx' indices if needed, so subdivision works on direct indices
+    // Resolve 'useEx' indices before subdivision
     const resolvedTris = bod.tris.map(t => ({
       ...t,
       v1: useEx && bod.exToIndex.has(t.v1) ? bod.exToIndex.get(t.v1) : t.v1,
-      v2: useEx && bod.exToIndex.has(t.v2) ? bod.exToIndex.get(t.v2) : t.v2, // Note: using v2/v3 from my parser
+      v2: useEx && bod.exToIndex.has(t.v2) ? bod.exToIndex.get(t.v2) : t.v2,
       v3: useEx && bod.exToIndex.has(t.v3) ? bod.exToIndex.get(t.v3) : t.v3
     }));
-
-    // Note: In my parser, I used v1, v2, v3. 
-    // But wait, in the loop below (original code), I see:
-    // const ia = useEx && bod.exToIndex.has(t.v1) ? bod.exToIndex.get(t.v1) : t.v1;
-    // const ib = useEx && bod.exToIndex.has(t.v3) ? bod.exToIndex.get(t.v3) : t.v3;
-    // const ic = useEx && bod.exToIndex.has(t.v2) ? bod.exToIndex.get(t.v2) : t.v2;
-    // It seems I swapped v2 and v3 in the original loop for some reason (maybe winding?).
-    // Let's check the parser:
-    // const v1 = parseInt(parts[1], 10);
-    // const v2 = parseInt(parts[2], 10);
-    // const v3 = parseInt(parts[3], 10);
-    // tris.push({ mat, v1, v2, v3, ... });
-    //
-    // In the original loop:
-    // const ib = ... t.v3
-    // const ic = ... t.v2
-    // And then:
-    // const b = flip ? ... ib ... : ... ic ...
-    // const c = flip ? ... ic ... : ... ib ...
-    //
-    // So originally:
-    // if flip=true (default): b uses ib (v3), c uses ic (v2). Order: v1, v3, v2.
-    // if flip=false: b uses ic (v2), c uses ib (v3). Order: v1, v2, v3.
-    //
-    // When I subdivide, I should probably stick to the raw indices v1, v2, v3 and let the final loop handle the flipping.
-    // BUT, the subdivision generates new triangles.
-    // So I need to pass the "raw" triangles to subdivide.
-    // However, 'useEx' mapping happens at the very end usually.
-    // If I subdivide, I generate NEW vertices that don't have 'ex' mappings.
-    // So I MUST resolve 'useEx' BEFORE subdivision.
 
     const result = subdivideMesh(bod.vertices, [], resolvedTris, tessellationLevel);
     finalVertices = result.vertices;
     finalTris = result.tris;
-    // We disable useEx for the final loop because we've already resolved it
+    // Disable useEx for the final loop; already resolved
     useEx = false;
   }
 
@@ -752,12 +675,6 @@ export async function convertBodToObj(bodFile, texDir, outName = 'model', outDir
   const groups = new Map();
   let areas = null;
 
-  // Area limit logic needs to be adapted if we subdivided, but maybe just skip it for now or apply it to the new tris?
-  // If we subdivide, triangles get smaller. The area limit was for "huge outliers".
-  // Let's re-calculate area limit based on new tris if needed, or just use the original logic if it was robust.
-  // Actually, if we subdivide, the "huge outliers" (infinite planes) will also be subdivided into smaller infinite planes?
-  // No, they are just big.
-  // Let's just calculate areas on the final tris.
 
   if (areaLimit === 'auto') {
     areas = [];
@@ -769,9 +686,6 @@ export async function convertBodToObj(bodFile, texDir, outName = 'model', outDir
       const B0 = finalVertices[ib0];
       const C0 = finalVertices[ic0];
       if (!A0 || !B0 || !C0) { areas.push(0); continue; }
-      // ... area calc ...
-      // For brevity, let's just copy the logic or simplify.
-      // Since I'm in a replace block, I should probably just keep the logic but use finalVertices/finalTris.
       const ux0 = B0[0] - A0[0];
       const uy0 = B0[1] - A0[1];
       const uz0 = B0[2] - A0[2];
@@ -793,7 +707,6 @@ export async function convertBodToObj(bodFile, texDir, outName = 'model', outDir
     const base = vt.length / 2;
     vt.push(t.uvs[0], t.uvs[1], t.uvs[2], t.uvs[3], t.uvs[4], t.uvs[5]);
 
-    // Note: logic for ib/ic swap based on v3/v2 is preserved here
     const ia = useEx && bod.exToIndex.has(t.v1) ? bod.exToIndex.get(t.v1) : t.v1;
     const ib = useEx && bod.exToIndex.has(t.v3) ? bod.exToIndex.get(t.v3) : t.v3;
     const ic = useEx && bod.exToIndex.has(t.v2) ? bod.exToIndex.get(t.v2) : t.v2;
