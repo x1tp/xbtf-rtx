@@ -627,12 +627,23 @@ export async function convertBodToObj(bodFile, texDir, outName = 'model', outDir
   for (const [matId, matData] of bod.materials.entries()) {
     mtl += `newmtl mat_${matId}\n`;
     const v = matData.vals;
+    const hasTexture = texFiles.has(matId) && texFiles.get(matId);
     if (v && v.length >= 9) {
       mtl += `Ka ${v[0] / 255} ${v[1] / 255} ${v[2] / 255}\n`;
-      mtl += `Kd ${v[3] / 255} ${v[4] / 255} ${v[5] / 255}\n`;
+      // When a texture is present, use white Kd so texture shows at full brightness
+      // (Three.js multiplies Kd with texture, dark Kd = dark/invisible texture)
+      if (hasTexture) {
+        mtl += `Kd 1 1 1\n`;
+      } else {
+        mtl += `Kd ${v[3] / 255} ${v[4] / 255} ${v[5] / 255}\n`;
+      }
       mtl += `Ks ${v[6] / 255} ${v[7] / 255} ${v[8] / 255}\n`;
     } else if (matData.color) {
-      mtl += `Kd ${matData.color[0]} ${matData.color[1]} ${matData.color[2]}\n`;
+      if (hasTexture) {
+        mtl += `Kd 1 1 1\n`;
+      } else {
+        mtl += `Kd ${matData.color[0]} ${matData.color[1]} ${matData.color[2]}\n`;
+      }
       mtl += `Ka 0.02 0.02 0.02\nKs 0.02 0.02 0.02\n`;
     } else {
       mtl += `Kd 1 1 1\n`;
