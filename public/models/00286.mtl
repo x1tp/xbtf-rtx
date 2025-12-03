@@ -3,52 +3,61 @@ Ka 0 0 0
 Kd 1 1 1
 Ks 0 0 0
 map_Kd true/155.jpg
+map_bump true/155_normal.png
 
 newmtl mat_1
 Ka 0.1568627450980392 0.1568627450980392 0.1568627450980392
 Kd 1 1 1
 Ks 0 0 0
 map_Kd true/201.jpg
+map_bump true/201_normal.png
 
 newmtl mat_2
 Ka 0 0 0
 Kd 1 1 1
 Ks 0 0 0
 map_Kd true/197.jpg
+map_bump true/197_normal.png
 
 newmtl mat_3
 Ka 0 0 0
 Kd 1 1 1
 Ks 0 0 0
 map_Kd true/196.jpg
+map_bump true/196_normal.png
 
 newmtl mat_4
 Ka 0 0 0
 Kd 1 1 1
 Ks 0 0 0
 map_Kd true/200.jpg
+map_bump true/200_normal.png
 
 newmtl mat_5
 Ka 0.1568627450980392 0.1568627450980392 0.1568627450980392
 Kd 1 1 1
 Ks 0 0 0
 map_Kd true/202.jpg
+map_bump true/202_normal.png
 
 newmtl mat_6
 Ka 0 0 0
 Kd 1 1 1
 Ks 0 0 0
 map_Kd true/198.jpg
+map_bump true/198_normal.png
 
 newmtl mat_7
 Ka 0.1568627450980392 0.1568627450980392 0.1568627450980392
 Kd 1 1 1
 Ks 0 0 0
 map_Kd true/203.jpg
+map_bump true/203_normal.png
 
 newmtl mat_8
 Ka 0 0 0
 Kd 1 1 1
 Ks 0 0 0
 map_Kd true/199.jpg
+map_bump true/199_normal.png
 

@@ -398,6 +398,12 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
                         mesh.receiveShadow = true;
                         const apply = (m: MeshStandardMaterial) => {
                             m.side = DoubleSide;
+                            // Reduce specular on Phong materials (OBJLoader default)
+                            if ((m as unknown as { isMeshPhongMaterial: boolean }).isMeshPhongMaterial) {
+                                const phong = m as unknown as { specular: { setScalar: (v: number) => void }; shininess: number };
+                                phong.specular.setScalar(0.1);
+                                phong.shininess = 10;
+                            }
                             if (m.map) { m.map.colorSpace = SRGBColorSpace; m.map.anisotropy = aniso; }
                             if (m.emissiveMap) { m.emissiveMap.colorSpace = SRGBColorSpace; m.emissiveMap.anisotropy = aniso; }
                             if ((m as unknown as { bumpMap?: Texture }).bumpMap && !m.normalMap) {

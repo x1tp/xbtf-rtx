@@ -3,12 +3,14 @@ Ka 0 0 0
 Kd 1 1 1
 Ks 0 0 0
 map_Kd true/59.jpg
+map_bump true/59_normal.png
 
 newmtl mat_1
 Ka 0 0 0
 Kd 1 1 1
 Ks 0 0 0
 map_Kd true/55.jpg
+map_bump true/55_normal.png
 
 newmtl mat_2
 Ka 1 1 1

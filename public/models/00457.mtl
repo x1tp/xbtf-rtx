@@ -3,4 +3,5 @@ Ka 0 0 0
 Kd 1 1 1
 Ks 0 0 0
 map_Kd true/145.jpg
+map_bump true/145_normal.png
 

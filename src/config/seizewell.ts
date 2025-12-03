@@ -25,10 +25,10 @@ export interface SeizewellLayout {
  * editor if you need tighter alignment.
  */
 export const SEIZEWELL_BLUEPRINT: SeizewellLayout = {
-    // Keep sun/planet at readable scene scales; the original AU-scale values
-    // were overkill for this view.
+    // Use a roughly Earth-sized planet (meters) but push it farther out so its
+    // apparent size stays close to the previous view.
     sun: { position: [12000, 8000, 6000], size: 900, color: '#ffdfc4', intensity: 8.0 },
-    planet: { position: [-3200, -1200, -14000], size: 4500 },
+    planet: { position: [-4534400, -1700400, -19838000], size: 6371000 },
     asteroids: { count: 520, range: 1400, center: [40, 40, -160] },
     playerStart: [0, 50, 900],
     stations: [

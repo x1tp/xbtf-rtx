@@ -50,6 +50,9 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
                 o.target = o.target === 'center' ? 'forward' : 'center';
             }
             if (e.code === 'F3') {
+                // Prevent the browser's built-in find dialog so F3 can be used for target view
+                e.preventDefault();
+                e.stopPropagation();
                 const target = useGameStore.getState().selectedTarget;
                 if (target) {
                     isTargetViewRef.current = !isTargetViewRef.current;

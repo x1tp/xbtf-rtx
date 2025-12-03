@@ -40,6 +40,10 @@ export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'Shi
                     const mats = Array.isArray(child.material) ? child.material : [child.material];
                     mats.forEach((m: Material) => {
                         (m as any).side = DoubleSide;
+                        if ((m as any).isMeshPhongMaterial) {
+                            (m as any).specular.setScalar(0.1);
+                            (m as any).shininess = 10;
+                        }
                         (m as any).needsUpdate = true;
                     });
                 }

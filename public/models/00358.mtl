@@ -3,4 +3,5 @@ Ka 0 0 0
 Kd 1 1 1
 Ks 0.8980392156862745 0.8980392156862745 0.8980392156862745
 map_Kd true/152.jpg
+map_bump true/152_normal.png
 

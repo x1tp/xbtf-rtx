@@ -3,6 +3,7 @@ Ka 0 0 0
 Kd 1 1 1
 Ks 0 0 0
 map_Kd true/44.jpg
+map_bump true/44_normal.png
 
 newmtl mat_1
 Ka 0 0 0
