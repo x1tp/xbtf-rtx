@@ -366,7 +366,6 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
                     g.computeVertexNormals();
                     g.computeBoundingSphere();
                     const m = new MeshStandardMaterial({ color: '#ffffff', roughness: 0.8, metalness: 0.0, side: DoubleSide });
-                    if (matId === 3) { m.transparent = true; m.opacity = 0.35; }
                     const url = await resolveTexUrl(texId);
                     const map = loadTexById(loader, url, aniso);
                     if (map) m.map = map;
@@ -447,8 +446,6 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
                             }
                             if (typeof m.metalness === 'number') m.metalness = Math.min(m.metalness ?? 0.0, 0.1);
                             if (typeof m.roughness === 'number') m.roughness = Math.max(m.roughness ?? 0.8, 0.9);
-                            const n = m.name?.toLowerCase?.() || '';
-                            if (n === 'mat_3') { m.transparent = true; m.opacity = 0.35; }
                             applyParallaxToMaterial(m, { heightMap: m.roughnessMap || m.normalMap, scale: 0.045, minLayers: 12, maxLayers: 28 });
                             m.needsUpdate = true;
                         };
