@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useLoader, useFrame, useThree } from '@react-three/fiber';
 import { OBJLoader, MTLLoader } from 'three-stdlib';
 import { EnginePlume } from './EnginePlume';
-import { AdditiveBlending, Box3, CanvasTexture, Color, Group, SpriteMaterial, Vector3, Texture, LinearMipmapLinearFilter, LinearFilter, SRGBColorSpace, LinearSRGBColorSpace, Mesh } from 'three';
+import { AdditiveBlending, Box3, CanvasTexture, Color, Group, SpriteMaterial, Vector3, Texture, LinearMipmapLinearFilter, LinearFilter, SRGBColorSpace, LinearSRGBColorSpace, Mesh, ClampToEdgeWrapping, TextureLoader } from 'three';
 import { useGameStore } from '../store/gameStore';
 
 
@@ -18,7 +18,10 @@ interface ShipModelProps {
 export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'ShipModel', modelPath, editorMode = false, markerOverrides }) => {
     const objPath = modelPath || '/models/00000.obj';
     const mtlPath = objPath.endsWith('.obj') ? objPath.replace('.obj', '.mtl') : '/models/00000.mtl';
-    const materials = useLoader(MTLLoader, mtlPath);
+    const materials = useLoader(MTLLoader, mtlPath, (loader) => {
+        loader.setResourcePath('/models/');
+        loader.setCrossOrigin('anonymous');
+    });
     const obj = useLoader(OBJLoader, objPath, (loader) => {
         materials.preload();
         loader.setMaterials(materials);
@@ -42,25 +45,63 @@ export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'Shi
                 tex.generateMipmaps = true;
                 tex.minFilter = LinearMipmapLinearFilter;
                 tex.magFilter = LinearFilter;
+                tex.wrapS = ClampToEdgeWrapping;
+                tex.wrapT = ClampToEdgeWrapping;
                 tex.needsUpdate = true;
             };
             // If the image isn't ready yet, wait for the texture's first upload.
             if (!tex.image) {
                 const onUpdate = () => {
-                    tex.removeEventListener?.('update', onUpdate);
+                    (tex as any).removeEventListener?.('update', onUpdate);
                     apply();
                 };
-                tex.addEventListener?.('update', onUpdate);
+                (tex as any).addEventListener?.('update', onUpdate);
                 return;
             }
             apply();
         };
         materials.preload();
+        const loader = new TextureLoader();
+        const tryLoad = (urls: string[]) => new Promise<Texture | null>((resolve) => {
+            const next = () => {
+                const url = urls.shift();
+                if (!url) { resolve(null); return; }
+                loader.load(url, (tex) => resolve(tex), undefined, () => next());
+            };
+            next();
+        });
+        const tweakAndReplace = async (target: Texture | null | undefined, isColor: boolean) => {
+            if (!target) return null;
+            const src = ((target as unknown as { source?: { data?: { src?: string } } }).source?.data?.src ||
+                (target.image && (target.image as { currentSrc?: string; src?: string }).currentSrc) ||
+                (target.image && (target.image as { src?: string }).src) ||
+                target.name ||
+                '') as string;
+            const base = src.split('/').pop() || '';
+            const candidates: string[] = [];
+            if (base) {
+                candidates.push(`/models/true/${base}`);
+                candidates.push(`/models/tex/${base}`);
+            }
+            const replacement = await tryLoad(candidates);
+            const tex = replacement || target;
+            applyTextureSettings(tex, isColor);
+            return replacement;
+        };
         Object.values(materials.materials).forEach((mat) => {
             const m = mat as unknown as { map?: Texture | null; bumpMap?: Texture | null; normalMap?: Texture | null; emissiveMap?: Texture | null };
+            tweakAndReplace(m.map, true).then((rep) => { if (rep) m.map = rep; });
+            tweakAndReplace(m.emissiveMap, true).then((rep) => { if (rep) m.emissiveMap = rep; });
+            const bump = m.bumpMap ?? m.normalMap;
+            tweakAndReplace(bump, false).then((rep) => {
+                if (rep) {
+                    if (m.bumpMap) m.bumpMap = rep;
+                    else if (m.normalMap) m.normalMap = rep;
+                }
+            });
             applyTextureSettings(m.map, true);
             applyTextureSettings(m.emissiveMap, true);
-            applyTextureSettings(m.bumpMap ?? m.normalMap, false);
+            applyTextureSettings(bump, false);
         });
     }, [gl, materials]);
     const initialMarkers = useMemo(() => {

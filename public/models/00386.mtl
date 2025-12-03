@@ -1,0 +1,10 @@
+newmtl mat_0
+Ka 0 0 0
+Kd 0 0 0
+Ks 0 0 0
+
+newmtl mat_1
+Ka 0 0 0
+Kd 0.6745098039215687 0 0
+Ks 0 0 0
+

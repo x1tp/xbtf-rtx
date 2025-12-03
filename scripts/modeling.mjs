@@ -436,6 +436,25 @@ function parseBOD(text) {
       const rest = m[3];
       const vals = rest.split(';').map(s => s.trim()).filter(s => s !== '').map(s => parseInt(s, 10));
       materials.set(matId, { texId, vals });
+      continue;
+    }
+    // Legacy MATERIAL: lines don't carry a texture id; capture colors so we can build an MTL
+    const mLegacy = line.match(/^\s*MATERIAL:\s*(\d+)\s*;\s*([\d\-]+)?\s*;(.*)$/i);
+    if (mLegacy) {
+      const matId = parseInt(mLegacy[1], 10);
+      const texMaybe = mLegacy[2];
+      const texId = texMaybe != null && texMaybe !== '' ? parseInt(texMaybe, 10) : null;
+      const rest = mLegacy[3];
+      const vals = rest.split(';').map(s => s.trim()).filter(s => s !== '').map(s => parseInt(s, 10));
+      let color = null;
+      if (vals.length >= 6) {
+        const r = vals[3] ?? vals[0] ?? 128;
+        const g = vals[4] ?? vals[1] ?? 128;
+        const b = vals[5] ?? vals[2] ?? 128;
+        color = [r / 255, g / 255, b / 255];
+      }
+      materials.set(matId, { texId: isNaN(texId) ? null : texId, vals, color });
+      continue;
     }
     const s = line.match(/^\s*(\d+)\s*;\s*\/\s*Automatic Object Size/i);
     if (s) size = parseInt(s[1], 10);
@@ -658,6 +677,9 @@ export async function convertBodToObj(bodFile, texDir, outName = 'model', outDir
       mtl += `Ka ${v[0] / 255} ${v[1] / 255} ${v[2] / 255}\n`;
       mtl += `Kd ${v[3] / 255} ${v[4] / 255} ${v[5] / 255}\n`;
       mtl += `Ks ${v[6] / 255} ${v[7] / 255} ${v[8] / 255}\n`;
+    } else if (matData.color) {
+      mtl += `Kd ${matData.color[0]} ${matData.color[1]} ${matData.color[2]}\n`;
+      mtl += `Ka 0.02 0.02 0.02\nKs 0.02 0.02 0.02\n`;
     } else {
       mtl += `Kd 1 1 1\n`;
     }

@@ -1,11 +1,26 @@
 import { create } from 'zustand';
 
+export interface NavTarget {
+  name: string;
+  position: [number, number, number];
+  type: 'station' | 'gate' | 'ship' | 'planet' | 'asteroid';
+}
+
+export interface NavIndicatorState {
+  screenX: number;
+  screenY: number;
+  distance: number;
+  isOnScreen: boolean;
+  angle: number;
+}
+
 interface GameState {
   speed: number;
   maxSpeed: number;
   throttle: number; // -reverseLimit to 1
   rotation: { x: number; y: number; z: number };
   position: { x: number; y: number; z: number };
+  setPosition: (position: { x: number; y: number; z: number }) => void;
   isDocked: boolean;
   sunVisible: boolean;
   sunAdapt: number;
@@ -13,6 +28,19 @@ interface GameState {
   setSunVisible: (v: boolean) => void;
   setSunAdapt: (v: number) => void;
   setSunIntensity: (v: number) => void;
+
+  // Time / SETA
+  timeScale: number;
+  setTimeScale: (scale: number) => void;
+
+  // Navigation/Sector map
+  sectorMapOpen: boolean;
+  selectedTarget: NavTarget | null;
+  navIndicatorState: NavIndicatorState;
+  toggleSectorMap: () => void;
+  setSectorMapOpen: (open: boolean) => void;
+  setSelectedTarget: (target: NavTarget | null) => void;
+  setNavIndicatorState: (state: NavIndicatorState) => void;
 
   setThrottle: (throttle: number) => void;
   updateSpeed: (speed?: number) => void;
@@ -31,6 +59,18 @@ export const useGameStore = create<GameState>((set) => ({
   sunVisible: false,
   sunAdapt: 0,
   sunIntensity: 0,
+
+  timeScale: 1.0,
+  setTimeScale: (scale) => set({ timeScale: scale }),
+
+  // Navigation state
+  sectorMapOpen: false,
+  selectedTarget: null,
+  navIndicatorState: { screenX: 0, screenY: 0, distance: 0, isOnScreen: false, angle: 0 },
+  toggleSectorMap: () => set((state) => ({ sectorMapOpen: !state.sectorMapOpen })),
+  setSectorMapOpen: (open) => set({ sectorMapOpen: open }),
+  setSelectedTarget: (target) => set({ selectedTarget: target }),
+  setNavIndicatorState: (state) => set({ navIndicatorState: state }),
 
   setThrottle: (val) => {
     const minReverse = -0.3; // allow gentle reverse
@@ -56,6 +96,7 @@ export const useGameStore = create<GameState>((set) => ({
     }),
 
   updatePosition: () => set(() => ({})),
+  setPosition: (position) => set({ position }),
 
   setRotation: (rot) => set({ rotation: rot }),
   setDocked: (docked) => set({ isDocked: docked, speed: 0, throttle: 0 }),

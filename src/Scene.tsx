@@ -7,6 +7,7 @@ import { Planet } from './components/Planet';
 import { Station } from './components/Station';
 import { Sun } from './components/Sun';
 import { Dust } from './components/Dust';
+import { NavigationIndicator } from './components/NavigationIndicator';
 import { InstancedMesh, TextureLoader, SRGBColorSpace, LinearSRGBColorSpace, RepeatWrapping, BackSide, LinearMipmapLinearFilter, LinearFilter } from 'three';
 import * as THREE from 'three';
 import { ensureRapier, getWorld, getWorldSync } from './physics/RapierWorld';
@@ -14,6 +15,7 @@ import type RAPIERType from '@dimforge/rapier3d-compat';
 
 interface SceneProps { hdr?: boolean }
 import { DEFAULT_SECTOR_CONFIG, type SectorConfig } from './config/sector';
+import { SEIZEWELL_BLUEPRINT } from './config/seizewell';
 export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
     const cfg: SectorConfig = React.useMemo(() => {
         const raw = typeof window !== 'undefined' ? window.localStorage.getItem('sector:config') : null;
@@ -30,7 +32,16 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
             return DEFAULT_SECTOR_CONFIG;
         }
     }, []);
-    const sunPosition: [number, number, number] = cfg.sun.position;
+    const useSeizewellLayout = true;
+    const layout = useSeizewellLayout ? SEIZEWELL_BLUEPRINT : null;
+    const spacing = 30; // spread layout objects apart to avoid overlaps
+    const place = (p: [number, number, number]): [number, number, number] => [p[0] * spacing, p[1] * spacing, p[2] * spacing];
+    const initialShipPos: [number, number, number] = layout ? place(layout.playerStart || [0, 10, 450]) : [0, 10, 450];
+    const [shipPos, setShipPos] = useState<[number, number, number]>(initialShipPos);
+    useEffect(() => {
+        setShipPos(layout ? place(layout.playerStart || [0, 10, 450]) : [0, 10, 450]);
+    }, [layout]);
+    const sunPosition: [number, number, number] = layout ? layout.sun.position : cfg.sun.position;
     const StarfieldSky: React.FC<{ density?: number; brightness?: number; milkyWayStrength?: number; orientation?: [number, number, number]; radius?: number; fadeMin?: number; fadeMax?: number; viewFadeMin?: number; viewFadeMax?: number }> = ({ density = 0.15, brightness = 0.5, milkyWayStrength = 0.22, orientation = [0.0, 0.25, 0.97], radius = 2000000, fadeMin = 0.2, fadeMax = 0.95, viewFadeMin = 0.6, viewFadeMax = 0.85 }) => {
         const matRef = useRef<THREE.ShaderMaterial | null>(null);
         const skyRef = useRef<THREE.Mesh | null>(null);
@@ -52,7 +63,9 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
             uViewAdapt: { value: 0 }
         }), [density, brightness, milkyWayStrength, orientation, fadeMin, fadeMax, viewFadeMin, viewFadeMax]);
         const adaptRef = useRef(0);
-        useFrame((state, delta) => {
+        const timeScale = useGameStore((state) => state.timeScale);
+        useFrame((state, rawDelta) => {
+            const delta = rawDelta * timeScale;
             const m = matRef.current;
             if (!m) return;
             const u = m.uniforms as unknown as { uTime: { value: number }; uSunDir: { value: THREE.Vector3 }; uCamSunDot: { value: number }; uSunVisible: { value: number } };
@@ -183,10 +196,8 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
             float s = stars(uv, uDensity);
             float m = milky(nd, uOrientation);
             float sunDot = max(dot(nd, normalize(uSunDir)), 0.0);
-            float inViewGate = uSunVisible * smoothstep(uViewFadeMin, uViewFadeMax, uCamSunDot);
-            float fadeDir = mix(1.0, 1.0 - smoothstep(uFadeMin, uFadeMax, sunDot), inViewGate);
-            float viewFade = 1.0 - uViewAdapt;
-            vec3 col = (vec3(s * uBrightness) + vec3(m * uMilkyWayStrength)) * fadeDir * viewFade;
+          float viewFade = 1.0; // force starfield always visible while we debug darkening
+          vec3 col = (vec3(s * uBrightness) + vec3(m * uMilkyWayStrength)) * viewFade;
           gl_FragColor = vec4(col, 1.0);
           }
         `;
@@ -205,16 +216,67 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
             <StarfieldSky density={0.02} brightness={0.7} milkyWayStrength={0.2} orientation={[0.0, 0.25, 0.97]} radius={2000000} fadeMin={0.2} fadeMax={0.9} viewFadeMin={0.6} viewFadeMax={0.85} />
             <Environment preset="night" />
             {!hdr && <ambientLight intensity={0.05} />}
-            <Sun position={sunPosition} size={cfg.sun.size} color={cfg.sun.color} intensity={cfg.sun.intensity} hdr={hdr} />
+            {!hdr && <hemisphereLight args={['#445577', '#050505', 0.2]} />}
+            <Sun position={sunPosition} size={layout ? layout.sun.size : cfg.sun.size} color={layout ? layout.sun.color : cfg.sun.color} intensity={layout ? layout.sun.intensity : cfg.sun.intensity} hdr={hdr} />
 
             {/* Player */}
-            <Ship enableLights={!hdr} position={[0, 10, 450]} />
+            <Ship enableLights={!hdr} position={shipPos} />
 
             {/* Environment Objects */}
-            <Planet position={cfg.planet.position} size={cfg.planet.size} color="#4466aa" hdr={hdr} sunPosition={sunPosition} />
-            <Station position={cfg.station.position} showLights={!hdr} scale={cfg.station.scale} modelPath={cfg.station.modelPath} rotationSpeed={cfg.station.rotationSpeed} rotationAxis={cfg.station.rotationAxis} />
-            <Asteroids count={cfg.asteroids.count} range={cfg.asteroids.range} center={cfg.asteroids.center} />
-            <Dust count={5000} range={cfg.asteroids.range} center={cfg.asteroids.center} color="#aaccff" size={0.8} opacity={0.15} />
+            <Planet position={layout ? layout.planet.position : cfg.planet.position} size={layout ? layout.planet.size : cfg.planet.size} color="#4466aa" hdr={hdr} sunPosition={sunPosition} />
+            {layout
+                ? (
+                    <>
+                        {layout.stations.map((st) => (
+                            <Station
+                                key={st.name}
+                                position={place(st.position)}
+                                showLights={!hdr}
+                                rotate
+                                scale={st.scale ?? 30}
+                                modelPath={st.modelPath}
+                                rotationSpeed={st.rotationSpeed ?? 0.04}
+                                rotationAxis={st.rotationAxis ?? 'y'}
+                                collisions={st.collisions ?? true}
+                            />
+                        ))}
+                        {layout.gates.map((g) => (
+                            <Station
+                                key={g.name}
+                                position={place(g.position)}
+                                showLights={false}
+                                rotate={false}
+                                scale={g.scale ?? 42}
+                                modelPath={g.modelPath}
+                                rotationSpeed={0}
+                                rotationAxis={g.rotationAxis ?? 'y'}
+                                rotation={g.rotation ?? [0, Math.PI / 2, 0]}
+                                collisions={g.collisions ?? false}
+                            />
+                        ))}
+                        {layout.ships.map((s) => (
+                            <Station
+                                key={s.name}
+                                position={place(s.position)}
+                                showLights={false}
+                                rotate={false}
+                                scale={s.scale ?? 20}
+                                modelPath={s.modelPath}
+                                rotationSpeed={s.rotationSpeed ?? 0}
+                                rotationAxis={s.rotationAxis ?? 'y'}
+                                collisions={s.collisions ?? false}
+                            />
+                        ))}
+                    </>
+                )
+                : (
+                    <Station position={cfg.station.position} showLights={!hdr} scale={cfg.station.scale} modelPath={cfg.station.modelPath} rotationSpeed={cfg.station.rotationSpeed} rotationAxis={cfg.station.rotationAxis} />
+                )}
+            <Asteroids count={layout ? layout.asteroids.count : cfg.asteroids.count} range={layout ? layout.asteroids.range * spacing : cfg.asteroids.range} center={layout ? place(layout.asteroids.center) : cfg.asteroids.center} />
+            <Dust count={5000} range={layout ? layout.asteroids.range * spacing : cfg.asteroids.range} center={layout ? place(layout.asteroids.center) : cfg.asteroids.center} color="#aaccff" size={0.8} opacity={0.15} />
+
+            {/* Navigation indicator for selected target */}
+            <NavigationIndicator />
 
         </>
     );
@@ -230,7 +292,7 @@ const Asteroids: React.FC<AsteroidsProps> = ({ count, range, center }) => {
     const { gl } = useThree();
     const maxAniso = useMemo(() => gl.capabilities?.getMaxAnisotropy?.() ?? 4, [gl]);
     type AsteroidUserData = { positions: THREE.Vector3[]; velocities: THREE.Vector3[]; scales: number[] };
-    const mobileThreshold = 10.0;
+    const mobileThreshold = 0.0; // Disable dynamic physics for asteroids to keep perf sane in large sectors
 
     const [particles] = useState(() => {
         const temp: { position: [number, number, number]; scale: number }[] = [];

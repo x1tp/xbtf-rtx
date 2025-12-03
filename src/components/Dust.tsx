@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useLayoutEffect } from 'react';
+import React, { useMemo, useRef, useLayoutEffect, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
@@ -20,21 +20,43 @@ export const Dust: React.FC<DustProps> = ({
     opacity = 0.4
 }) => {
     const meshRef = useRef<THREE.InstancedMesh>(null);
+    const materialRef = useRef<THREE.ShaderMaterial | null>(null);
 
-    // Generate random positions and initial phases
+    // Deterministic pseudo-random values to stay pure during render
+    const baseSeed = useMemo(() => {
+        let seed = 1234567;
+        seed ^= Math.imul(count, 1103515245);
+        seed ^= Math.imul(Math.floor(range * 100), 2654435761);
+        seed ^= Math.imul(Math.floor(center[0] * 100), 2246822519);
+        seed ^= Math.imul(Math.floor(center[1] * 100), 3266489917);
+        seed ^= Math.imul(Math.floor(center[2] * 100), 668265263);
+        seed ^= Math.imul(Math.floor(size * 1000), 374761393);
+        return seed >>> 0;
+    }, [center, count, range, size]);
+
     const particles = useMemo(() => {
+        const hashRand = (i: number, salt: number) => {
+            const x = Math.sin((i + 1) * 12.9898 + (baseSeed + salt) * 78.233) * 43758.5453;
+            return x - Math.floor(x);
+        };
         const temp = [];
         for (let i = 0; i < count; i++) {
-            const x = (Math.random() - 0.5) * range + center[0];
-            const y = (Math.random() - 0.5) * range + center[1];
-            const z = (Math.random() - 0.5) * range + center[2];
-            const scale = size * (0.5 + Math.random());
-            const speed = 0.2 + Math.random() * 0.5;
-            const offset = Math.random() * 100;
+            const rx = hashRand(i, 17);
+            const ry = hashRand(i, 23);
+            const rz = hashRand(i, 31);
+            const rScale = hashRand(i, 41);
+            const rSpeed = hashRand(i, 53);
+            const rOffset = hashRand(i, 67);
+            const x = (rx - 0.5) * range + center[0];
+            const y = (ry - 0.5) * range + center[1];
+            const z = (rz - 0.5) * range + center[2];
+            const scale = size * (0.5 + rScale);
+            const speed = 0.2 + rSpeed * 0.5;
+            const offset = rOffset * 100;
             temp.push({ x, y, z, scale, speed, offset });
         }
         return temp;
-    }, [count, range, center, size]);
+    }, [baseSeed, center, count, range, size]);
 
     useLayoutEffect(() => {
         if (!meshRef.current) return;
@@ -107,6 +129,10 @@ export const Dust: React.FC<DustProps> = ({
         });
     }, [color, opacity, size]);
 
+    useEffect(() => {
+        materialRef.current = material;
+    }, [material]);
+
     // We need to pass attributes for the shader animation
     useLayoutEffect(() => {
         if (!meshRef.current) return;
@@ -126,8 +152,9 @@ export const Dust: React.FC<DustProps> = ({
     }, [count, particles]);
 
     useFrame((state) => {
-        if (material) {
-            material.uniforms.uTime.value = state.clock.elapsedTime;
+        const mat = materialRef.current;
+        if (mat) {
+            mat.uniforms.uTime.value = state.clock.elapsedTime;
         }
     });
 

@@ -6,6 +6,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { ensureRapier, getWorld, getWorldSync } from '../physics/RapierWorld';
 import type RAPIERType from '@dimforge/rapier3d-compat';
 import { AtmosphereShader } from '../shaders/AtmosphereShader';
+import { useGameStore } from '../store/gameStore';
 
 type AtmosphereParams = {
     rimPower?: number;
@@ -125,6 +126,7 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, onTexturesLoaded
 
     const [ready, setReady] = useState(false);
     const { gl } = useThree();
+    const timeScale = useGameStore((state) => state.timeScale);
 
     useEffect(() => {
         const loader = new TextureLoader();
@@ -198,7 +200,8 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, onTexturesLoaded
     const planetBodyRef = useRef<RAPIERType.RigidBody | null>(null);
 
 
-    useFrame((_, delta) => {
+    useFrame((_, rawDelta) => {
+        const delta = rawDelta * timeScale;
         if (planetRef.current) {
             planetRef.current.rotation.y += delta * 0.001; // Slow rotation
         }

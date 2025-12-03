@@ -1,0 +1,12 @@
+newmtl mat_0
+Ka 0 0 0
+Kd 1 0.4 0.4
+Ks 0 0 0
+map_Kd true/29.jpg
+
+newmtl mat_1
+Ka 0 0 0
+Kd 0 0 0
+Ks 0 0 0
+map_Kd true/28.jpg
+

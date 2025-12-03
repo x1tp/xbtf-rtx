@@ -1,4 +1,4 @@
-import { Suspense, useRef, useState, useEffect } from 'react';
+import { Suspense, useRef, useState, useEffect, useMemo } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { Scene } from './Scene';
 import { ArcballControls, Grid, GizmoHelper, GizmoViewport, Text, OrthographicCamera, PerspectiveCamera as DreiPerspectiveCamera, Line, Environment, TransformControls, useProgress } from '@react-three/drei';
@@ -9,13 +9,18 @@ import { TradingInterface } from './components/TradingInterface';
 import { SimpleEffects } from './components/SimpleEffects';
 import { ShipModel } from './components/ShipModel';
 import type { PerspectiveCamera, Scene as ThreeScene, Mesh, MeshStandardMaterial, WebGLRenderer, Object3D } from 'three';
-import { Box3, Vector3, Vector2, SRGBColorSpace, NoToneMapping, PCFSoftShadowMap, Raycaster } from 'three';
+import { Box3, Vector3, Vector2, SRGBColorSpace, ACESFilmicToneMapping, NoToneMapping, PCFSoftShadowMap, Raycaster } from 'three';
 import { Station } from './components/Station';
 import { PhysicsStepper } from './physics/PhysicsStepper';
 import { PlanetEditor } from './admin/PlanetEditor';
 import { getPhysicsMetrics } from './physics/RapierWorld';
+import { ModelGrid } from './components/ModelGrid';
 
 
+
+import { SectorMap2D } from './components/SectorMap2D';
+import { OffScreenArrow } from './components/NavigationIndicator';
+import { SEIZEWELL_BLUEPRINT } from './config/seizewell';
 
 function App() {
   const sceneRef = useRef<ThreeScene | null>(null);
@@ -27,6 +32,19 @@ function App() {
   const adminMode = params.get('admin') === 'ship';
   const adminModel = params.get('model') || '/models/00000.obj';
   const path = window.location.pathname;
+
+  // Calculate sector map objects (moved from Scene.tsx to be outside Canvas)
+  const sectorObjects = useMemo(() => {
+      const layout = SEIZEWELL_BLUEPRINT;
+      if (!layout) return [];
+      const spacing = 30;
+      const place = (p: [number, number, number]): [number, number, number] => [p[0] * spacing, p[1] * spacing, p[2] * spacing];
+      const objects: { name: string; position: [number, number, number]; type: 'station' | 'gate' | 'ship' }[] = [];
+      for (const st of layout.stations) objects.push({ name: st.name, position: place(st.position), type: 'station' });
+      for (const g of layout.gates) objects.push({ name: g.name, position: place(g.position), type: 'gate' });
+      for (const s of layout.ships) objects.push({ name: s.name, position: place(s.position), type: 'ship' });
+      return objects;
+  }, []);
 
   if (isViewer) {
     return (
@@ -82,6 +100,8 @@ function App() {
       </Canvas>
       <SmartLoader />
       <HUD />
+      <SectorMap2D objects={sectorObjects} />
+      <OffScreenArrow />
       <TradingInterface />
       <PerfOverlay glRef={glRef} sceneRef={sceneRef} />
       <div style={{
@@ -356,6 +376,8 @@ function ShipEditorCanvas({ modelPath }: { modelPath?: string }) {
   return (
     <>
       <Canvas
+        shadows
+        gl={{ logarithmicDepthBuffer: true, outputColorSpace: SRGBColorSpace, toneMapping: ACESFilmicToneMapping, toneMappingExposure: 1.15 }}
         onCreated={({ scene, camera }) => {
           sceneRef.current = scene;
           cameraRef.current = camera as PerspectiveCamera;
@@ -363,9 +385,10 @@ function ShipEditorCanvas({ modelPath }: { modelPath?: string }) {
       >
         <Suspense fallback={null}>
           <color attach="background" args={["#0b1016"]} />
-          <hemisphereLight args={["#bcdfff", "#223344", 0.6]} />
-          <directionalLight position={[10, 12, 10]} intensity={1.4} color="#ffffff" />
-          <ambientLight intensity={0.2} />
+          <Environment preset="night" />
+          <hemisphereLight args={["#bcdfff", "#223344", 0.2]} />
+          <directionalLight position={[10, 12, 10]} intensity={1.4} color="#ffffff" castShadow />
+          <ambientLight intensity={0.1} />
           <ShipModel enableLights={false} editorMode name="ShipModelEditor" modelPath={modelPath} markerOverrides={markers} />
           {markers.map((m, i) => (
             <group
@@ -434,8 +457,8 @@ function AdminHome() {
   }
   return (
     <div style={{ width: '100vw', height: '100vh', background: '#0b1016', color: '#c3e7ff', fontFamily: 'monospace' }}>
-      <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 640 }}>
-        <h2>Select Ship</h2>
+      <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 1400, height: '100%', boxSizing: 'border-box', margin: '0 auto' }}>
+        <h2>Select Ingame Object</h2>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span>Model path</span>
           <input value={model} onChange={(e) => setModel(e.target.value)} placeholder="/models/00000.obj" style={{ flex: 1, padding: '6px 10px', background: '#0f2230', border: '1px solid #3fb6ff', color: '#c3e7ff' }} />
@@ -444,11 +467,9 @@ function AdminHome() {
           <button onClick={() => { window.location.href = `/admin/ship?model=${encodeURIComponent(model)}`; }} style={{ padding: '8px 12px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Open Editor</button>
           <button onClick={() => setTab('root')} style={{ padding: '8px 12px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Back</button>
         </div>
-        <div style={{ marginTop: 16 }}>
-          <div style={{ marginBottom: 8, color: '#8ab6d6' }}>Quick picks</div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => setModel('/models/00000.obj')} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>00000.obj</button>
-          </div>
+        <div style={{ marginTop: 16, flex: 1, overflowY: 'auto', minHeight: 0 }}>
+          <div style={{ marginBottom: 8, color: '#8ab6d6' }}>Select Model</div>
+          <ModelGrid onSelect={(path) => setModel(path)} currentModel={model} />
         </div>
       </div>
     </div>

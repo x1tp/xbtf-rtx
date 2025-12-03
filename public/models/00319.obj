@@ -1,0 +1,15 @@
+mtllib 00319.mtl
+v 2 2 0
+v -2 2 0
+v -2 -2 0
+v 2 -2 0
+vt 1 0
+vt 0 1
+vt 0 0
+vt 1 0
+vt 1 1
+vt 0 1
+g B_dis02
+usemtl mat_0
+f 1/1 2/3 3/2
+f 1/4 3/6 4/5

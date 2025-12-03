@@ -4,8 +4,12 @@ import { useFrame } from '@react-three/fiber';
 import { getWorld, stepWorld } from './RapierWorld';
 import type RAPIERType from '@dimforge/rapier3d-compat';
 
+import { useGameStore } from '../store/gameStore';
+
 export const PhysicsStepper: FC = () => {
   const worldRef = useRef<RAPIERType.World | null>(null);
+  const timeScale = useGameStore((state) => state.timeScale);
+
   useEffect(() => {
     void getWorld().then((w) => {
       worldRef.current = w;
@@ -13,7 +17,10 @@ export const PhysicsStepper: FC = () => {
   }, []);
 
   useFrame(() => {
-    void stepWorld();
+    const steps = Math.max(1, Math.floor(timeScale));
+    for (let i = 0; i < steps; i++) {
+      void stepWorld();
+    }
   }, 1000);
 
   return null;

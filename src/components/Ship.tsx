@@ -21,6 +21,8 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
     const updateSpeed = useGameStore((state) => state.updateSpeed);
     const setThrottle = useGameStore((state) => state.setThrottle);
     const throttle = useGameStore((state) => state.throttle);
+    const timeScale = useGameStore((state) => state.timeScale);
+    const setTimeScale = useGameStore((state) => state.setTimeScale);
     const velocityRef = useRef(new Vector3());
     const planetRadiusRef = useRef(0);
     const stationRadiusRef = useRef(0);
@@ -44,6 +46,14 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
             if (e.code === 'KeyT') {
                 const o = orbitRef.current;
                 o.target = o.target === 'center' ? 'forward' : 'center';
+            }
+            if (e.code === 'KeyM') {
+                useGameStore.getState().toggleSectorMap();
+            }
+            if (e.code === 'KeyJ') {
+                const current = useGameStore.getState().timeScale;
+                // Toggle between 1x and 10x
+                useGameStore.getState().setTimeScale(current === 1.0 ? 10.0 : 1.0);
             }
             if (e.code === 'Backspace') {
                 e.preventDefault();
@@ -178,21 +188,59 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
     }
     }, [scene]);
 
-    useFrame((state, delta) => {
+    useFrame((state, rawDelta) => {
+        const delta = rawDelta * timeScale;
         void state;
         if (!shipRef.current) return;
         const ship = shipRef.current;
         const velocity = velocityRef.current;
         const orbit = orbitRef.current;
 
+        // Helper to compute camera follow (recalculates vectors from current quaternion)
+        const updateCameraFollow = () => {
+            const fwd = new Vector3(0, 0, -1).applyQuaternion(ship.quaternion).normalize();
+            const upVec = new Vector3(0, 1, 0).applyQuaternion(ship.quaternion);
+            const rightVec = new Vector3().crossVectors(fwd, upVec).normalize();
+            const base = fwd.clone().multiplyScalar(-orbit.distance);
+            const qYaw = new Quaternion().setFromAxisAngle(upVec, orbit.yaw);
+            const qPitch = new Quaternion().setFromAxisAngle(rightVec, orbit.pitch);
+            const offset = base.clone().applyQuaternion(qYaw).applyQuaternion(qPitch);
+            const desired = ship.position.clone().add(offset);
+            const lookTarget = orbit.target === 'center'
+                ? ship.position.clone()
+                : ship.position.clone().add(fwd.clone().multiplyScalar(50));
+            const t = 1 - Math.exp(-5 * delta);
+            if (!initializedRef.current) {
+                camera.position.copy(desired);
+                camera.up.copy(upVec);
+                camera.lookAt(lookTarget);
+                initializedRef.current = true;
+            } else {
+                camera.position.lerp(desired, t);
+                camera.up.copy(upVec);
+                camera.lookAt(lookTarget);
+            }
+        };
+
+        // Skip all ship controls when sector map is open
+        const sectorMapOpen = useGameStore.getState().sectorMapOpen;
+        if (sectorMapOpen) {
+            // Still update camera to follow ship, but no input processing
+            updateCameraFollow();
+            return;
+        }
+
         // Input-driven throttle changes
         if (keys.current['KeyW']) {
+            if (timeScale > 1.0) setTimeScale(1.0);
             setThrottle(throttle + delta * 0.5);
             brakeRef.current = false;
         } else if (keys.current['KeyS']) {
+            if (timeScale > 1.0) setTimeScale(1.0);
             setThrottle(throttle - delta * 0.5);
             brakeRef.current = false;
         } else if (brakeRef.current) {
+            if (timeScale > 1.0) setTimeScale(1.0);
             const eased = MathUtils.damp(throttle, 0, 1.2, delta);
             setThrottle(eased);
         }
@@ -212,12 +260,24 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
         rotationChange.y = -mx * yawSpeed * delta;
 
         // Keys control Roll
-        if (keys.current['KeyQ']) rotationChange.z = rollSpeed * delta;
-        if (keys.current['KeyE']) rotationChange.z = -rollSpeed * delta;
+        if (keys.current['KeyQ']) {
+            rotationChange.z = rollSpeed * delta;
+            if (timeScale > 1.0) setTimeScale(1.0);
+        }
+        if (keys.current['KeyE']) {
+            rotationChange.z = -rollSpeed * delta;
+            if (timeScale > 1.0) setTimeScale(1.0);
+        }
 
         // Apply rotation in local space so controls stay aligned after rolling
-        if (rotationChange.x !== 0) ship.rotateX(rotationChange.x);
-        if (rotationChange.y !== 0) ship.rotateY(rotationChange.y);
+        if (rotationChange.x !== 0) {
+            ship.rotateX(rotationChange.x);
+            if (timeScale > 1.0) setTimeScale(1.0);
+        }
+        if (rotationChange.y !== 0) {
+            ship.rotateY(rotationChange.y);
+            if (timeScale > 1.0) setTimeScale(1.0);
+        }
         if (rotationChange.z !== 0) ship.rotateZ(rotationChange.z);
 
         const forward = new Vector3(0, 0, -1).applyQuaternion(ship.quaternion).normalize();
@@ -325,25 +385,11 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
         if (keys.current['BracketLeft']) orbit.distance = MathUtils.clamp(orbit.distance - zoomSpeed * delta, 5, 60);
         if (keys.current['BracketRight']) orbit.distance = MathUtils.clamp(orbit.distance + zoomSpeed * delta, 5, 60);
 
-        const base = forward.clone().multiplyScalar(-orbit.distance);
-        const qYaw = new Quaternion().setFromAxisAngle(up, orbit.yaw);
-        const qPitch = new Quaternion().setFromAxisAngle(right, orbit.pitch);
-        const offset = base.clone().applyQuaternion(qYaw).applyQuaternion(qPitch);
-        const desired = ship.position.clone().add(offset);
-        const lookTarget = orbit.target === 'center'
-            ? ship.position.clone()
-            : ship.position.clone().add(forward.clone().multiplyScalar(50));
-        const t = 1 - Math.exp(-5 * delta);
-        if (!initializedRef.current) {
-            camera.position.copy(desired);
-            camera.up.copy(up);
-            camera.lookAt(lookTarget);
-            initializedRef.current = true;
-        } else {
-            camera.position.lerp(desired, t);
-            camera.up.copy(up);
-            camera.lookAt(lookTarget);
-        }
+        // Update camera to follow ship
+        updateCameraFollow();
+
+        // Sync ship position to store for sector map
+        useGameStore.getState().setPosition({ x: ship.position.x, y: ship.position.y, z: ship.position.z });
 
         if (shipBodyRef.current) {
             const body = shipBodyRef.current;
