@@ -94,6 +94,9 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
             });
         }, [texturePath]);
         const adaptRef = useRef(0);
+        const visibleSmoothRef = useRef(0);
+        const prevVisibleRef = useRef(true);
+        const holdRef = useRef(0);
         const timeScale = useGameStore((state) => state.timeScale);
         useFrame((state, rawDelta) => {
             const delta = rawDelta * timeScale;
@@ -125,16 +128,28 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
             const a = scene.getObjectByName('AsteroidField'); if (a) occluders.push(a);
             const hits = ray.intersectObjects(occluders, true);
             const visible = hits.length === 0;
-            u.uSunVisible.value = visible ? 1 : 0;
+            if (!visible && prevVisibleRef.current && d >= viewFadeMin) {
+                holdRef.current = Math.max(holdRef.current, 0.35);
+            }
+            if (holdRef.current > 0) {
+                holdRef.current = Math.max(0, holdRef.current - delta);
+            }
+            const visTarget = holdRef.current > 0 ? 1 : (visible ? 1 : 0);
+            const vs = visibleSmoothRef.current;
+            const kv = visTarget > vs ? 8.0 : 1.8;
+            const tv = 1 - Math.exp(-kv * delta);
+            visibleSmoothRef.current = vs + (visTarget - vs) * tv;
+            u.uSunVisible.value = visibleSmoothRef.current;
             useGameStore.getState().setSunVisible(visible && d >= viewFadeMin);
-            const target = visible ? Math.max(0, Math.min(1, (d - viewFadeMin) / Math.max(0.0001, (viewFadeMax - viewFadeMin)))) : 0;
-            // Slower adaptation to let the user "see more" for longer before it darkens
-            const k = 0.5;
+            const facing = Math.max(0, Math.min(1, (d - viewFadeMin) / Math.max(0.0001, (viewFadeMax - viewFadeMin))));
+            const target = facing * visibleSmoothRef.current;
+            const k = 2.6;
             const t = 1 - Math.exp(-k * delta);
             adaptRef.current = adaptRef.current + (target - adaptRef.current) * t;
             useGameStore.getState().setSunAdapt(adaptRef.current);
             useGameStore.getState().setSunIntensity(target);
             (m.uniforms as unknown as { uViewAdapt: { value: number } }).uViewAdapt.value = adaptRef.current;
+            prevVisibleRef.current = visible;
             const sky = skyRef.current;
             if (sky) {
                 sky.position.copy(camPos);
@@ -275,11 +290,7 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
                 color="#4466aa"
                 hdr={hdr}
                 sunPosition={sunPosition}
-                atmosphereEnabled={(() => {
-                    const id = currentSectorId || 'seizewell';
-                    const p = PLANET_DATABASE[id];
-                    return p ? p.atmosphereEnabled : true;
-                })()}
+
                 cloudsParams={(() => {
                     const id = currentSectorId || 'seizewell';
                     const p = PLANET_DATABASE[id];

@@ -88,3 +88,21 @@ float fbm(vec3 p, int octaves, float persistence, float lacunarity) {
   return value;
 }
 `;
+
+export const ridgedFbmChunk = `
+float ridgedFbm(vec3 p, int octaves, float persistence, float lacunarity) {
+  float value = 0.0;
+  float amplitude = 0.5;
+  float frequency = 1.0;
+  float weight = 1.0;
+  for (int i = 0; i < 10; i++) {
+    if (i >= octaves) break;
+    float signal = 1.0 - abs(snoise(p * frequency));
+    signal = signal * signal;
+    value += signal * amplitude;
+    amplitude *= persistence;
+    frequency *= lacunarity;
+  }
+  return value;
+}
+`;

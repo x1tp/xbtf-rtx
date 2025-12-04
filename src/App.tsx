@@ -29,6 +29,41 @@ import { UniverseMap } from './components/UniverseMap';
 import { EconomyTicker } from './components/EconomyTicker';
 import { getAllPresets } from './config/plumes';
 
+
+function OverExposureOverlay() {
+  const [alpha, setAlpha] = useState(0)
+  const alphaRef = useRef(0)
+  const lastIntensityRef = useRef(0)
+  useEffect(() => {
+    let raf = 0
+    let last = performance.now()
+    const step = () => {
+      const now = performance.now()
+      const dt = (now - last) * 0.001
+      last = now
+      const s = useGameStore.getState()
+      const base = Math.max(0, Math.min(1, s.sunIntensity * (1 - s.sunAdapt)))
+      const deltaI = s.sunIntensity - lastIntensityRef.current
+      lastIntensityRef.current = s.sunIntensity
+      const shock = Math.max(0, deltaI) * 0.8
+      const target = Math.max(base, Math.min(1, shock))
+      const current = alphaRef.current
+      const k = target > current ? 12.0 : 3.0
+      const t = 1 - Math.exp(-k * dt)
+      const next = current + (target - current) * t
+      alphaRef.current = next
+      setAlpha(next)
+      raf = requestAnimationFrame(step)
+    }
+    raf = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(raf)
+  }, [])
+  const op = Math.max(0, Math.min(0.85, alpha))
+  return (
+    <div style={{ position: 'fixed', left: 0, top: 0, width: '100vw', height: '100vh', background: 'white', opacity: op, pointerEvents: 'none', zIndex: 900 }} />
+  )
+}
+
 function App() {
   const sceneRef = useRef<ThreeScene | null>(null);
   const cameraRef = useRef<PerspectiveCamera | null>(null);
@@ -125,6 +160,7 @@ function App() {
           <EconomyTicker />
         </Suspense>
       </Canvas>
+      <OverExposureOverlay />
       <SmartLoader />
       <HUD />
       <SectorMap2D />
