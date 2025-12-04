@@ -385,15 +385,73 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
         }
         if (isObj && stationRef.current) {
             const mtlUrl = (modelPath as string).replace(/\.obj$/i, '.mtl');
+            const mtlBase = mtlUrl.slice(0, mtlUrl.lastIndexOf('/') + 1);
             const mtlLoader = new MTLLoader();
-            mtlLoader.load(mtlUrl, (materials) => {
+            mtlLoader.setResourcePath(mtlBase);
+            mtlLoader.load(mtlUrl, async (materials) => {
                 if (cancelled) return;
                 materials.preload();
                 const loader = new OBJLoader();
                 loader.setMaterials(materials);
+                const mtlText = await fetch(mtlUrl).then((r) => r.text()).catch(() => '');
+                const texMap: Record<string, { kd?: string; bump?: string }> = {};
+                let cur = '';
+                mtlText.split(/\r?\n/).forEach((ln) => {
+                    const a = ln.match(/^\s*newmtl\s+(.+)$/i);
+                    if (a) { cur = a[1].trim(); if (!texMap[cur]) texMap[cur] = {}; return; }
+                    const kd = ln.match(/^\s*map_Kd\s+(.+)$/i);
+                    if (kd && cur) {
+                        const s = kd[1].trim();
+                        const m = s.match(/([^\s]+\.(?:jpe?g|png|tga|bmp))/i);
+                        texMap[cur].kd = (m ? m[1] : s);
+                    }
+                    const mb = ln.match(/^\s*map_bump\s+(.+)$/i) || ln.match(/^\s*bump\s+(.+)$/i);
+                    if (mb && cur) {
+                        const s = mb[1].trim();
+                        const m2 = s.match(/([^\s]+\.(?:jpe?g|png|tga|bmp))/i);
+                        texMap[cur].bump = (m2 ? m2[1] : s);
+                    }
+                });
                 loader.load(modelPath as string, (obj) => {
                     if (cancelled) return;
                     const aniso = gl?.capabilities?.getMaxAnisotropy?.() ?? 4;
+                    const tloader = new TextureLoader();
+                    const applyTex = (tex: Texture | null, isColor: boolean) => {
+                        if (!tex) return;
+                        tex.colorSpace = isColor ? SRGBColorSpace : LinearSRGBColorSpace;
+                        tex.anisotropy = aniso;
+                        tex.generateMipmaps = true;
+                        tex.minFilter = LinearMipmapLinearFilter;
+                        tex.magFilter = LinearFilter;
+                        tex.wrapS = RepeatWrapping;
+                        tex.wrapT = RepeatWrapping;
+                        tex.flipY = false;
+                        tex.needsUpdate = true;
+                    };
+                    const tryLoad = async (p: string | undefined): Promise<Texture | null> => {
+                        if (!p) return null;
+                        const normalize = (s: string) => {
+                            const stripped = s.replace(/^['"]|['"]$/g, '').trim();
+                            const last = stripped.match(/([^\s]+\.(?:jpe?g|png|tga|bmp))/i);
+                            const val = last ? last[1] : stripped;
+                            const slashed = val.replace(/\\/g, '/').replace(/^\.\/+/, '');
+                            return slashed;
+                        };
+                        const make = (u: string) => (u.startsWith('/') ? u : mtlBase + u);
+                        const urls: string[] = [];
+                        const np = normalize(p);
+                        urls.push(make(np));
+                        const lower = np.replace(/\.(JPE?G|PNG|TGA|BMP)$/i, (m) => m.toLowerCase());
+                        if (lower !== p) urls.push(make(lower));
+                        const bn = np.split('/').pop() || np;
+                        urls.push('/models/true/' + bn);
+                        urls.push('/models/tex/' + bn);
+                        for (const u of urls) {
+                            const tex = await tloader.loadAsync(u).catch(() => null);
+                            if (tex) return tex;
+                        }
+                        return null;
+                    };
                     obj.traverse((o) => {
                         const mesh = o as Mesh;
                         mesh.castShadow = true;
@@ -406,7 +464,7 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
                                 phong.specular.setScalar(0.1);
                                 phong.shininess = 10;
                             }
-                            if (m.map) { m.map.colorSpace = SRGBColorSpace; m.map.anisotropy = aniso; }
+                            if (m.map) { m.map.colorSpace = SRGBColorSpace; m.map.anisotropy = aniso; m.map.flipY = false; }
                             if (m.emissiveMap) { m.emissiveMap.colorSpace = SRGBColorSpace; m.emissiveMap.anisotropy = aniso; }
                             if ((m as unknown as { bumpMap?: Texture }).bumpMap && !m.normalMap) {
                                 m.normalMap = (m as unknown as { bumpMap?: Texture }).bumpMap as Texture;
@@ -444,6 +502,19 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
                                 const em = tryTex(`${base}-emissive.${ext}`, false);
                                 if (em) { m.emissiveMap = em; m.emissiveIntensity = 1.0; }
                             }
+                            const nm = (m.name || '').trim();
+                            const srcs = texMap[nm] || {};
+                            const fixMaps = async () => {
+                                if (!m.map && srcs.kd) {
+                                    const tx = await tryLoad(srcs.kd);
+                                    if (tx) { m.map = tx; applyTex(tx, true); }
+                                }
+                                if (!m.normalMap && srcs.bump) {
+                                    const tx = await tryLoad(srcs.bump);
+                                    if (tx) { m.normalMap = tx; applyTex(tx, false); }
+                                }
+                            };
+                            void fixMaps();
                             if (typeof m.metalness === 'number') m.metalness = Math.min(m.metalness ?? 0.0, 0.1);
                             if (typeof m.roughness === 'number') m.roughness = Math.max(m.roughness ?? 0.8, 0.9);
                             applyParallaxToMaterial(m, { heightMap: m.roughnessMap || m.normalMap, scale: 0.045, minLayers: 12, maxLayers: 28 });

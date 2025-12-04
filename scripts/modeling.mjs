@@ -510,7 +510,7 @@ function parseBOD(text) {
     const v1 = parseInt(parts[1], 10);
     const v2 = parseInt(parts[2], 10);
     const v3 = parseInt(parts[3], 10);
-    
+
     let uvs = [0, 0, 0, 0, 0, 0];
     if (parts.length >= 12) {
       uvs = [
@@ -638,6 +638,18 @@ export async function convertBodToObj(bodFile, texDir, outName = 'model', outDir
         mtl += `Kd ${v[3] / 255} ${v[4] / 255} ${v[5] / 255}\n`;
       }
       mtl += `Ks ${v[6] / 255} ${v[7] / 255} ${v[8] / 255}\n`;
+
+      // Extended properties for MATERIAL3
+      if (v.length >= 12) {
+        mtl += `Ke ${v[9] / 255} ${v[10] / 255} ${v[11] / 255}\n`;
+      }
+      if (v.length >= 13) {
+        mtl += `Ns ${v[12]}\n`;
+      }
+      if (v.length >= 17) {
+        // Opacity is at index 16 (0-100)
+        mtl += `d ${v[16] / 100}\n`;
+      }
     } else if (matData.color) {
       if (hasTexture) {
         mtl += `Kd 1 1 1\n`;

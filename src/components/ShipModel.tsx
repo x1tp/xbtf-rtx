@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useLoader, useFrame, useThree } from '@react-three/fiber';
 import { OBJLoader, MTLLoader } from 'three-stdlib';
 import { EnginePlume } from './EnginePlume';
-import { AdditiveBlending, Box3, CanvasTexture, Color, Group, SpriteMaterial, Vector3, Texture, LinearMipmapLinearFilter, LinearFilter, SRGBColorSpace, LinearSRGBColorSpace, Mesh, ClampToEdgeWrapping, TextureLoader, DoubleSide, Material } from 'three';
+import { AdditiveBlending, Box3, CanvasTexture, Color, Group, SpriteMaterial, Vector3, Texture, LinearMipmapLinearFilter, LinearFilter, SRGBColorSpace, LinearSRGBColorSpace, Mesh, RepeatWrapping, DoubleSide, Material, TextureLoader, MeshPhongMaterial } from 'three';
 import { useGameStore } from '../store/gameStore';
 
 
@@ -18,8 +18,11 @@ interface ShipModelProps {
 export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'ShipModel', modelPath, editorMode = false, markerOverrides }) => {
     const objPath = modelPath || '/models/00000.obj';
     const mtlPath = objPath.endsWith('.obj') ? objPath.replace('.obj', '.mtl') : '/models/00000.mtl';
+    // Most converted BOD models need flipY disabled to display textures correctly
+    const needsFlipYFix = true; // Apply to all models for consistency with Blender
     const materials = useLoader(MTLLoader, mtlPath, (loader) => {
-        loader.setResourcePath('/models/');
+        const rp = mtlPath.slice(0, mtlPath.lastIndexOf('/') + 1);
+        loader.setResourcePath(rp);
         loader.setCrossOrigin('anonymous');
     });
     const obj = useLoader(OBJLoader, objPath, (loader) => {
@@ -31,20 +34,18 @@ export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'Shi
             if (child instanceof Mesh) {
                 child.castShadow = true;
                 child.receiveShadow = true;
-                // Recompute vertex normals for proper lighting
-                if (child.geometry) {
-                    child.geometry.computeVertexNormals();
+                if (child.geometry && 'computeVertexNormals' in child.geometry) {
+                    // Keep original normals; some converted OBJ files include authored normals.
                 }
                 // Enable double-sided rendering to match Blender's default behavior
                 if (child.material) {
                     const mats = Array.isArray(child.material) ? child.material : [child.material];
                     mats.forEach((m: Material) => {
-                        (m as any).side = DoubleSide;
-                        if ((m as any).isMeshPhongMaterial) {
-                            (m as any).specular.setScalar(0.1);
-                            (m as any).shininess = 10;
+                        m.side = DoubleSide;
+                        if ((m as MeshPhongMaterial).isMeshPhongMaterial) {
+                            // Trust MTL values for specular/shininess
                         }
-                        (m as any).needsUpdate = true;
+                        m.needsUpdate = true;
                     });
                 }
             }
@@ -61,67 +62,147 @@ export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'Shi
                 tex.generateMipmaps = true;
                 tex.minFilter = LinearMipmapLinearFilter;
                 tex.magFilter = LinearFilter;
-                tex.wrapS = ClampToEdgeWrapping;
-                tex.wrapT = ClampToEdgeWrapping;
+                tex.wrapS = RepeatWrapping;
+                tex.wrapT = RepeatWrapping;
+
+                // BOD-converted models need flipY disabled to match Blender UV layout
+                if (needsFlipYFix) {
+                    tex.flipY = false;
+                }
+
                 tex.needsUpdate = true;
             };
-            // If the image isn't ready yet, wait for the texture's first upload.
-            if (!tex.image) {
-                const onUpdate = () => {
-                    (tex as any).removeEventListener?.('update', onUpdate);
-                    apply();
-                };
-                (tex as any).addEventListener?.('update', onUpdate);
-                return;
-            }
             apply();
         };
         materials.preload();
-        const loader = new TextureLoader();
-        const tryLoad = (urls: string[]) => new Promise<Texture | null>((resolve) => {
-            const next = () => {
-                const url = urls.shift();
-                if (!url) { resolve(null); return; }
-                loader.load(url, (tex) => resolve(tex), undefined, () => next());
-            };
-            next();
-        });
-        const tweakAndReplace = async (target: Texture | null | undefined, isColor: boolean) => {
-            if (!target) return null;
-            const src = ((target as unknown as { source?: { data?: { src?: string } } }).source?.data?.src ||
-                (target.image && (target.image as { currentSrc?: string; src?: string }).currentSrc) ||
-                (target.image && (target.image as { src?: string }).src) ||
-                target.name ||
-                '') as string;
-            const base = src.split('/').pop() || '';
-            const candidates: string[] = [];
-            if (base) {
-                candidates.push(`/models/true/${base}`);
-                candidates.push(`/models/tex/${base}`);
-            }
-            const replacement = await tryLoad(candidates);
-            const tex = replacement || target;
-            applyTextureSettings(tex, isColor);
-            return replacement;
-        };
+
+        // Apply texture settings to all materials
         Object.values(materials.materials).forEach((mat) => {
             const m = mat as unknown as { map?: Texture | null; bumpMap?: Texture | null; normalMap?: Texture | null; emissiveMap?: Texture | null; side?: number };
             // Enable double-sided rendering to match Blender's default behavior
             m.side = DoubleSide;
-            tweakAndReplace(m.map, true).then((rep) => { if (rep) m.map = rep; });
-            tweakAndReplace(m.emissiveMap, true).then((rep) => { if (rep) m.emissiveMap = rep; });
-            const bump = m.bumpMap ?? m.normalMap;
-            tweakAndReplace(bump, false).then((rep) => {
-                if (rep) {
-                    if (m.bumpMap) m.bumpMap = rep;
-                    else if (m.normalMap) m.normalMap = rep;
+
+            // Apply settings to diffuse/albedo map
+            applyTextureSettings(m.map, true);
+
+            // Apply settings to emissive map
+            applyTextureSettings(m.emissiveMap, true);
+
+            // Convert bump map to normal map if no normal map exists
+            if (m.bumpMap && !m.normalMap) {
+                m.normalMap = m.bumpMap;
+                m.bumpMap = null;
+            }
+
+            // Apply settings to normal map
+            applyTextureSettings(m.normalMap, false);
+        });
+    }, [gl, materials, objPath, needsFlipYFix]);
+    useEffect(() => {
+        const run = async () => {
+            const maxAniso = gl?.capabilities?.getMaxAnisotropy?.() ?? 4;
+            const tloader = new TextureLoader();
+            const base = mtlPath.slice(0, mtlPath.lastIndexOf('/') + 1);
+            const text = await fetch(mtlPath).then((r) => r.text()).catch(() => '');
+            const map: Record<string, { kd?: string; bump?: string }> = {};
+            let cur = '';
+            text.split(/\r?\n/).forEach((ln) => {
+                const a = ln.match(/^\s*newmtl\s+(.+)$/i);
+                if (a) { cur = a[1].trim(); if (!map[cur]) map[cur] = {}; return; }
+                const kd = ln.match(/^\s*map_Kd\s+(.+)$/i);
+                if (kd && cur) {
+                    const s = kd[1].trim();
+                    const m = s.match(/([^\s]+\.(?:jpe?g|png|tga|bmp))/i);
+                    map[cur].kd = (m ? m[1] : s);
+                }
+                const mb = ln.match(/^\s*map_bump\s+(.+)$/i) || ln.match(/^\s*bump\s+(.+)$/i);
+                if (mb && cur) {
+                    const s = mb[1].trim();
+                    const m2 = s.match(/([^\s]+\.(?:jpe?g|png|tga|bmp))/i);
+                    map[cur].bump = (m2 ? m2[1] : s);
                 }
             });
-            applyTextureSettings(m.map, true);
-            applyTextureSettings(m.emissiveMap, true);
-            applyTextureSettings(bump, false);
-        });
-    }, [gl, materials]);
+            const applyTex = (tex: Texture | null, isColor: boolean) => {
+                if (!tex) return;
+                tex.colorSpace = isColor ? SRGBColorSpace : LinearSRGBColorSpace;
+                tex.anisotropy = maxAniso;
+                tex.generateMipmaps = true;
+                tex.minFilter = LinearMipmapLinearFilter;
+                tex.magFilter = LinearFilter;
+                tex.wrapS = RepeatWrapping;
+                tex.wrapT = RepeatWrapping;
+                tex.flipY = false;
+                tex.needsUpdate = true;
+            };
+            const tryLoad = async (p: string | undefined): Promise<Texture | null> => {
+                if (!p) return null;
+                const normalize = (s: string) => {
+                    const stripped = s.replace(/^['"]|['"]$/g, '').trim();
+                    const last = stripped.match(/([^\s]+\.(?:jpe?g|png|tga|bmp))/i);
+                    const val = last ? last[1] : stripped;
+                    const slashed = val.replace(/\\/g, '/').replace(/^\.\/+/, '');
+                    return slashed;
+                };
+                const make = (u: string) => (u.startsWith('/') ? u : base + u);
+                const urls: string[] = [];
+                const np = normalize(p);
+                urls.push(make(np));
+                const lower = np.replace(/\.(JPE?G|PNG|TGA|BMP)$/i, (m) => m.toLowerCase());
+                if (lower !== p) urls.push(make(lower));
+                const bn = np.split('/').pop() || np;
+                urls.push('/models/true/' + bn);
+                urls.push('/models/tex/' + bn);
+                for (const u of urls) {
+                    const tex = await tloader.loadAsync(u).catch(() => null);
+                    if (tex) return tex;
+                }
+                return null;
+            };
+            Object.entries(materials.materials).forEach(([name, mat]) => {
+                const m = mat as unknown as { map?: Texture | null; normalMap?: Texture | null; bumpMap?: Texture | null };
+                const srcs = map[name] || {};
+                const loadMaps = async () => {
+                    if (!m.map && srcs.kd) {
+                        const tex = await tryLoad(srcs.kd);
+                        if (tex) { m.map = tex; applyTex(tex, true); }
+                    }
+                    if (!m.normalMap && srcs.bump) {
+                        const tex = await tryLoad(srcs.bump);
+                        if (tex) { m.normalMap = tex; applyTex(tex, false); m.bumpMap = null; }
+                    }
+                };
+                void loadMaps();
+            });
+
+            obj.traverse((child) => {
+                const mesh = child as Mesh;
+                const mm = mesh.material as Material | Material[] | null | undefined;
+                const applyMatFix = async (mat: Material) => {
+                    const nm = (mat as unknown as { name?: string }).name || '';
+                    const srcs = map[nm] || {};
+                    const m = mat as unknown as { map?: Texture | null; normalMap?: Texture | null; bumpMap?: Texture | null };
+                    if (m.bumpMap && !m.normalMap) {
+                        m.normalMap = m.bumpMap;
+                        m.bumpMap = null;
+                    }
+                    if (!m.map && srcs.kd) {
+                        const tx = await tryLoad(srcs.kd);
+                        if (tx) { m.map = tx; applyTex(tx, true); }
+                    }
+                    if (!m.normalMap && srcs.bump) {
+                        const tx = await tryLoad(srcs.bump);
+                        if (tx) { m.normalMap = tx; applyTex(tx, false); m.bumpMap = null; }
+                    }
+                };
+                if (Array.isArray(mm)) {
+                    mm.forEach((m) => { void applyMatFix(m); });
+                } else if (mm) {
+                    void applyMatFix(mm);
+                }
+            });
+        };
+        void run();
+    }, [gl, materials, mtlPath, obj]);
     const initialMarkers = useMemo(() => {
         const rawInit = typeof window !== 'undefined' ? window.localStorage.getItem('ship:engineMarkers:' + objPath) : null;
         if (rawInit) {

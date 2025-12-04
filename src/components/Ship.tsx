@@ -495,7 +495,7 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
 
     return (
         <group ref={shipRef} name="PlayerShip" position={position}>
-            <ShipModel enableLights={enableLights} />
+            <ShipModel enableLights={enableLights} modelPath="/models/00124.obj" />
             {/* External ship model could go here, but invisible from inside */}
         </group>
     );
