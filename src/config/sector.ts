@@ -3,6 +3,7 @@ export interface SectorConfig {
   planet: { position: [number, number, number]; size: number };
   station: { position: [number, number, number]; scale: number; modelPath: string; rotationSpeed: number; rotationAxis: 'x' | 'y' | 'z' };
   asteroids: { count: number; range: number; center: [number, number, number] };
+  background?: { type: 'starfield' | 'nebula'; texturePath?: string };
 }
 export const DEFAULT_SECTOR_CONFIG: SectorConfig = {
   // Approximate real-scale: 1 AU distance and real solar radius (meters)
@@ -18,17 +19,7 @@ import { PROFIT_SHARE_BLUEPRINT } from './profit_share'
 import { GREATER_PROFIT_BLUEPRINT } from './greater_profit'
 import { SEIZEWELL_BLUEPRINT } from './seizewell'
 
-const gatePositions: [number, number, number][] = [
-  [-1200, 0, 0],
-  [0, 900, 0],
-  [1200, 0, 0],
-  [0, -900, 0],
-  [-900, 900, 0],
-  [900, 900, 0],
-  [900, -900, 0],
-  [-900, -900, 0],
-]
-const gateNames = ['West Gate', 'North Gate', 'East Gate', 'South Gate', 'NW Gate', 'NE Gate', 'SE Gate', 'SW Gate']
+
 
 const MANUAL_SECTOR_LAYOUTS: Record<string, SeizewellLayout> = {
   seizewell: SEIZEWELL_BLUEPRINT,
@@ -49,19 +40,32 @@ export const getSectorLayoutById = (id: string): SeizewellLayout => {
 
     let name = 'Gate'
     let position: [number, number, number] = [0, 0, 0]
+    let rotation: [number, number, number] = [0, 0, 0]
 
-    if (dx === 1) { name = 'East Gate'; position = [4000, 0, 0] }
-    else if (dx === -1) { name = 'West Gate'; position = [-4000, 0, 0] }
-    else if (dy === 1) { name = 'South Gate'; position = [0, 0, 4000] }
-    else if (dy === -1) { name = 'North Gate'; position = [0, 0, -4000] }
-    else {
+    if (dx === 1) {
+      name = 'East Gate'
+      position = [1000, 0, 0]
+      rotation = [0, Math.PI / 2, 0]
+    } else if (dx === -1) {
+      name = 'West Gate'
+      position = [-1000, 0, 0]
+      rotation = [0, -Math.PI / 2, 0]
+    } else if (dy === 1) {
+      name = 'South Gate'
+      position = [0, 0, 1000]
+      rotation = [0, 0, 0]
+    } else if (dy === -1) {
+      name = 'North Gate'
+      position = [0, 0, -1000]
+      rotation = [0, Math.PI, 0]
+    } else {
       // Fallback for non-adjacent jumps if any
       name = 'Gate'
       position = [2000, 0, 2000]
     }
 
-    return { name, position, modelPath: '/models/00088.obj' }
-  }).filter((g): g is { name: string; position: [number, number, number]; modelPath: string } => !!g)
+    return { name, position, rotation, modelPath: '/models/00088.obj' }
+  }).filter((g): g is { name: string; position: [number, number, number]; rotation: [number, number, number]; modelPath: string } => !!g)
 
   const manual = MANUAL_SECTOR_LAYOUTS[id as keyof typeof MANUAL_SECTOR_LAYOUTS]
   if (manual) {

@@ -1,7 +1,7 @@
 import React, { useMemo, useEffect, useState, useRef } from 'react';
-import { Icosahedron, Sphere } from '@react-three/drei';
+import { Icosahedron } from '@react-three/drei';
 import * as THREE from 'three';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import { ensureRapier, getWorld, getWorldSync } from '../physics/RapierWorld';
 import type RAPIERType from '@dimforge/rapier3d-compat';
 import type { PlanetDatabaseEntry } from '../config/planetDatabase';
@@ -22,50 +22,153 @@ type CloudsParams = {
 interface PlanetProps {
     position: [number, number, number];
     size: number;
-    color: string; // Fallback/Base color
+    color: string;
     hdr?: boolean;
     sunPosition?: [number, number, number];
     cloudsParams?: CloudsParams;
     config?: PlanetDatabaseEntry;
 }
 
-export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, sunPosition, config }) => {
+// Create cloud texture (cached) - procedural wispy cloud
+let cachedCloudTextures: THREE.CanvasTexture[] = [];
+function getCloudTexture(variant: number = 0): THREE.CanvasTexture {
+    if (cachedCloudTextures[variant]) return cachedCloudTextures[variant];
+    
+    const canvas = document.createElement('canvas');
+    const size = 256;
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+        const imageData = ctx.createImageData(size, size);
+        const data = imageData.data;
+        
+        // Better noise function with interpolation
+        const hash = (x: number, y: number, seed: number) => {
+            const n = Math.sin(x * 127.1 + y * 311.7 + seed * 758.5453) * 43758.5453;
+            return n - Math.floor(n);
+        };
+        
+        // Smooth noise with interpolation
+        const smoothNoise = (x: number, y: number, seed: number) => {
+            const ix = Math.floor(x);
+            const iy = Math.floor(y);
+            const fx = x - ix;
+            const fy = y - iy;
+            
+            // Smooth interpolation
+            const sx = fx * fx * (3 - 2 * fx);
+            const sy = fy * fy * (3 - 2 * fy);
+            
+            const n00 = hash(ix, iy, seed);
+            const n10 = hash(ix + 1, iy, seed);
+            const n01 = hash(ix, iy + 1, seed);
+            const n11 = hash(ix + 1, iy + 1, seed);
+            
+            const nx0 = n00 * (1 - sx) + n10 * sx;
+            const nx1 = n01 * (1 - sx) + n11 * sx;
+            
+            return nx0 * (1 - sy) + nx1 * sy;
+        };
+        
+        // Fractal noise for cloud-like pattern
+        const fbm = (x: number, y: number, seed: number) => {
+            let value = 0;
+            let amplitude = 0.6;
+            let frequency = 1;
+            for (let i = 0; i < 6; i++) {
+                value += amplitude * smoothNoise(x * frequency, y * frequency, seed + i * 100);
+                amplitude *= 0.5;
+                frequency *= 2.0;
+            }
+            return value;
+        };
+        
+        const cx = size / 2;
+        const cy = size / 2;
+        
+        // Different stretch factors per variant for variety
+        const stretches = [
+            { sx: 1.0, sy: 0.4 }, // Horizontal streak
+            { sx: 0.5, sy: 0.8 }, // Vertical-ish
+            { sx: 1.2, sy: 0.6 }, // Wide horizontal
+            { sx: 0.7, sy: 0.7 }, // More round
+        ];
+        const stretch = stretches[variant % stretches.length];
+        const seedOffset = variant * 1000;
+        
+        for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+                const idx = (y * size + x) * 4;
+                
+                // Distance from center with stretch for elongated shapes
+                const dx = (x - cx) / cx * stretch.sx;
+                const dy = (y - cy) / cy * stretch.sy;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                // Smoother radial falloff
+                const radialFade = Math.max(0, 1 - Math.pow(dist, 2.0));
+                
+                // Noise-based cloud density
+                const n = fbm(x * 0.015 + seedOffset, y * 0.015, seedOffset);
+                
+                // Streak-like pattern by adding directional noise
+                const streak = fbm(x * 0.03 + seedOffset, y * 0.008, seedOffset + 500);
+                
+                // Combine noises for wispy effect
+                const combined = (n * 0.6 + streak * 0.4);
+                const cloudDensity = Math.pow(Math.max(0, combined - 0.25) * 1.8, 0.7);
+                
+                // Final alpha
+                const alpha = radialFade * cloudDensity * 280;
+                
+                data[idx] = 255;
+                data[idx + 1] = 255;
+                data[idx + 2] = 255;
+                data[idx + 3] = Math.min(255, alpha);
+            }
+        }
+        
+        ctx.putImageData(imageData, 0, 0);
+        
+        // Multiple blur passes for softer edges
+        ctx.filter = 'blur(4px)';
+        ctx.drawImage(canvas, 0, 0);
+        ctx.filter = 'blur(2px)';
+        ctx.drawImage(canvas, 0, 0);
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    cachedCloudTextures[variant] = texture;
+    return texture;
+}
+
+export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, config }) => {
     const surfaceShaderUniformsRef = useRef<Record<string, { value: unknown }> | null>(null);
+    const { scene } = useThree();
 
     // Procedural Planet Shader Logic
     const onBeforeCompile = useMemo(() => {
         return (shader: Shader) => {
             surfaceShaderUniformsRef.current = shader.uniforms;
             
-            // Add Uniforms
             shader.uniforms.uTime = { value: 0 };
             shader.uniforms.uRadius = { value: size };
             shader.uniforms.uScale = { value: config?.noiseScale ?? 2.0 };
             shader.uniforms.uBumpStrength = { value: (config?.bumpIntensity ?? 0.6) * 0.2 };
             shader.uniforms.uSeed = { value: config?.seed ?? Math.random() * 100.0 };
-            shader.uniforms.cloudsMap = { value: null };
-            shader.uniforms.cloudShadowOffset = { value: 0 };
 
-            // Colors
-            // Default Palette if config missing
             const palette = config?.colorPalette ?? [
-                '#14285A', // Deep Ocean
-                '#285A8C', // Shallow Ocean
-                '#BEB48C', // Beach
-                '#96AA50', // Grass/Savanna
-                '#286432', // Forest
-                '#645A55', // Rock
-                '#F0F5FF'  // Snow
+                '#14285A', '#285A8C', '#BEB48C', '#96AA50', '#286432', '#645A55', '#F0F5FF'
             ];
-            // Safely map input palette to 7 slots
             const c = [
                 new THREE.Color(palette[0] || '#14285A'),
                 new THREE.Color(palette[1] || '#285A8C'),
                 new THREE.Color(palette[2] || '#BEB48C'),
                 new THREE.Color(palette[3] || '#96AA50'),
                 new THREE.Color(palette[4] || '#286432'),
-                new THREE.Color(palette[5] || (palette.length > 0 ? palette[palette.length-1] : '#645A55')),
-                new THREE.Color(palette[6] || (palette.length > 0 ? palette[palette.length-1] : '#F0F5FF'))
+                new THREE.Color(palette[5] || '#645A55'),
+                new THREE.Color(palette[6] || '#F0F5FF')
             ];
             
             shader.uniforms.uColorDeepOcean = { value: c[0] };
@@ -76,7 +179,6 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, su
             shader.uniforms.uColorRock = { value: c[5] };
             shader.uniforms.uColorSnow = { value: c[6] };
 
-            // Inject Noise Functions & Varyings
             shader.vertexShader = `
                 ${simplex3dChunk}
                 ${fbmChunk}
@@ -86,7 +188,7 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, su
                 uniform float uBumpStrength;
                 uniform float uSeed;
                 varying float vHeight;
-                varying vec3 vRawPos; // Normalized position for consistent noise
+                varying vec3 vRawPos;
             ` + shader.vertexShader;
 
             shader.fragmentShader = `
@@ -106,46 +208,24 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, su
                 varying vec3 vRawPos;
             ` + shader.fragmentShader;
 
-            // Vertex Main
             shader.vertexShader = shader.vertexShader.replace(
                 '#include <begin_vertex>',
                 `
                 #include <begin_vertex>
-                
-                // Normalize local position for noise lookup (avoids precision issues with large coordinates)
                 vRawPos = normalize(position);
-                
-                // Calculate Displacement
-                // Use lower frequency for large shapes, high freq for detail
                 float noiseVal = fbm(vRawPos * uScale, 6, 0.45, 2.0); 
-                
-                // We displace along normal
-                // Scale displacement based on planet radius (uRadius)
-                // e.g. max 2% of radius for mountains
                 float displacement = noiseVal * uBumpStrength * uRadius * 0.02; 
-                
-                // Apply displacement to position
                 transformed += normal * displacement;
-                
-                vHeight = noiseVal; // Pass to fragment
+                vHeight = noiseVal;
                 `
             );
 
-            // Fragment Main - Replace map_fragment to inject color logic
             shader.fragmentShader = shader.fragmentShader.replace(
                 '#include <map_fragment>',
                 `
                 #include <map_fragment>
-                
-                // Recalculate FBM for per-pixel detail
                 float h_frag = fbm(vRawPos * uScale, 8, 0.45, 2.0);
-                
-                // Perturb normal for bump mapping effect
-                // Simple derivative-based bump or just rely on color for now?
-                // Let's do color first
-                
                 vec3 col = uColorDeepOcean;
-                
                 if (h_frag < -0.05) {
                     col = mix(uColorDeepOcean, uColorShallowOcean, smoothstep(-0.5, -0.05, h_frag));
                 } else if (h_frag < 0.05) {
@@ -159,17 +239,10 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, su
                 } else {
                     col = mix(uColorRock, uColorSnow, smoothstep(0.7, 0.9, h_frag));
                 }
-                
-                // Simple fake bump based on noise derivative
-                // We can adjust roughness based on biome
-                float roughnessVal = 0.8;
-                if (h_frag < 0.0) roughnessVal = 0.2; // Water is shiny
-                
                 diffuseColor.rgb = col;
                 `
             );
 
-            // Inject roughness control
             shader.fragmentShader = shader.fragmentShader.replace(
                 '#include <roughnessmap_fragment>',
                 `
@@ -183,71 +256,127 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, su
     }, [config, size]);
 
     const planetRef = useRef<THREE.Group>(null);
-    const cloudsRef = useRef<THREE.Mesh>(null);
     const planetBodyRef = useRef<RAPIERType.RigidBody | null>(null);
     const [ready, setReady] = useState(false);
 
-    // Clouds Material
-    const cloudShaderMaterial = useMemo(() => {
-        return new THREE.ShaderMaterial({
-            uniforms: {
-                uMask: { value: null },
-                uTime: { value: 0 },
-                uOpacity: { value: cloudsParams?.opacity ?? 0.8 },
-                uAlphaTest: { value: cloudsParams?.alphaTest ?? 0.2 },
-                uLightDir: { value: new THREE.Vector3(1, 0, 0) },
-                uScale: { value: 3.0 }
-            },
-            vertexShader: `
-                varying vec2 vUv;
-                varying vec3 vWorldPos;
-                varying vec3 vNormal;
-                void main() {
-                    vUv = uv;
-                    vNormal = normalize(normalMatrix * normal);
-                    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-                    vWorldPos = worldPosition.xyz;
-                    gl_Position = projectionMatrix * viewMatrix * worldPosition;
-                }
-            `,
-            fragmentShader: `
-                uniform float uTime;
-                uniform float uOpacity;
-                uniform vec3 uLightDir;
-                uniform float uScale;
-                varying vec3 vWorldPos;
-                varying vec3 vNormal;
-                
-                ${simplex3dChunk}
-                ${fbmChunk}
+    // Generate cloud data - positioned tangent to sphere
+    const cloudData = useMemo(() => {
+        const count = 350; // More clouds for better coverage
+        const baseRadius = size * 1.003; // Very close to surface
+        const data: { position: THREE.Vector3; scaleX: number; scaleY: number; opacity: number; normal: THREE.Vector3; rotation: number }[] = [];
+        
+        let seed = 12345;
+        const seededRandom = () => {
+            seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+            return seed / 0x7fffffff;
+        };
+        
+        for (let i = 0; i < count; i++) {
+            // Random point on unit sphere using spherical coordinates for even distribution
+            const theta = seededRandom() * Math.PI * 2;
+            const phi = Math.acos(2 * seededRandom() - 1);
+            const nx = Math.sin(phi) * Math.cos(theta);
+            const ny = Math.cos(phi); // Y-up
+            const nz = Math.sin(phi) * Math.sin(theta);
+            
+            const r = baseRadius;
+            const pos = new THREE.Vector3(nx * r, ny * r, nz * r);
+            const normal = new THREE.Vector3(nx, ny, nz);
+            
+            // Varied cloud sizes - some small wisps, some larger formations
+            const sizeVariant = seededRandom();
+            let baseScale: number;
+            if (sizeVariant < 0.3) {
+                baseScale = size * 0.01 + seededRandom() * size * 0.015; // Small wisps
+            } else if (sizeVariant < 0.7) {
+                baseScale = size * 0.02 + seededRandom() * size * 0.025; // Medium
+            } else {
+                baseScale = size * 0.035 + seededRandom() * size * 0.03; // Large formations
+            }
+            
+            data.push({
+                position: pos,
+                scaleX: baseScale * (1.2 + seededRandom() * 0.8),
+                scaleY: baseScale * (1.0 + seededRandom() * 0.6),
+                opacity: 0.15 + seededRandom() * 0.25,
+                normal: normal,
+                rotation: seededRandom() * Math.PI * 2
+            });
+        }
+        return data;
+    }, [size]);
 
-                void main() {
-                    // Cloud noise
-                    // Normalize pos for noise stability
-                    vec3 pos = normalize(vWorldPos);
-                    
-                    // Moving clouds
-                    vec3 offset = vec3(uTime * 0.02, 0.0, 0.0);
-                    float noise = fbm((pos + offset) * uScale, 6, 0.5, 2.0);
-                    
-                    // Mask
-                    float cloudDensity = smoothstep(0.2, 0.6, noise);
-                    
-                    if (cloudDensity < 0.1) discard;
-                    
-                    // Simple Lighting
-                    float light = max(0.0, dot(vNormal, normalize(uLightDir)));
-                    light = mix(0.4, 1.0, light); // Ambient + Diffuse
-                    
-                    gl_FragColor = vec4(vec3(1.0) * light, cloudDensity * uOpacity);
-                }
-            `,
-            transparent: true,
-            depthWrite: false,
-            depthTest: true,
-            side: THREE.DoubleSide
+    // Cloud mesh refs
+    const cloudMeshesRef = useRef<THREE.Mesh[]>([]);
+
+    // Initialize cloud meshes (not sprites - actual planes tangent to sphere)
+    useEffect(() => {
+        if (!ready || !(cloudsParams?.enabled ?? true)) return;
+        
+        const meshes = cloudMeshesRef.current;
+        
+        // Pre-generate multiple texture variants
+        const numVariants = 4;
+        const cloudTextures: THREE.CanvasTexture[] = [];
+        for (let i = 0; i < numVariants; i++) {
+            cloudTextures.push(getCloudTexture(i));
+        }
+        
+        // Clear old meshes
+        meshes.forEach(m => {
+            m.removeFromParent();
+            m.geometry.dispose();
+            (m.material as THREE.Material).dispose();
         });
-    }, [cloudsParams]);
+        meshes.length = 0;
+        
+        // Shared geometry - simple plane
+        const planeGeo = new THREE.PlaneGeometry(1, 1);
+        
+        // Create cloud meshes tangent to sphere surface
+        cloudData.forEach((data, i) => {
+            // Use different texture variants for variety
+            const textureVariant = i % numVariants;
+            
+            const material = new THREE.MeshBasicMaterial({
+                map: cloudTextures[textureVariant],
+                color: 0xffffff,
+                transparent: true,
+                opacity: data.opacity * (cloudsParams?.opacity ?? 0.7),
+                depthWrite: false,
+                depthTest: true,
+                side: THREE.DoubleSide,
+                blending: THREE.NormalBlending,
+            });
+            
+            const mesh = new THREE.Mesh(planeGeo.clone(), material);
+            
+            // Position in world space
+            const worldPos = new THREE.Vector3(...position).add(data.position);
+            mesh.position.copy(worldPos);
+            
+            // Orient to face outward from planet (normal = radial direction)
+            mesh.lookAt(worldPos.clone().add(data.normal));
+            
+            // Apply random rotation around the normal
+            mesh.rotateZ(data.rotation);
+            
+            // Scale
+            mesh.scale.set(data.scaleX, data.scaleY, 1);
+            
+            scene.add(mesh);
+            meshes.push(mesh);
+        });
+        
+        return () => {
+            meshes.forEach(m => {
+                m.removeFromParent();
+                m.geometry.dispose();
+                (m.material as THREE.Material).dispose();
+            });
+            meshes.length = 0;
+        };
+    }, [ready, cloudData, cloudsParams, scene, position]);
 
     useFrame((_, delta) => {
         if (!ready) setReady(true);
@@ -256,11 +385,22 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, su
             (surfaceShaderUniformsRef.current.uTime.value as number) += delta;
         }
         
-        if (cloudsRef.current && cloudShaderMaterial) {
-             cloudShaderMaterial.uniforms.uTime.value += delta;
-             const sunVec = new THREE.Vector3(...(sunPosition || [1000, 0, 0]));
-             cloudsRef.current.worldToLocal(sunVec);
-             cloudShaderMaterial.uniforms.uLightDir.value.copy(sunVec).normalize();
+        // Slowly rotate clouds around planet
+        if (cloudMeshesRef.current.length > 0) {
+            const rotSpeed = 0.00002; // Very slow rotation
+            const angle = delta * rotSpeed;
+            const center = new THREE.Vector3(...position);
+            const axis = new THREE.Vector3(0, 1, 0); // Rotate around Y
+            
+            cloudMeshesRef.current.forEach(mesh => {
+                // Rotate position around planet center
+                const rel = mesh.position.clone().sub(center);
+                rel.applyAxisAngle(axis, angle);
+                mesh.position.copy(center.clone().add(rel));
+                
+                // Also rotate the mesh orientation
+                mesh.rotateOnWorldAxis(axis, angle);
+            });
         }
 
         if (planetBodyRef.current && planetRef.current) {
@@ -300,7 +440,6 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, su
 
     return (
         <group position={position} name="PlanetGroup">
-            {/* EARTH */}
             <group ref={planetRef} name="Planet">
                 <Icosahedron args={[size, 128]} castShadow receiveShadow>
                     <meshPhysicalMaterial
@@ -310,12 +449,6 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, su
                         onBeforeCompile={onBeforeCompile}
                     />
                 </Icosahedron>
-                {/* CLOUDS */}
-                {ready && ((cloudsParams?.enabled ?? true)) && (
-                    <Sphere ref={cloudsRef} args={[size * 1.04, 128, 128]} renderOrder={10}>
-                         <primitive object={cloudShaderMaterial} attach="material" />
-                    </Sphere>
-                )}
             </group>
         </group>
     );

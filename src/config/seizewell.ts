@@ -17,6 +17,7 @@ export interface SeizewellLayout {
     ships: BlueprintObject[];
     asteroids: { count: number; range: number; center: [number, number, number] };
     playerStart?: [number, number, number];
+    background?: { type: 'starfield' | 'nebula'; texturePath?: string };
 }
 
 /**
@@ -53,5 +54,6 @@ export const SEIZEWELL_BLUEPRINT: SeizewellLayout = {
     ships: [
         { name: 'Teladi Destroyer Phoenix (M2)', modelPath: '/models/00140.obj', position: [550, 10, 200], scale: 20, rotationAxis: 'y', rotationSpeed: 0, collisions: false },
         { name: 'Albatross (TL)', modelPath: '/models/00187.obj', position: [590, 10, 300], scale: 18, rotationAxis: 'y', rotationSpeed: 0, collisions: false }
-    ]
+    ],
+    background: { type: 'nebula', texturePath: '/materials/skybox/seizewell_v3.png' }
 };

@@ -36,6 +36,7 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
     }, []);
     const currentSectorId = useGameStore((s) => s.currentSectorId);
     const layout = useMemo(() => getSectorLayoutById(currentSectorId || 'seizewell'), [currentSectorId]);
+    const background = layout?.background || cfg.background;
     const spacing = 30; // spread layout objects apart to avoid overlaps
     const place = (p: [number, number, number]): [number, number, number] => [p[0] * spacing, p[1] * spacing, p[2] * spacing];
     const placedShips = React.useMemo(
@@ -49,7 +50,7 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
         setShipPos(layout ? place(layout.playerStart || [0, 10, 450]) : [0, 10, 450]);
     }, [layout]);
     const sunPosition: [number, number, number] = layout ? layout.sun.position : cfg.sun.position;
-    const StarfieldSky: React.FC<{ density?: number; brightness?: number; milkyWayStrength?: number; orientation?: [number, number, number]; radius?: number; fadeMin?: number; fadeMax?: number; viewFadeMin?: number; viewFadeMax?: number }> = ({ density = 0.15, brightness = 0.5, milkyWayStrength = 0.22, orientation = [0.0, 0.25, 0.97], radius = 2000000, fadeMin = 0.2, fadeMax = 0.95, viewFadeMin = 0.6, viewFadeMax = 0.85 }) => {
+    const StarfieldSky: React.FC<{ density?: number; brightness?: number; milkyWayStrength?: number; orientation?: [number, number, number]; radius?: number; fadeMin?: number; fadeMax?: number; viewFadeMin?: number; viewFadeMax?: number; texturePath?: string }> = ({ density = 0.15, brightness = 0.5, milkyWayStrength = 0.22, orientation = [0.0, 0.25, 0.97], radius = 2000000, fadeMin = 0.2, fadeMax = 0.95, viewFadeMin = 0.6, viewFadeMax = 0.85, texturePath }) => {
         const matRef = useRef<THREE.ShaderMaterial | null>(null);
         const skyRef = useRef<THREE.Mesh | null>(null);
         const { scene } = useThree();
@@ -67,8 +68,31 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
             uViewFadeMin: { value: viewFadeMin },
             uViewFadeMax: { value: viewFadeMax },
             uSunVisible: { value: 1 },
-            uViewAdapt: { value: 0 }
+            uViewAdapt: { value: 0 },
+            uTexture: { value: null },
+            uHasTexture: { value: 0 }
         }), [density, brightness, milkyWayStrength, orientation, fadeMin, fadeMax, viewFadeMin, viewFadeMax]);
+
+        useEffect(() => {
+            if (!texturePath) {
+                if (matRef.current) {
+                    matRef.current.uniforms.uTexture.value = null;
+                    matRef.current.uniforms.uHasTexture.value = 0;
+                }
+                return;
+            }
+            new TextureLoader().loadAsync(texturePath).then((t) => {
+                t.colorSpace = SRGBColorSpace;
+                t.minFilter = LinearFilter;
+                t.magFilter = LinearFilter;
+                t.wrapS = THREE.RepeatWrapping;
+                t.wrapT = THREE.ClampToEdgeWrapping;
+                if (matRef.current) {
+                    matRef.current.uniforms.uTexture.value = t;
+                    matRef.current.uniforms.uHasTexture.value = 1;
+                }
+            });
+        }, [texturePath]);
         const adaptRef = useRef(0);
         const timeScale = useGameStore((state) => state.timeScale);
         useFrame((state, rawDelta) => {
@@ -137,6 +161,8 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
           uniform float uViewFadeMax;
           uniform float uSunVisible;
           uniform float uViewAdapt;
+          uniform sampler2D uTexture;
+          uniform float uHasTexture;
           varying vec3 vDir;
           const float PI = 3.141592653589793;
           float hash(vec2 p) {
@@ -206,7 +232,18 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
           // Fade stars when looking toward the sun to mimic camera contrast washout
           float glare = smoothstep(uViewFadeMin, uViewFadeMax, uCamSunDot) * uSunVisible;
           float viewFade = mix(1.0, 0.25, glare * 0.7);
-          vec3 col = (vec3(s * uBrightness) + vec3(m * uMilkyWayStrength)) * viewFade;
+          
+          vec3 baseCol = (vec3(s * uBrightness) + vec3(m * uMilkyWayStrength));
+          if (uHasTexture > 0.5) {
+              vec2 texUV = vec2(atan(nd.z, nd.x), asin(nd.y));
+              texUV *= vec2(0.1591, 0.3183);
+              texUV += 0.5;
+              vec3 texCol = texture2D(uTexture, texUV).rgb;
+              // Blend texture with stars (maybe reduce stars intensity)
+              baseCol = texCol + vec3(s * uBrightness * 0.3);
+          }
+          
+          vec3 col = baseCol * viewFade;
           gl_FragColor = vec4(col, 1.0);
           }
         `;
@@ -222,7 +259,7 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
             <color attach="background" args={['#000005']} />
 
             {/* Environment */}
-            <StarfieldSky density={0.02} brightness={0.7} milkyWayStrength={0.2} orientation={[0.0, 0.25, 0.97]} radius={2000000} fadeMin={0.2} fadeMax={0.9} viewFadeMin={0.6} viewFadeMax={0.85} />
+            <StarfieldSky density={0.02} brightness={0.7} milkyWayStrength={0.2} orientation={[0.0, 0.25, 0.97]} radius={2000000} fadeMin={0.2} fadeMax={0.9} viewFadeMin={0.6} viewFadeMax={0.85} texturePath={background?.texturePath} />
             <Environment preset="night" />
             {!hdr && <ambientLight intensity={0.05} />}
             {!hdr && <hemisphereLight args={['#445577', '#050505', 0.2]} />}
