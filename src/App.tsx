@@ -6,6 +6,7 @@ import type { ArcballControls as ArcballControlsImpl } from 'three-stdlib';
 import { HUD } from './components/HUD';
 import { TradingInterface } from './components/TradingInterface';
 import { SimpleEffects } from './components/SimpleEffects';
+import { RealismEffectsLite, RealismEffectsFull } from './components/RealismEffects';
 import { ShipModel } from './components/ShipModel';
 import type { PerspectiveCamera, Scene as ThreeScene, Mesh, MeshStandardMaterial, WebGLRenderer, Object3D } from 'three';
 import { Box3, Vector3, Vector2, SRGBColorSpace, ACESFilmicToneMapping, NoToneMapping, PCFSoftShadowMap, Raycaster } from 'three';
@@ -21,12 +22,12 @@ import { ModelGrid } from './components/ModelGrid';
 import { SectorMap2D } from './components/SectorMap2D';
 import { OffScreenArrow } from './components/NavigationIndicator';
 import { getSectorLayoutById } from './config/sector';
-import { UNIVERSE_SECTORS_XT } from './config/universe_xtension';
+import { UNIVERSE_SECTORS_XBTF } from './config/universe_xbtf';
 import { useGameStore } from './store/gameStore';
 import { EnginePlume } from './components/EnginePlume';
 import { UniverseMap } from './components/UniverseMap';
 import { EconomyTicker } from './components/EconomyTicker';
-import { PLUME_PRESETS, getAllPresets } from './config/plumes';
+import { getAllPresets } from './config/plumes';
 
 function App() {
   const sceneRef = useRef<ThreeScene | null>(null);
@@ -37,6 +38,7 @@ function App() {
   const modelParam = params.get('model') || null;
   const adminMode = params.get('admin') === 'ship';
   const adminModel = params.get('model') || '/models/00000.obj';
+  const effectsMode = params.get('effects') || 'simple'; // 'simple' | 'realism' | 'realism-full'
   const path = window.location.pathname;
   const setNavObjects = useGameStore((s) => s.setNavObjects);
   const currentSectorId = useGameStore((s) => s.currentSectorId);
@@ -45,10 +47,10 @@ function App() {
     const layout = getSectorLayoutById(currentSectorId || 'seizewell');
     const spacing = 30;
     const place = (p: [number, number, number]): [number, number, number] => [p[0] * spacing, p[1] * spacing, p[2] * spacing];
-    const sector = UNIVERSE_SECTORS_XT.find((s) => s.id === (currentSectorId || 'seizewell')) || UNIVERSE_SECTORS_XT[0];
+    const sector = UNIVERSE_SECTORS_XBTF.find((s) => s.id === (currentSectorId || 'seizewell')) || UNIVERSE_SECTORS_XBTF[0];
     const nbNames = (sector?.neighbors || []).slice(0, layout.gates.length);
     const nb = nbNames
-      .map((nm) => UNIVERSE_SECTORS_XT.find((x) => x.name === nm)?.id)
+      .map((nm) => UNIVERSE_SECTORS_XBTF.find((x) => x.name === nm)?.id)
       .filter((x): x is string => !!x);
     const objects: { name: string; position: [number, number, number]; type: 'station' | 'gate' | 'ship'; targetSectorId?: string }[] = [];
     for (const st of layout.stations) objects.push({ name: st.name, position: place(st.position), type: 'station' });
@@ -116,7 +118,9 @@ function App() {
       >
         <Suspense fallback={null}>
           <Scene hdr={false} />
-          <SimpleEffects />
+          {effectsMode === 'simple' && <SimpleEffects />}
+          {effectsMode === 'realism' && <RealismEffectsLite />}
+          {effectsMode === 'realism-full' && <RealismEffectsFull />}
           <PhysicsStepper />
           <EconomyTicker />
         </Suspense>
@@ -611,8 +615,8 @@ function ShipEditorCanvas({ modelPath }: { modelPath?: string }) {
               </div>
             ))}
           </div>
-          <button 
-            onClick={() => setAllPlumePresets(getAllPresets())} 
+          <button
+            onClick={() => setAllPlumePresets(getAllPresets())}
             style={{ marginTop: 8, padding: '4px 8px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff', fontSize: 11, cursor: 'pointer' }}
           >
             Refresh Presets

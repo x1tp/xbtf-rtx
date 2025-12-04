@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
 import type { NavTarget } from '../store/gameStore';
-import { UNIVERSE_SECTORS_XT } from '../config/universe_xtension';
+import { UNIVERSE_SECTORS_XBTF } from '../config/universe_xbtf';
 
 interface SectorObject {
     name: string;
@@ -19,11 +19,11 @@ type TabType = 'ships' | 'all' | 'stations';
 
 // Icon shapes for different object types
 const getObjectIcon = (type: string, isSelected: boolean, isPlayer: boolean) => {
-    const baseColor = isPlayer ? '#00ff00' : isSelected ? '#ffff00' : 
-        type === 'station' ? '#00aaff' : 
-        type === 'gate' ? '#ff8800' : 
-        type === 'ship' ? '#ff4488' : '#888888';
-    
+    const baseColor = isPlayer ? '#00ff00' : isSelected ? '#ffff00' :
+        type === 'station' ? '#00aaff' :
+            type === 'gate' ? '#ff8800' :
+                type === 'ship' ? '#ff4488' : '#888888';
+
     if (isPlayer) {
         // Player ship - green crosshair
         return (
@@ -34,7 +34,7 @@ const getObjectIcon = (type: string, isSelected: boolean, isPlayer: boolean) => 
             </g>
         );
     }
-    
+
     if (type === 'station') {
         // Station - square with dots
         return (
@@ -44,7 +44,7 @@ const getObjectIcon = (type: string, isSelected: boolean, isPlayer: boolean) => 
             </g>
         );
     }
-    
+
     if (type === 'gate') {
         // Gate - diamond shape
         return (
@@ -54,7 +54,7 @@ const getObjectIcon = (type: string, isSelected: boolean, isPlayer: boolean) => 
             </g>
         );
     }
-    
+
     // Ship - triangle
     return (
         <g>
@@ -76,7 +76,7 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
     const selectedTarget = useGameStore((s) => s.selectedTarget);
     const storePosition = useGameStore((s) => s.position);
     const storeObjects = useGameStore((s) => s.navObjects);
-    
+
     const [activeTab, setActiveTab] = useState<TabType>('all');
     const [zoom, setZoom] = useState(1);
     const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -86,17 +86,17 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
     const [mapWidth, setMapWidth] = useState(800);
     const [mapHeight, setMapHeight] = useState(600);
     const [axisView, setAxisView] = useState<AxisView>('xz');
-    
+
     const mapRef = useRef<SVGSVGElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-    
+
     // Axis view labels
     const axisLabels: Record<AxisView, { horizontal: string; vertical: string; name: string }> = {
         'xz': { horizontal: 'X', vertical: 'Z', name: 'Top (X-Z)' },
         'xy': { horizontal: 'X', vertical: 'Y', name: 'Front (X-Y)' },
         'yz': { horizontal: 'Y', vertical: 'Z', name: 'Side (Y-Z)' },
     };
-    
+
     // Handle Insert key for axis switching
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -113,7 +113,7 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [sectorMapOpen]);
-    
+
     // Resize map to fit container
     useEffect(() => {
         const updateSize = () => {
@@ -132,7 +132,7 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
             clearTimeout(timeout);
         };
     }, [sectorMapOpen]);
-    
+
     // Use store position if available
     const currentPlayerPos: [number, number, number] = [
         storePosition?.x ?? playerPosition[0],
@@ -160,11 +160,11 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
     const maxH = Math.max(...allCoords.map(c => c[0])) + 500;
     const minV = Math.min(...allCoords.map(c => c[1])) - 500;
     const maxV = Math.max(...allCoords.map(c => c[1])) + 500;
-    
+
     const rangeH = maxH - minH;
     const rangeV = maxV - minV;
     const scale = Math.min(mapWidth / rangeH, mapHeight / rangeV) * 0.85;
-    
+
     // Transform world coordinates to map coordinates
     const worldToMap = (pos: [number, number, number]) => {
         const [h, v] = getAxisCoords(pos);
@@ -189,20 +189,20 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
     const handleClose = () => {
         setSectorMapOpen(false);
     };
-    
+
     const handleWheel = (e: React.WheelEvent) => {
         e.preventDefault();
         const delta = e.deltaY > 0 ? 0.9 : 1.1;
         setZoom(z => Math.max(0.2, Math.min(5, z * delta)));
     };
-    
+
     const handleMouseDown = (e: React.MouseEvent) => {
         if (e.button === 0 || e.button === 2) {
             setIsDragging(true);
             setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
         }
     };
-    
+
     const handleMouseMove = (e: React.MouseEvent) => {
         if (isDragging) {
             setPan({
@@ -211,7 +211,7 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
             });
         }
     };
-    
+
     const handleMouseUp = () => {
         setIsDragging(false);
     };
@@ -244,17 +244,17 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
     for (let i = -gridCount; i <= gridCount; i++) {
         const offset = i * gridSpacing * scale * zoom;
         gridLines.push(
-            <line 
+            <line
                 key={`h${i}`}
-                x1={0} y1={mapHeight/2 + offset + pan.y}
-                x2={mapWidth} y2={mapHeight/2 + offset + pan.y}
+                x1={0} y1={mapHeight / 2 + offset + pan.y}
+                x2={mapWidth} y2={mapHeight / 2 + offset + pan.y}
                 stroke="rgba(40, 80, 120, 0.3)"
                 strokeWidth="1"
             />,
             <line
                 key={`v${i}`}
-                x1={mapWidth/2 + offset + pan.x} y1={0}
-                x2={mapWidth/2 + offset + pan.x} y2={mapHeight}
+                x1={mapWidth / 2 + offset + pan.x} y1={0}
+                x2={mapWidth / 2 + offset + pan.x} y2={mapHeight}
                 stroke="rgba(40, 80, 120, 0.3)"
                 strokeWidth="1"
             />
@@ -372,7 +372,7 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
                         ref={mapRef}
                         width={mapWidth}
                         height={mapHeight}
-                        style={{ 
+                        style={{
                             cursor: isDragging ? 'grabbing' : 'grab',
                             background: 'transparent',
                             position: 'absolute',
@@ -388,37 +388,37 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
                         {/* Grid lines */}
                         <g>
                             {gridLines}
-                            
+
                             {/* Axis lines */}
-                            <line 
-                                x1={0} y1={mapHeight/2 + pan.y}
-                                x2={mapWidth} y2={mapHeight/2 + pan.y}
+                            <line
+                                x1={0} y1={mapHeight / 2 + pan.y}
+                                x2={mapWidth} y2={mapHeight / 2 + pan.y}
                                 stroke="rgba(60, 120, 160, 0.5)"
                                 strokeWidth="1"
                             />
-                            <line 
-                                x1={mapWidth/2 + pan.x} y1={0}
-                                x2={mapWidth/2 + pan.x} y2={mapHeight}
+                            <line
+                                x1={mapWidth / 2 + pan.x} y1={0}
+                                x2={mapWidth / 2 + pan.x} y2={mapHeight}
                                 stroke="rgba(60, 120, 160, 0.5)"
                                 strokeWidth="1"
                             />
-                            
+
                             {/* Axis labels */}
-                            <text x={mapWidth - 25} y={mapHeight/2 + pan.y - 5} fill="#4080a0" fontSize="11">+{axisLabels[axisView].horizontal.toLowerCase()}</text>
-                            <text x={10} y={mapHeight/2 + pan.y - 5} fill="#4080a0" fontSize="11">-{axisLabels[axisView].horizontal.toLowerCase()}</text>
-                            <text x={mapWidth/2 + pan.x + 5} y={20} fill="#4080a0" fontSize="11">-{axisLabels[axisView].vertical.toLowerCase()}</text>
-                            <text x={mapWidth/2 + pan.x + 5} y={mapHeight - 10} fill="#4080a0" fontSize="11">+{axisLabels[axisView].vertical.toLowerCase()}</text>
+                            <text x={mapWidth - 25} y={mapHeight / 2 + pan.y - 5} fill="#4080a0" fontSize="11">+{axisLabels[axisView].horizontal.toLowerCase()}</text>
+                            <text x={10} y={mapHeight / 2 + pan.y - 5} fill="#4080a0" fontSize="11">-{axisLabels[axisView].horizontal.toLowerCase()}</text>
+                            <text x={mapWidth / 2 + pan.x + 5} y={20} fill="#4080a0" fontSize="11">-{axisLabels[axisView].vertical.toLowerCase()}</text>
+                            <text x={mapWidth / 2 + pan.x + 5} y={mapHeight - 10} fill="#4080a0" fontSize="11">+{axisLabels[axisView].vertical.toLowerCase()}</text>
                         </g>
-                        
+
                         {/* Objects */}
                         <g>
                             {filteredObjects.map((obj, i) => {
                                 const pos = worldToMap(obj.position);
                                 const isSelected = selectedTarget?.name === obj.name;
                                 const isHovered = hoveredObject?.name === obj.name;
-                                
+
                                 return (
-                                    <g 
+                                    <g
                                         key={obj.name + i}
                                         transform={`translate(${pos.x}, ${pos.y})`}
                                         style={{ cursor: 'pointer' }}
@@ -428,10 +428,10 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
                                     >
                                         {/* Selection indicator */}
                                         {isSelected && (
-                                            <rect 
+                                            <rect
                                                 x="-12" y="-12" width="24" height="24"
-                                                fill="none" 
-                                                stroke="#ffff00" 
+                                                fill="none"
+                                                stroke="#ffff00"
                                                 strokeWidth="1"
                                                 strokeDasharray="4,2"
                                             />
@@ -443,9 +443,9 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
                                         {getObjectIcon(obj.type, isSelected, false)}
                                         {/* Label on hover */}
                                         {(isHovered || isSelected) && (
-                                            <text 
-                                                y="18" 
-                                                textAnchor="middle" 
+                                            <text
+                                                y="18"
+                                                textAnchor="middle"
                                                 fill={isSelected ? '#ffff00' : '#ffffff'}
                                                 fontSize="9"
                                                 style={{ pointerEvents: 'none' }}
@@ -456,7 +456,7 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
                                     </g>
                                 );
                             })}
-                            
+
                             {/* Player position */}
                             {(() => {
                                 const playerPos = worldToMap(currentPlayerPos);
@@ -471,7 +471,7 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
                             })()}
                         </g>
                     </svg>
-                    
+
                     {/* Zoom controls */}
                     <div style={{
                         position: 'absolute',
@@ -568,7 +568,7 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
                     }}
                 >
                     <span style={{ color: '#ff9944', fontSize: 14, fontWeight: 'bold' }}>
-                        {(() => { const s = UNIVERSE_SECTORS_XT.find((x) => x.id === (currentSectorId || 'seizewell')); return s ? s.name : (currentSectorId || 'seizewell'); })()}
+                        {(() => { const s = UNIVERSE_SECTORS_XBTF.find((x) => x.id === (currentSectorId || 'seizewell')); return s ? s.name : (currentSectorId || 'seizewell'); })()}
                     </span>
                     <span style={{ color: '#6090a0', fontSize: 10 }}>
                         &lt;&lt; Select a position &gt;&gt;
@@ -584,12 +584,12 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
                             style={{
                                 flex: 1,
                                 padding: '8px',
-                                background: activeTab === tab 
-                                    ? 'rgba(50, 90, 130, 0.6)' 
+                                background: activeTab === tab
+                                    ? 'rgba(50, 90, 130, 0.6)'
                                     : 'transparent',
                                 border: 'none',
-                                borderBottom: activeTab === tab 
-                                    ? '2px solid #6ad0ff' 
+                                borderBottom: activeTab === tab
+                                    ? '2px solid #6ad0ff'
                                     : '2px solid transparent',
                                 color: activeTab === tab ? '#ffffff' : '#6090a0',
                                 cursor: 'pointer',
@@ -632,9 +632,9 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
                     {filteredObjects.map((obj, i) => {
                         const isSelected = selectedTarget?.name === obj.name;
                         const distance = getDistance(obj.position);
-                        const typeColor = obj.type === 'station' ? '#00aaff' : 
-                                         obj.type === 'gate' ? '#ff8800' : '#ff4488';
-                        
+                        const typeColor = obj.type === 'station' ? '#00aaff' :
+                            obj.type === 'gate' ? '#ff8800' : '#ff4488';
+
                         return (
                             <div
                                 key={obj.name + i}
@@ -645,8 +645,8 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
                                     display: 'flex',
                                     alignItems: 'center',
                                     padding: '6px 8px',
-                                    background: isSelected 
-                                        ? 'rgba(80, 120, 40, 0.4)' 
+                                    background: isSelected
+                                        ? 'rgba(80, 120, 40, 0.4)'
                                         : 'rgba(30, 50, 70, 0.3)',
                                     borderLeft: `3px solid ${isSelected ? '#88cc44' : typeColor}`,
                                     marginBottom: 1,
@@ -654,10 +654,10 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
                                     transition: 'background 0.1s',
                                 }}
                             >
-                                <span 
-                                    style={{ 
-                                        color: isSelected ? '#ccff88' : '#c0d0e0', 
-                                        fontSize: 11, 
+                                <span
+                                    style={{
+                                        color: isSelected ? '#ccff88' : '#c0d0e0',
+                                        fontSize: 11,
                                         flex: 1,
                                         overflow: 'hidden',
                                         textOverflow: 'ellipsis',
@@ -666,8 +666,8 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
                                 >
                                     {obj.name}
                                 </span>
-                                <span style={{ 
-                                    color: isSelected ? '#88cc44' : '#6090a0', 
+                                <span style={{
+                                    color: isSelected ? '#88cc44' : '#6090a0',
                                     fontSize: 10,
                                     marginLeft: 8,
                                 }}>

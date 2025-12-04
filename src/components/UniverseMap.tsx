@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, useLayoutEffect } from 'react'
 import { useGameStore } from '../store/gameStore'
-import { UNIVERSE_SECTORS_XT } from '../config/universe_xtension'
-import type { UniverseSector } from '../config/universe_xtension'
+import { UNIVERSE_SECTORS_XBTF } from '../config/universe_xbtf'
+import type { UniverseSector } from '../config/universe_xbtf'
 
 type Vec2 = { x: number; y: number }
 
@@ -17,61 +17,32 @@ const ownerColor: Record<string, string> = {
 
 const useLayout = (sectors: UniverseSector[]) => {
   return useMemo(() => {
-    const n = sectors.length
     const pos: Record<string, Vec2> = {}
-    const ids = sectors.map((s) => s.id)
-    for (let i = 0; i < n; i++) {
-      const a = (i / n) * Math.PI * 2
-      pos[ids[i]] = { x: Math.cos(a) * 300, y: Math.sin(a) * 300 }
-    }
-    const adj = new Map<string, string[]>()
-    sectors.forEach((s: UniverseSector) => adj.set(s.id, s.neighbors.map((nm: string) => {
-      const t = sectors.find((q: UniverseSector) => q.name.toLowerCase() === nm.toLowerCase())
-      return t ? t.id : ''
-    }).filter(Boolean)))
-    for (let iter = 0; iter < 800; iter++) {
-      for (let i = 0; i < n; i++) {
-        const id = ids[i]
-        const p = pos[id]
-        let fx = -p.x * 0.001
-        let fy = -p.y * 0.001
-        const neigh = adj.get(id) || []
-        for (const nb of neigh) {
-          const q = pos[nb]
-          const dx = q.x - p.x
-          const dy = q.y - p.y
-          const d = Math.max(1, Math.hypot(dx, dy))
-          const k = 0.02
-          fx += (dx / d) * k * (d - 120)
-          fy += (dy / d) * k * (d - 120)
-        }
-        for (let j = 0; j < n; j++) {
-          if (j === i) continue
-          const id2 = ids[j]
-          const q = pos[id2]
-          const dx = q.x - p.x
-          const dy = q.y - p.y
-          const d2 = Math.max(1, dx * dx + dy * dy)
-          const k2 = 4000 / d2
-          fx -= dx * k2
-          fy -= dy * k2
-        }
-        p.x += fx
-        p.y += fy
+    // Grid spacing
+    const spacingX = 120
+    const spacingY = 120
+
+    // Calculate bounds to center the map
+    const xs = sectors.map(s => s.x)
+    const ys = sectors.map(s => s.y)
+    const minX = Math.min(...xs)
+    const maxX = Math.max(...xs)
+    const minY = Math.min(...ys)
+    const maxY = Math.max(...ys)
+
+    const width = (maxX - minX) * spacingX
+    const height = (maxY - minY) * spacingY
+
+    const offsetX = -width / 2
+    const offsetY = -height / 2
+
+    sectors.forEach(s => {
+      pos[s.id] = {
+        x: (s.x - minX) * spacingX + offsetX,
+        y: (s.y - minY) * spacingY + offsetY
       }
-    }
-    const xs = ids.map((id) => pos[id].x)
-    const ys = ids.map((id) => pos[id].y)
-    const minX = Math.min(...xs), maxX = Math.max(...xs)
-    const minY = Math.min(...ys), maxY = Math.max(...ys)
-    const w = maxX - minX, h = maxY - minY
-    const cx = (minX + maxX) / 2
-    const cy = (minY + maxY) / 2
-    const norm = Math.max(w, h)
-    ids.forEach((id) => {
-      pos[id].x = (pos[id].x - cx) / (norm || 1)
-      pos[id].y = (pos[id].y - cy) / (norm || 1)
     })
+
     return pos
   }, [sectors])
 }
@@ -86,7 +57,7 @@ export const UniverseMap: React.FC = () => {
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [drag, setDrag] = useState<{ x: number; y: number } | null>(null)
   const [activeOwner, setActiveOwner] = useState<string>('all')
-  const sectors = UNIVERSE_SECTORS_XT
+  const sectors = UNIVERSE_SECTORS_XBTF
   const pos = useLayout(sectors)
   const containerRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ w: 1024, h: 768 })
@@ -135,7 +106,7 @@ export const UniverseMap: React.FC = () => {
     if (drag) setPan({ x: e.clientX - drag.x, y: e.clientY - drag.y })
   }
   const onMouseUp = () => setDrag(null)
-  const toMap = (p: Vec2) => ({ x: p.x * (size.w * 0.85) * zoom + size.w / 2 + pan.x, y: p.y * (size.h * 0.85) * zoom + size.h / 2 + pan.y })
+  const toMap = (p: Vec2) => ({ x: p.x * zoom + size.w / 2 + pan.x, y: p.y * zoom + size.h / 2 + pan.y })
   const selectSector = (id: string) => {
     setSelectedSectorId(id)
     setOpen(false)
@@ -232,7 +203,7 @@ export const UniverseMap: React.FC = () => {
                   </g>
                 )
               })}
-          </g>
+            </g>
           </svg>
           <div style={{ position: 'absolute', top: 10, right: 10, display: 'flex', flexDirection: 'column', gap: 4 }}>
             <button onClick={() => setZoom((z) => Math.min(5, z * 1.2))} style={{ width: 24, height: 24, background: 'rgba(30, 50, 70, 0.8)', border: '1px solid #3a6a90', color: '#8ac0e0', cursor: 'pointer', fontSize: 14 }}>+</button>

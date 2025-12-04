@@ -1,7 +1,7 @@
 export interface SectorConfig {
   sun: { position: [number, number, number]; size: number; color: string; intensity: number };
   planet: { position: [number, number, number]; size: number };
-  station: { position: [number, number, number]; scale: number; modelPath: string; rotationSpeed: number; rotationAxis: 'x'|'y'|'z' };
+  station: { position: [number, number, number]; scale: number; modelPath: string; rotationSpeed: number; rotationAxis: 'x' | 'y' | 'z' };
   asteroids: { count: number; range: number; center: [number, number, number] };
 }
 export const DEFAULT_SECTOR_CONFIG: SectorConfig = {
@@ -11,7 +11,7 @@ export const DEFAULT_SECTOR_CONFIG: SectorConfig = {
   station: { position: [50, 0, -120], scale: 40, modelPath: '/models/00001.obj', rotationSpeed: -0.05, rotationAxis: 'z' },
   asteroids: { count: 500, range: 400, center: [-250, 80, -900] }
 };
-import { UNIVERSE_SECTORS_XT } from './universe_xtension'
+import { UNIVERSE_SECTORS_XBTF } from './universe_xbtf'
 import type { SeizewellLayout } from './seizewell'
 import { TELADI_GAIN_BLUEPRINT } from './teladi_gain'
 import { PROFIT_SHARE_BLUEPRINT } from './profit_share'
@@ -38,11 +38,38 @@ const MANUAL_SECTOR_LAYOUTS: Record<string, SeizewellLayout> = {
 }
 
 export const getSectorLayoutById = (id: string): SeizewellLayout => {
+  const sector = UNIVERSE_SECTORS_XBTF.find((s) => s.id === id) || UNIVERSE_SECTORS_XBTF[0]
+
+  const gates = (sector?.neighbors || []).map((nm) => {
+    const neighbor = UNIVERSE_SECTORS_XBTF.find((s) => s.name === nm)
+    if (!neighbor) return null
+
+    const dx = neighbor.x - sector.x
+    const dy = neighbor.y - sector.y
+
+    let name = 'Gate'
+    let position: [number, number, number] = [0, 0, 0]
+
+    if (dx === 1) { name = 'East Gate'; position = [4000, 0, 0] }
+    else if (dx === -1) { name = 'West Gate'; position = [-4000, 0, 0] }
+    else if (dy === 1) { name = 'South Gate'; position = [0, 0, 4000] }
+    else if (dy === -1) { name = 'North Gate'; position = [0, 0, -4000] }
+    else {
+      // Fallback for non-adjacent jumps if any
+      name = 'Gate'
+      position = [2000, 0, 2000]
+    }
+
+    return { name, position, modelPath: '/models/00088.obj' }
+  }).filter((g): g is { name: string; position: [number, number, number]; modelPath: string } => !!g)
+
   const manual = MANUAL_SECTOR_LAYOUTS[id as keyof typeof MANUAL_SECTOR_LAYOUTS]
-  if (manual) return manual
-  const sector = UNIVERSE_SECTORS_XT.find((s) => s.id === id) || UNIVERSE_SECTORS_XT[0]
-  const nb = (sector?.neighbors || []).slice(0, gatePositions.length)
-  const gates = nb.map((_, i) => ({ name: gateNames[i] || 'Gate', position: gatePositions[i] as [number, number, number], modelPath: '/models/00088.obj' }))
+  if (manual) {
+    return {
+      ...manual,
+      gates
+    }
+  }
   const stations = [
     { name: 'Trading Station', position: DEFAULT_SECTOR_CONFIG.station.position, scale: DEFAULT_SECTOR_CONFIG.station.scale, rotate: true, modelPath: DEFAULT_SECTOR_CONFIG.station.modelPath },
   ]

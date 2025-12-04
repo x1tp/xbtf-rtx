@@ -11,7 +11,8 @@
     "model:generate": "node ./scripts/generate-model.mjs",
     "model:watch": "node ./scripts/generate-model.mjs scripts/station_complex.json --watch",
     "material:generate": "node ./scripts/generate-pbr.mjs",
-    "models:convert": "node ./scripts/convert-all-bods.mjs"
+    "models:convert": "node ./scripts/convert-all-bods.mjs",
+    "textures:upscale": "node ./scripts/upscale-textures.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.19.3",
@@ -26,6 +27,7 @@
     "r3f-perf": "^7.2.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "realism-effects": "^1.1.2",
     "screen-space-reflections": "^2.5.0",
     "sharp": "^0.33.4",
     "three": "^0.169.0",

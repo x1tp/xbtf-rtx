@@ -217,6 +217,8 @@ async function generateProceduralBase(name, prompt, resolution) {
   if (lower.includes('canopy') || lower.includes('glass')) return generateGlassBase(resolution);
   return generatePaintedBase(resolution);
 }
+
+
 async function generateEarthBase(resolution) {
   const width = resolution; const height = resolution; const channels = 3;
   const buf = Buffer.alloc(width * height * channels);
