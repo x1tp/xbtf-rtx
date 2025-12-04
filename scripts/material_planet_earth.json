@@ -1,6 +1,7 @@
 {
   "name": "planet_earth",
-  "prompt": "earth-like planet: blue oceans, green and brown landmasses, polar ice caps, scattered white clouds",
-  "resolution": 2048,
-  "forceAi": true
+  "prompt": "planet earth equirectangular continents oceans realistic biome palette",
+  "resolution": 4096,
+  "forceAi": false,
+  "noProceduralFallback": false
 }

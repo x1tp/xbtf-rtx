@@ -2,7 +2,6 @@ import { Suspense, useRef, useState, useEffect } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { Scene } from './Scene';
 import { ArcballControls, Grid, GizmoHelper, GizmoViewport, Text, OrthographicCamera, PerspectiveCamera as DreiPerspectiveCamera, Line, Environment, TransformControls, useProgress } from '@react-three/drei';
-import { Perf } from 'r3f-perf';
 import type { ArcballControls as ArcballControlsImpl } from 'three-stdlib';
 import { HUD } from './components/HUD';
 import { TradingInterface } from './components/TradingInterface';
@@ -13,6 +12,7 @@ import { Box3, Vector3, Vector2, SRGBColorSpace, ACESFilmicToneMapping, NoToneMa
 import { Station } from './components/Station';
 import { PhysicsStepper } from './physics/PhysicsStepper';
 import { PlanetEditor } from './admin/PlanetEditor';
+import { PlumeEditor } from './admin/PlumeEditor';
 import { getPhysicsMetrics } from './physics/RapierWorld';
 import { ModelGrid } from './components/ModelGrid';
 
@@ -20,10 +20,13 @@ import { ModelGrid } from './components/ModelGrid';
 
 import { SectorMap2D } from './components/SectorMap2D';
 import { OffScreenArrow } from './components/NavigationIndicator';
-import { SEIZEWELL_BLUEPRINT } from './config/seizewell';
+import { getSectorLayoutById } from './config/sector';
+import { UNIVERSE_SECTORS_XT } from './config/universe_xtension';
 import { useGameStore } from './store/gameStore';
-import { PLUME_PRESETS } from './config/plumes';
 import { EnginePlume } from './components/EnginePlume';
+import { UniverseMap } from './components/UniverseMap';
+import { EconomyTicker } from './components/EconomyTicker';
+import { PLUME_PRESETS } from './config/plumes';
 
 function App() {
   const sceneRef = useRef<ThreeScene | null>(null);
@@ -36,17 +39,23 @@ function App() {
   const adminModel = params.get('model') || '/models/00000.obj';
   const path = window.location.pathname;
   const setNavObjects = useGameStore((s) => s.setNavObjects);
+  const currentSectorId = useGameStore((s) => s.currentSectorId);
 
   useEffect(() => {
-    const layout = SEIZEWELL_BLUEPRINT;
+    const layout = getSectorLayoutById(currentSectorId || 'seizewell');
     const spacing = 30;
     const place = (p: [number, number, number]): [number, number, number] => [p[0] * spacing, p[1] * spacing, p[2] * spacing];
-    const objects: { name: string; position: [number, number, number]; type: 'station' | 'gate' | 'ship' }[] = [];
+    const sector = UNIVERSE_SECTORS_XT.find((s) => s.id === (currentSectorId || 'seizewell')) || UNIVERSE_SECTORS_XT[0];
+    const nbNames = (sector?.neighbors || []).slice(0, layout.gates.length);
+    const nb = nbNames
+      .map((nm) => UNIVERSE_SECTORS_XT.find((x) => x.name === nm)?.id)
+      .filter((x): x is string => !!x);
+    const objects: { name: string; position: [number, number, number]; type: 'station' | 'gate' | 'ship'; targetSectorId?: string }[] = [];
     for (const st of layout.stations) objects.push({ name: st.name, position: place(st.position), type: 'station' });
-    for (const g of layout.gates) objects.push({ name: g.name, position: place(g.position), type: 'gate' });
+    layout.gates.forEach((g, i) => { objects.push({ name: g.name, position: place(g.position), type: 'gate', targetSectorId: nb[i] }); });
     for (const s of layout.ships) objects.push({ name: s.name, position: place(s.position), type: 'ship' });
     setNavObjects(objects);
-  }, [setNavObjects]);
+  }, [setNavObjects, currentSectorId]);
 
   if (isViewer) {
     return (
@@ -68,6 +77,18 @@ function App() {
     );
   }
 
+  if (path.startsWith('/admin/economy')) {
+    return (
+      <EconomyAdmin />
+    );
+  }
+
+  if (path.startsWith('/admin/plume')) {
+    return (
+      <PlumeEditor />
+    );
+  }
+
   if (adminMode || path.startsWith('/admin/ship')) {
     const modelFromPath = new URLSearchParams(window.location.search).get('model') || adminModel;
     return (
@@ -81,7 +102,7 @@ function App() {
     <div style={{ width: '100vw', height: '100vh', background: 'black' }}>
       <Canvas
         shadows
-        gl={{ logarithmicDepthBuffer: true }}
+        gl={{ logarithmicDepthBuffer: true, antialias: true }}
         camera={{ fov: 75, near: 1, far: 600000000000 }}
         onCreated={({ gl, scene, camera }) => {
           gl.outputColorSpace = SRGBColorSpace;
@@ -97,12 +118,13 @@ function App() {
           <Scene hdr={false} />
           <SimpleEffects />
           <PhysicsStepper />
-          <Perf position="top-right" />
+          <EconomyTicker />
         </Suspense>
       </Canvas>
       <SmartLoader />
       <HUD />
       <SectorMap2D />
+      <UniverseMap />
       <OffScreenArrow />
       <TradingInterface />
       <PerfOverlay glRef={glRef} sceneRef={sceneRef} />
@@ -383,7 +405,25 @@ function ShipEditorCanvas({ modelPath }: { modelPath?: string }) {
       window.removeEventListener('mousedown', onDown);
       window.removeEventListener('contextmenu', preventContextMenu);
     };
-  }, [mode]);
+  }, [mode, selectedPlumeType]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Delete' || e.code === 'Backspace') {
+        if (selectedId && selectedId.startsWith('plume-')) {
+          const idx = parseInt(selectedId.split('-')[1]);
+          if (!isNaN(idx)) {
+            setPlumes(prev => prev.filter((_, i) => i !== idx));
+            setSelectedId(null);
+            setSelectedObject(null);
+            setStatus('Deleted plume');
+          }
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedId]);
 
   useEffect(() => {
     if (!status) return;
@@ -433,6 +473,7 @@ function ShipEditorCanvas({ modelPath }: { modelPath?: string }) {
             plumePositions={plumes}
             cockpitPosition={cockpit || undefined}
             weaponPositions={weapons}
+            throttle={0.75}
           />
 
           {/* Plume Markers */}
@@ -590,6 +631,8 @@ function AdminHome() {
           <div style={{ display: 'flex', gap: 12 }}>
             <button onClick={() => setTab('ships')} style={{ padding: '8px 12px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Edit Ships</button>
             <button onClick={() => { window.location.assign('/admin/sector'); }} style={{ padding: '8px 12px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Edit Sector</button>
+            <button onClick={() => { window.location.assign('/admin/plume'); }} style={{ padding: '8px 12px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Edit Plumes</button>
+            <button onClick={() => { window.location.assign('/admin/economy'); }} style={{ padding: '8px 12px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>View Economy</button>
           </div>
         </div>
       </div>
@@ -622,6 +665,153 @@ function AdminHome() {
       </div>
     </div>
   );
+}
+function EconomyAdmin() {
+  const wares = useGameStore((s) => s.wares)
+  const recipes = useGameStore((s) => s.recipes)
+  const stations = useGameStore((s) => s.stations)
+  const sectorPrices = useGameStore((s) => s.sectorPrices)
+  const initEconomy = useGameStore((s) => s.initEconomy)
+  const tickEconomy = useGameStore((s) => s.tickEconomy)
+  const timeScale = useGameStore((s) => s.timeScale)
+  const setTimeScale = useGameStore((s) => s.setTimeScale)
+  const syncEconomy = useGameStore((s) => s.syncEconomy)
+  const [sectorFilter, setSectorFilter] = useState('all')
+  const sectorList = Array.from(new Set<string>([...stations.map((st) => st.sectorId), ...Object.keys(sectorPrices)])).sort()
+  const wareMap = new Map<string, string>(wares.map((w) => [w.id, w.name]))
+  const recipeMap = new Map<string, { id: string; productId: string; inputs: { wareId: string; amount: number }[]; cycleTimeSec: number; batchSize: number }>(recipes.map((r) => [r.id, r]))
+  const visibleStations = stations.filter((st) => sectorFilter === 'all' || st.sectorId === sectorFilter)
+  useEffect(() => { syncEconomy() }, [syncEconomy])
+  useEffect(() => { const id = setInterval(() => syncEconomy(), 1000); return () => clearInterval(id) }, [syncEconomy])
+  return (
+    <div style={{ width: '100vw', height: '100vh', background: '#0b1016', color: '#c3e7ff', fontFamily: 'monospace' }}>
+      <div style={{ padding: 20, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, height: '100%', boxSizing: 'border-box' }}>
+        <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 18 }}>Economy Admin</span>
+            <span style={{ color: '#8ab6d6' }}>{wares.length} wares • {recipes.length} recipes • {stations.length} stations</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button onClick={() => initEconomy()} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Init</button>
+            <button onClick={() => tickEconomy(10)} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Tick +10s</button>
+            <button onClick={() => setTimeScale(timeScale === 1 ? 10 : 1)} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Time {timeScale.toFixed(1)}x</button>
+            <button onClick={() => { window.location.assign('/admin'); }} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Back</button>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>Sector</span>
+          <select value={sectorFilter} onChange={(e) => setSectorFilter(e.target.value)} style={{ padding: '6px 10px', background: '#0f2230', border: '1px solid #3fb6ff', color: '#c3e7ff' }}>
+            <option value="all">all</option>
+            {sectorList.map((sid) => (<option key={sid} value={sid}>{sid}</option>))}
+          </select>
+        </div>
+        <div style={{ background: '#0f2230', border: '1px solid #184b6a', borderRadius: 6, padding: 12, overflow: 'auto' }}>
+          <div style={{ marginBottom: 8, color: '#8ab6d6' }}>Sector Prices</div>
+          {sectorFilter === 'all' ? (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {Object.keys(sectorPrices).map((sid) => {
+                const sp = sectorPrices[sid] || {}
+                const items = Object.entries(sp)
+                return (
+                  <div key={sid} style={{ border: '1px solid #184b6a', borderRadius: 6, padding: 8 }}>
+                    <div style={{ color: '#c3e7ff', marginBottom: 6 }}>{sid}</div>
+                    {items.length === 0 ? (
+                      <div style={{ color: '#6090a0' }}>no prices</div>
+                    ) : (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 4 }}>
+                        {items.map(([wid, price]) => (
+                          <>
+                            <div style={{ color: '#c3e7ff' }}>{wareMap.get(wid) || wid}</div>
+                            <div style={{ color: '#88cc44', textAlign: 'right' }}>{Math.round(price)}</div>
+                          </>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            (() => {
+              const sp = sectorPrices[sectorFilter] || {}
+              const items = Object.entries(sp)
+              return items.length === 0 ? (
+                <div style={{ color: '#6090a0' }}>no prices</div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 4 }}>
+                  {items.map(([wid, price]) => (
+                    <>
+                      <div style={{ color: '#c3e7ff' }}>{wareMap.get(wid) || wid}</div>
+                      <div style={{ color: '#88cc44', textAlign: 'right' }}>{Math.round(price)}</div>
+                    </>
+                  ))}
+                </div>
+              )
+            })()
+          )}
+        </div>
+        <div style={{ background: '#0f2230', border: '1px solid #184b6a', borderRadius: 6, padding: 12, overflow: 'auto' }}>
+          <div style={{ marginBottom: 8, color: '#8ab6d6' }}>Stations</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
+            {visibleStations.length === 0 ? (
+              <div style={{ color: '#6090a0' }}>no stations</div>
+            ) : (
+              visibleStations.map((st) => {
+                const r = recipeMap.get(st.recipeId)
+                const prodName = r ? (wareMap.get(r.productId) || r.productId) : st.recipeId
+                const inv = Object.entries(st.inventory)
+                return (
+                  <div key={st.id} style={{ border: '1px solid #184b6a', borderRadius: 6, padding: 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <div style={{ color: '#c3e7ff' }}>{st.name}</div>
+                      <div style={{ color: '#88cc44' }}>{st.sectorId}</div>
+                    </div>
+                    <div style={{ color: '#8ab6d6', marginBottom: 6 }}>{prodName}</div>
+                    {inv.length === 0 ? (
+                      <div style={{ color: '#6090a0' }}>empty</div>
+                    ) : (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 4 }}>
+                        {inv.map(([wid, qty]) => (
+                          <>
+                            <div style={{ color: '#c3e7ff' }}>{wareMap.get(wid) || wid}</div>
+                            <div style={{ color: '#ffaa44', textAlign: 'right' }}>{Math.round(qty)}</div>
+                          </>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })
+            )}
+          </div>
+        </div>
+        <div style={{ background: '#0f2230', border: '1px solid #184b6a', borderRadius: 6, padding: 12, overflow: 'auto' }}>
+          <div style={{ marginBottom: 8, color: '#8ab6d6' }}>Wares</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 4 }}>
+            {wares.map((w) => (
+              <>
+                <div style={{ color: '#c3e7ff' }}>{w.name}</div>
+                <div style={{ color: '#6090a0', textAlign: 'right' }}>{w.category}</div>
+                <div style={{ color: '#88cc44', textAlign: 'right' }}>{w.basePrice}</div>
+              </>
+            ))}
+          </div>
+        </div>
+        <div style={{ background: '#0f2230', border: '1px solid #184b6a', borderRadius: 6, padding: 12, overflow: 'auto' }}>
+          <div style={{ marginBottom: 8, color: '#8ab6d6' }}>Recipes</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 4 }}>
+            {recipes.map((r) => (
+              <>
+                <div style={{ color: '#c3e7ff' }}>{wareMap.get(r.productId) || r.productId}</div>
+                <div style={{ color: '#6090a0', textAlign: 'right' }}>{r.batchSize}</div>
+                <div style={{ color: '#6090a0', textAlign: 'right' }}>{r.cycleTimeSec}s</div>
+              </>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function PerfOverlay({ glRef, sceneRef }: { glRef: React.RefObject<WebGLRenderer | null>; sceneRef: React.RefObject<ThreeScene | null> }) {

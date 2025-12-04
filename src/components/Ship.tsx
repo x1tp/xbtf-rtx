@@ -73,6 +73,9 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
             if (e.code === 'KeyM') {
                 useGameStore.getState().toggleSectorMap();
             }
+            if (e.code === 'KeyU') {
+                useGameStore.getState().toggleUniverseMap();
+            }
             if (e.code === 'KeyJ') {
                 const current = useGameStore.getState().timeScale;
                 // Toggle between 1x and 10x
@@ -129,7 +132,7 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
             window.removeEventListener('mouseup', handleMouseUp);
             window.removeEventListener('wheel', handleWheel);
         };
-    }, []);
+    }, [scene]);
 
     useEffect(() => {
         let cancelled = false;
@@ -194,7 +197,7 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
                 shipBodyRef.current = null;
                 shipColliderRef.current = null;
                 characterControllerRef.current = null;
-            hullColliderRef.current = null;
+                hullColliderRef.current = null;
             }
         };
 
@@ -302,9 +305,10 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
             }
         }
 
-        // Skip all ship controls when sector map is open
+        // Skip all ship controls when sector map or universe map is open
         const sectorMapOpen = useGameStore.getState().sectorMapOpen;
-        if (sectorMapOpen) {
+        const universeMapOpen = useGameStore.getState().universeMapOpen;
+        if (sectorMapOpen || universeMapOpen) {
             // Still update camera to follow ship, but no input processing
             updateCameraFollow();
             return;
@@ -508,7 +512,7 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
 
     return (
         <group ref={shipRef} name="PlayerShip" position={position}>
-            <ShipModel enableLights={enableLights} modelPath="/models/00124.obj" />
+            <ShipModel enableLights={enableLights} modelPath="/models/00124.obj" throttle={throttle} />
             {/* External ship model could go here, but invisible from inside */}
         </group>
     );

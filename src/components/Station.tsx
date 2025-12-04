@@ -4,7 +4,7 @@ import { useGLTF } from '@react-three/drei';
 import type { GLTF } from 'three-stdlib';
 import { OBJLoader } from 'three-stdlib';
 import { MTLLoader } from 'three-stdlib';
-import { Group, MeshStandardMaterial, Mesh, SRGBColorSpace, LinearSRGBColorSpace, DoubleSide, Box3, Vector3, TextureLoader, BufferGeometry, Float32BufferAttribute, Texture, RepeatWrapping, Matrix4, Quaternion, LinearMipmapLinearFilter, LinearFilter } from 'three';
+import { Group, MeshStandardMaterial, MeshBasicMaterial, Mesh, SRGBColorSpace, LinearSRGBColorSpace, DoubleSide, Box3, Vector3, TextureLoader, BufferGeometry, Float32BufferAttribute, Texture, RepeatWrapping, Matrix4, Quaternion, LinearMipmapLinearFilter, LinearFilter } from 'three';
 import { ensureRapier, getWorld, getWorldSync } from '../physics/RapierWorld';
 import type RAPIERType from '@dimforge/rapier3d-compat';
 
@@ -456,7 +456,7 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
                         const mesh = o as Mesh;
                         mesh.castShadow = true;
                         mesh.receiveShadow = true;
-                        const apply = (m: MeshStandardMaterial) => {
+                        const apply = (m: MeshStandardMaterial, matIndex: number) => {
                             m.side = DoubleSide;
                             // Reduce specular on Phong materials (OBJLoader default)
                             if ((m as unknown as { isMeshPhongMaterial: boolean }).isMeshPhongMaterial) {
@@ -464,8 +464,38 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
                                 phong.specular.setScalar(0.1);
                                 phong.shininess = 10;
                             }
+                            // Ensure emissive materials glow properly (engines, windows, lights)
+                            // Check if material has emissive color set from MTL Ke values
+                            if (m.emissive) {
+                                const e = m.emissive;
+                                const brightness = e.r + e.g + e.b;
+                                if (brightness > 0.01) {
+                                    // Replace with MeshBasicMaterial - completely unlit, ignores all lighting
+                                    const tex = m.map;
+                                    const basicMat = new MeshBasicMaterial({
+                                        map: tex,
+                                        side: DoubleSide,
+                                        toneMapped: false,
+                                    });
+                                    if (tex) {
+                                        tex.colorSpace = SRGBColorSpace;
+                                        tex.anisotropy = aniso;
+                                        tex.flipY = false;
+                                    }
+                                    // Replace material on mesh
+                                    if (Array.isArray(mesh.material)) {
+                                        mesh.material[matIndex] = basicMat;
+                                    } else {
+                                        mesh.material = basicMat;
+                                    }
+                                    // Emissive surfaces shouldn't receive or cast shadows
+                                    mesh.receiveShadow = false;
+                                    mesh.castShadow = false;
+                                    return; // Skip rest of processing
+                                }
+                            }
                             if (m.map) { m.map.colorSpace = SRGBColorSpace; m.map.anisotropy = aniso; m.map.flipY = false; }
-                            if (m.emissiveMap) { m.emissiveMap.colorSpace = SRGBColorSpace; m.emissiveMap.anisotropy = aniso; }
+                            if (m.emissiveMap) { m.emissiveMap.colorSpace = SRGBColorSpace; m.emissiveMap.anisotropy = aniso; m.emissiveMap.flipY = false; }
                             if ((m as unknown as { bumpMap?: Texture }).bumpMap && !m.normalMap) {
                                 m.normalMap = (m as unknown as { bumpMap?: Texture }).bumpMap as Texture;
                                 (m as unknown as { bumpMap?: Texture }).bumpMap = undefined;
@@ -533,7 +563,7 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
                             }
                         }
                         const mat = mesh.material as MeshStandardMaterial | MeshStandardMaterial[] | null | undefined;
-                        if (Array.isArray(mat)) mat.forEach(apply); else if (mat) apply(mat as MeshStandardMaterial);
+                        if (Array.isArray(mat)) mat.forEach((m, i) => apply(m, i)); else if (mat) apply(mat as MeshStandardMaterial, 0);
                     });
                     if (cancelled) return;
                     if (stationRef.current) {
@@ -580,8 +610,35 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
                     mesh.visible = false;
                     return;
                 }
-                const apply = (m: MeshStandardMaterial) => {
+                const apply = (m: MeshStandardMaterial, matIndex: number) => {
                     m.side = DoubleSide;
+                    // Ensure emissive materials glow properly (engines, windows, lights)
+                    // Emissive surfaces should NOT receive shadows - they glow on their own
+                    if (m.emissive) {
+                        const e = m.emissive;
+                        const brightness = e.r + e.g + e.b;
+                        if (brightness > 0.01) {
+                            // Replace with MeshBasicMaterial - completely unlit
+                            const tex = m.map;
+                            const basicMat = new MeshBasicMaterial({
+                                map: tex,
+                                side: DoubleSide,
+                                toneMapped: false,
+                            });
+                            if (tex) {
+                                tex.colorSpace = SRGBColorSpace;
+                                tex.anisotropy = aniso;
+                            }
+                            if (Array.isArray(mesh.material)) {
+                                mesh.material[matIndex] = basicMat;
+                            } else {
+                                mesh.material = basicMat;
+                            }
+                            mesh.receiveShadow = false;
+                            mesh.castShadow = false;
+                            return;
+                        }
+                    }
                     if (m.map) { m.map.colorSpace = SRGBColorSpace; m.map.anisotropy = aniso; }
                     if (m.emissiveMap) { m.emissiveMap.colorSpace = SRGBColorSpace; m.emissiveMap.anisotropy = aniso; }
                     if (m.normalMap) { m.normalMap.colorSpace = LinearSRGBColorSpace; m.normalMap.anisotropy = aniso; }
@@ -634,7 +691,7 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
                 if (g && g.attributes && !('normal' in g.attributes) && typeof g.computeVertexNormals === 'function') {
                     g.computeVertexNormals();
                 }
-                if (Array.isArray(mat)) mat.forEach(apply); else if (mat) apply(mat as MeshStandardMaterial);
+                if (Array.isArray(mat)) mat.forEach((m, i) => apply(m, i)); else if (mat) apply(mat as MeshStandardMaterial, 0);
             });
             if (stationRef.current) {
                 void rebuildCollision(stationRef.current);

@@ -1,7 +1,8 @@
 import type { FC } from 'react'
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { CylinderGeometry, ShaderMaterial, Mesh, AdditiveBlending, Color, DoubleSide } from 'three'
+import { BufferGeometry, BufferAttribute, ShaderMaterial, AdditiveBlending, Color } from 'three'
+import type { Points } from 'three'
 import { useGameStore } from '../store/gameStore'
 
 interface EnginePlumeProps {
@@ -14,6 +15,10 @@ interface EnginePlumeProps {
   glow?: number
   noiseScale?: number
   shock?: number
+  shockFrequency?: number
+  animationSpeed?: number
+  smoothness?: number
+  throttle?: number
 }
 
 export const EnginePlume: FC<EnginePlumeProps> = ({
@@ -25,158 +30,221 @@ export const EnginePlume: FC<EnginePlumeProps> = ({
   glow = 5.0,
   noiseScale = 2.0,
   shock = 1.0,
+  shockFrequency = 20.0,
+  animationSpeed = 10.0,
+  throttle,
 }) => {
-  // Use a cylinder geometry: radiusTop=radius, radiusBottom=0 (cone-like), height=1
-  // We'll scale it in the mesh.
-  // Open ended cylinder might be better for the look, but closed is fine too.
+  const count = Math.floor(800 * density) // Particle count based on density
+  
   const geom = useMemo(() => {
-    // radiusTop, radiusBottom, height, radialSegments, heightSegments, openEnded
-    const g = new CylinderGeometry(1, 0.4, 1, 16, 8, true)
-    g.translate(0, -0.5, 0) // Pivot at top
-    g.rotateX(-Math.PI / 2) // Point along -Z (or +Z depending on usage, original was box)
-    // Original box was scaled [radius*2, radius*2, length] and rotated [0, PI, 0]
-    // So it pointed along -Z relative to the ship if ship points -Z.
-    // Let's align this cylinder to point along +Z in its local space, then we rotate it to match.
+    const g = new BufferGeometry()
+    const positions = new Float32Array(count * 3)
+    const velocities = new Float32Array(count * 3)
+    const ages = new Float32Array(count)
+    const randoms = new Float32Array(count * 2) // For noise/variation
+    let seed = 123456789
+    const rng = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0
+      return (seed & 0xffffffff) / 4294967296
+    }
+    
+    // Initialize particles
+    for (let i = 0; i < count; i++) {
+      // Start at nozzle
+      positions[i * 3] = (rng() - 0.5) * radius * 0.3
+      positions[i * 3 + 1] = (rng() - 0.5) * radius * 0.3
+      positions[i * 3 + 2] = 0
+      
+      // Velocity pointing backwards (+Z)
+      velocities[i * 3] = (rng() - 0.5) * 0.2
+      velocities[i * 3 + 1] = (rng() - 0.5) * 0.2
+      velocities[i * 3 + 2] = 1.0 + rng() * 0.5
+      
+      // Stagger initial ages
+      ages[i] = rng()
+      
+      randoms[i * 2] = rng()
+      randoms[i * 2 + 1] = rng()
+    }
+    
+    g.setAttribute('position', new BufferAttribute(positions, 3))
+    g.setAttribute('velocity', new BufferAttribute(velocities, 3))
+    g.setAttribute('age', new BufferAttribute(ages, 1))
+    g.setAttribute('random', new BufferAttribute(randoms, 2))
+    
     return g
-  }, [])
+  }, [count, radius])
 
   const col = useMemo(() => new Color(color), [color])
 
   const mat = useMemo(
-    () =>
-      new ShaderMaterial({
+    () => {
+      const material = new ShaderMaterial({
         blending: AdditiveBlending,
+        // Keep in the transparent queue so we render after opaque meshes but still read their depth
         transparent: true,
         depthWrite: false,
-        depthTest: false,
-        side: DoubleSide,
+        depthTest: true,
         uniforms: {
           uTime: { value: 0 },
           uColor: { value: col },
-          uOpacity: { value: density },
-          uNoiseScale: { value: noiseScale },
-          uThrottle: { value: 0 },
           uGlow: { value: glow },
+          uThrottle: { value: 0 },
+          uLength: { value: length },
+          uRadius: { value: radius },
           uShock: { value: shock },
+          uShockFreq: { value: shockFrequency },
+          uAnimSpeed: { value: animationSpeed },
+          uNoiseScale: { value: noiseScale },
         },
         vertexShader: `
-          varying vec2 vUv;
-          varying vec3 vPos;
+          attribute vec3 velocity;
+          attribute float age;
+          attribute vec2 random;
+          
           uniform float uTime;
           uniform float uThrottle;
+          uniform float uLength;
+          uniform float uRadius;
+          uniform float uAnimSpeed;
           uniform float uNoiseScale;
-
-          // Simple noise function
+          
+          varying float vAge;
+          varying float vSpeed;
+          varying vec2 vRandom;
+          
+          // Simple hash for noise
           float hash(float n) { return fract(sin(n) * 43758.5453123); }
-          float noise(vec3 x) {
-            vec3 p = floor(x);
-            vec3 f = fract(x);
-            f = f * f * (3.0 - 2.0 * f);
-            float n = p.x + p.y * 57.0 + 113.0 * p.z;
-            return mix(mix(mix(hash(n + 0.0), hash(n + 1.0), f.x),
-                           mix(hash(n + 57.0), hash(n + 58.0), f.x), f.y),
-                       mix(mix(hash(n + 113.0), hash(n + 114.0), f.x),
-                           mix(hash(n + 170.0), hash(n + 171.0), f.x), f.y), f.z);
-          }
-
+          
           void main() {
-            vUv = uv;
-            vPos = position;
+            vAge = age;
+            vRandom = random;
             
-            vec3 pos = position;
+            // Calculate particle lifetime position
+            float life = fract(age + uTime * uAnimSpeed * 0.3);
+            float throttle = max(0.0, uThrottle);
             
-            // Add some wobble/noise to vertices based on throttle and time
-            float n = noise(pos * uNoiseScale + vec3(0.0, 0.0, uTime * 5.0));
-            float displacement = n * 0.1 * uThrottle;
+            // Start position with slight spread
+            vec3 startPos = position;
             
-            // Expand slightly based on noise
-            pos += normal * displacement;
-
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+            // Velocity with turbulence
+            vec3 vel = velocity * uLength * 3.0;
+            float turbulence = hash(random.x * 100.0 + uTime) * 0.5;
+            vel.x += (random.x - 0.5) * turbulence * uRadius;
+            vel.y += (random.y - 0.5) * turbulence * uRadius;
+            
+            // Calculate world position
+            vec3 pos = startPos + vel * life * throttle;
+            
+            // Expand outward slightly as particles age
+            pos.x += (random.x - 0.5) * uRadius * life * 0.5;
+            pos.y += (random.y - 0.5) * uRadius * life * 0.5;
+            
+            vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+            gl_Position = projectionMatrix * mvPosition;
+            
+            // Particle size: larger at start, smaller with age
+            float baseSize = uRadius * 12.0;
+            vSpeed = length(velocity);
+            gl_PointSize = mix(baseSize * (1.0 + throttle), baseSize * 0.2, life) * throttle;
           }
         `,
         fragmentShader: `
-          varying vec2 vUv;
-          varying vec3 vPos;
           uniform vec3 uColor;
-          uniform float uOpacity;
-          uniform float uTime;
-          uniform float uThrottle;
           uniform float uGlow;
+          uniform float uTime;
           uniform float uShock;
-
+          uniform float uShockFreq;
+          uniform float uAnimSpeed;
+          
+          varying float vAge;
+          varying float vSpeed;
+          varying vec2 vRandom;
+          
           void main() {
-            // Gradient along the length (vUv.y is 0 at bottom, 1 at top usually, but check geometry mapping)
-            // Cylinder UVs: y goes 0 to 1 along height.
-            // We shifted geometry so top is at 0, bottom at -1.
-            // Let's assume standard UVs: y=1 at top, y=0 at bottom.
+            // Distance from center of point sprite
+            vec2 center = gl_PointCoord - 0.5;
+            float dist = length(center);
             
-            float fade = smoothstep(0.0, 0.2, vUv.y) * smoothstep(1.0, 0.4, vUv.y);
+            // Soft circle falloff
+            float alpha = smoothstep(0.5, 0.0, dist);
             
-            // Core intensity
-            float core = pow(fade, 2.0) * 2.0;
+            // Fade over particle lifetime
+            float life = vAge;
+            float lifeFade = 1.0 - life;
             
-            // Shock diamonds pattern
-            float shock = sin(vUv.y * 20.0 - uTime * 10.0) * 0.5 + 0.5;
-            shock = pow(shock, 4.0) * uShock * uThrottle;
+            // Color evolution: hot white/yellow -> cool blue over lifetime
+            vec3 hotColor = vec3(1.0, 0.95, 0.8);
+            vec3 coolColor = uColor;
+            vec3 col = mix(hotColor, coolColor, life * 0.7);
             
-            // Combine
-            vec3 finalColor = uColor * (core + shock) * uGlow;
+            // Shock diamond effect (periodic brightness)
+            float shockPhase = life * uShockFreq - uTime * uAnimSpeed;
+            float shock = pow(abs(sin(shockPhase)), 3.0) * uShock;
+            col += col * shock * 0.5;
             
-            // Opacity fade out at ends
-            float alpha = uOpacity * fade * (0.5 + 0.5 * uThrottle);
+            // Flicker based on particle random seed
+            float flicker = 0.9 + 0.1 * sin(uTime * 20.0 + vRandom.x * 100.0);
             
-            gl_FragColor = vec4(finalColor, alpha);
+            // Apply glow and combine
+            col *= uGlow * flicker;
+            
+            // Final alpha
+            float finalAlpha = alpha * lifeFade * (0.3 + 0.7 * vSpeed);
+            
+            gl_FragColor = vec4(col, finalAlpha);
           }
         `,
-      }),
-    [col, density, glow, noiseScale, shock]
+      });
+      material.needsUpdate = true;
+      // Clone the material so each plume instance has its own
+      return material.clone();
+    },
+    [col, glow, shock, shockFrequency, animationSpeed, noiseScale, length, radius]
   )
 
-  const meshRef = useRef<Mesh>(null)
+  const pointsRef = useRef<Points>(null)
+  const ageArrayRef = useRef<Float32Array | null>(null)
 
-  useFrame((state) => {
-    const dt = state.clock.getDelta()
-    if (meshRef.current) {
-      const uniforms = (meshRef.current.material as ShaderMaterial).uniforms
-      uniforms.uTime.value += dt
-      uniforms.uThrottle.value = Math.max(0, useGameStore.getState().throttle)
+  useFrame((state, delta) => {
+    if (!pointsRef.current) return
+    
+    const uniforms = (pointsRef.current.material as ShaderMaterial).uniforms
+    uniforms.uTime.value = state.clock.elapsedTime
+    uniforms.uThrottle.value = throttle !== undefined ? throttle : Math.max(0, useGameStore.getState().throttle)
+    
+    // Update particle ages
+    const geometry = pointsRef.current.geometry
+    const ageAttr = geometry.getAttribute('age') as BufferAttribute
+    
+    if (!ageArrayRef.current) {
+      ageArrayRef.current = new Float32Array(ageAttr.array)
     }
+    
+    const ages = ageArrayRef.current
+    const speed = animationSpeed * 0.01 * delta
+    
+    for (let i = 0; i < ages.length; i++) {
+      ages[i] += speed
+      if (ages[i] > 1.0) {
+        ages[i] = 0.0 // Recycle particle
+      }
+    }
+    
+    ageAttr.array = ages
+    ageAttr.needsUpdate = true
   })
 
   return (
-    <mesh
-      ref={meshRef}
+    <points
+      ref={pointsRef}
       frustumCulled={false}
       name="EnginePlume"
-      renderOrder={5}
+      // Slightly after default transparent effects; glow sprite renders with a higher order
+      renderOrder={1}
       geometry={geom}
       material={mat}
       position={position}
-      // Original was rotated [0, PI, 0] to point backwards.
-      // Our geometry points along +Y (default cylinder) but we rotated it to -Z in geom construction?
-      // Wait, Cylinder default is along Y axis.
-      // In geom: translate(0, -0.5, 0) moves center to top.
-      // rotateX(-PI/2) rotates it so +Y becomes -Z? No.
-      // +Y rotated -90deg around X -> +Z.
-      // So it points along +Z.
-      // Ship points -Z. So we want plume to point +Z (backwards).
-      // So rotation should be identity or adjusted if parent is rotated.
-      // The prop passed is rotation={[0, Math.PI, 0]} in usage usually?
-      // Let's look at usage in ShipModel.tsx:
-      // <EnginePlume ... rotation={[0, Math.PI, 0]} /> is NOT passed in ShipModel.tsx.
-      // ShipModel.tsx passes position, length, radius etc.
-      // The OLD EnginePlume had `rotation={[0, Math.PI, 0]}` hardcoded in the return JSX.
-      // And it used BoxGeometry(1,1,1).
-
-      // Let's stick to a standard orientation:
-      // If we want it to point "backwards" from the ship (which faces -Z), the plume should extend towards +Z.
-      // My geometry construction:
-      // Cylinder is Y-up.
-      // rotateX(-Math.PI / 2) makes it Z-forward (points to +Z).
-      // So it should be correct without extra rotation if placed at the engine nozzle.
-
-      scale={[radius, radius, length]}
     />
   )
 }

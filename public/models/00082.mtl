@@ -2,20 +2,26 @@ newmtl mat_0
 Ka 0 0 0
 Kd 1 1 1
 Ks 0.8980392156862745 0.8980392156862745 0.8980392156862745
+Ke 0 0 0
+Ns 40
+d 1
 map_Kd true/37.jpg
-map_bump true/37_normal.png
 
 newmtl mat_1
 Ka 0 0 0
 Kd 1 1 1
 Ks 1 1 1
+Ke 0 0 0
+Ns 16
+d 1
 map_Kd true/218.jpg
-map_bump true/218_normal.png
 
 newmtl mat_2
 Ka 0 0 0
 Kd 1 1 1
 Ks 0 0 0
+Ke 0 0 0
+Ns 40
+d 1
 map_Kd true/25.jpg
-map_bump true/25_normal.png
 

@@ -2,6 +2,8 @@ newmtl mat_0
 Ka 0 0 0
 Kd 1 1 1
 Ks 0 0 0
+Ke 0 0 0
+Ns 25
+d 1
 map_Kd true/58.jpg
-map_bump true/58_normal.png
 

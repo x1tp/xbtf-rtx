@@ -15,8 +15,8 @@ import { ensureRapier, getWorld, getWorldSync } from './physics/RapierWorld';
 import type RAPIERType from '@dimforge/rapier3d-compat';
 
 interface SceneProps { hdr?: boolean }
-import { DEFAULT_SECTOR_CONFIG, type SectorConfig } from './config/sector';
-import { SEIZEWELL_BLUEPRINT } from './config/seizewell';
+import { DEFAULT_SECTOR_CONFIG, type SectorConfig, getSectorLayoutById } from './config/sector';
+import { PLANET_DATABASE } from './config/planetDatabase';
 import { useAiNavigation } from './ai/useAiNavigation';
 export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
     const cfg: SectorConfig = React.useMemo(() => {
@@ -34,8 +34,8 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
             return DEFAULT_SECTOR_CONFIG;
         }
     }, []);
-    const useSeizewellLayout = true;
-    const layout = useSeizewellLayout ? SEIZEWELL_BLUEPRINT : null;
+    const currentSectorId = useGameStore((s) => s.currentSectorId);
+    const layout = useMemo(() => getSectorLayoutById(currentSectorId || 'seizewell'), [currentSectorId]);
     const spacing = 30; // spread layout objects apart to avoid overlaps
     const place = (p: [number, number, number]): [number, number, number] => [p[0] * spacing, p[1] * spacing, p[2] * spacing];
     const placedShips = React.useMemo(
@@ -232,7 +232,27 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
             <Ship enableLights={!hdr} position={shipPos} />
 
             {/* Environment Objects */}
-            <Planet position={layout ? layout.planet.position : cfg.planet.position} size={layout ? layout.planet.size : cfg.planet.size} color="#4466aa" hdr={hdr} sunPosition={sunPosition} />
+            <Planet
+                position={layout ? layout.planet.position : cfg.planet.position}
+                size={(() => { const id = currentSectorId || 'seizewell'; const p = PLANET_DATABASE[id]; const base = (layout ? layout.planet.size : cfg.planet.size); return p && typeof p.size === 'number' ? p.size : base; })()}
+                color="#4466aa"
+                hdr={hdr}
+                sunPosition={sunPosition}
+                atmosphereEnabled={(() => {
+                    const id = currentSectorId || 'seizewell';
+                    const p = PLANET_DATABASE[id];
+                    return p ? p.atmosphereEnabled : true;
+                })()}
+                cloudsParams={(() => {
+                    const id = currentSectorId || 'seizewell';
+                    const p = PLANET_DATABASE[id];
+                    return p ? { enabled: true, opacity: p.cloudOpacity, alphaTest: 0.0 } : { enabled: true, opacity: 0.8, alphaTest: 0.0 };
+                })()}
+                config={(() => {
+                    const id = currentSectorId || 'seizewell';
+                    return PLANET_DATABASE[id];
+                })()}
+            />
             {layout
                 ? (
                     <>

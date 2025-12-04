@@ -173,7 +173,7 @@ export const AIShip: FC<AIShipProps> = ({ name, modelPath, position, navGraph, o
 
   return (
     <group ref={shipRef} name={name}>
-      <ShipModel name={name} modelPath={modelPath} enableLights={false} />
+      <ShipModel name={name} modelPath={modelPath} enableLights={false} throttle={1.0} />
     </group>
   );
 };

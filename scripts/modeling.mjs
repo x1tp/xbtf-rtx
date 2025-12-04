@@ -640,11 +640,25 @@ export async function convertBodToObj(bodFile, texDir, outName = 'model', outDir
       mtl += `Ks ${v[6] / 255} ${v[7] / 255} ${v[8] / 255}\n`;
 
       // Extended properties for MATERIAL3
-      if (v.length >= 12) {
-        mtl += `Ke ${v[9] / 255} ${v[10] / 255} ${v[11] / 255}\n`;
+      // MATERIAL3 format: after Ks comes [flag1, illumination_intensity, Ns, ...]
+      // Index 10 appears to be self-illumination intensity (0-100)
+      // When high (e.g., 100), use diffuse color as emissive for glowing surfaces (engines, windows)
+      if (v.length >= 11) {
+        const selfIllum = v[10] ?? 0; // 0-100 scale
+        if (selfIllum > 0) {
+          // Use Kd (diffuse) color as emissive when self-illuminated
+          const intensity = selfIllum / 100;
+          const keR = (v[3] / 255) * intensity;
+          const keG = (v[4] / 255) * intensity;
+          const keB = (v[5] / 255) * intensity;
+          mtl += `Ke ${keR} ${keG} ${keB}\n`;
+        } else {
+          mtl += `Ke 0 0 0\n`;
+        }
       }
-      if (v.length >= 13) {
-        mtl += `Ns ${v[12]}\n`;
+      if (v.length >= 12) {
+        // vals[11] is likely Ns (shininess)
+        mtl += `Ns ${v[11]}\n`;
       }
       if (v.length >= 17) {
         // Opacity is at index 16 (0-100)

@@ -1,0 +1,7 @@
+{
+  "name": "planet_seizewell",
+  "prompt": "planet earth equirectangular continents oceans realistic biome palette teladi",
+  "resolution": 4096,
+  "forceAi": false,
+  "noProceduralFallback": false
+}

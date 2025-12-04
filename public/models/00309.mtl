@@ -2,48 +2,62 @@ newmtl mat_0
 Ka 0 0 0
 Kd 1 1 1
 Ks 0 0 0
+Ke 0 0 0
+Ns 40
+d 1
 map_Kd true/178.jpg
-map_bump true/178_normal.png
 
 newmtl mat_1
 Ka 0 0 0
 Kd 1 1 1
 Ks 0 0 0
+Ke 0 0 0
+Ns 40
+d 1
 map_Kd true/37.jpg
-map_bump true/37_normal.png
 
 newmtl mat_2
 Ka 0 0 0
 Kd 1 1 1
 Ks 0 0 0
+Ke 0 0 0
+Ns 40
+d 1
 map_Kd true/163.jpg
-map_bump true/163_normal.png
 
 newmtl mat_3
 Ka 0 0 0
 Kd 1 1 1
 Ks 0 0 0
+Ke 0 0 0
+Ns 40
+d 1
 map_Kd true/165.jpg
-map_bump true/165_normal.png
 
 newmtl mat_4
 Ka 0 0 0
 Kd 1 1 1
 Ks 0 0 0
+Ke 0 0 0
+Ns 40
+d 1
 map_Kd true/162.jpg
-map_bump true/162_normal.png
 
 newmtl mat_5
 Ka 0 0 0
 Kd 1 1 1
 Ks 0 0 0
+Ke 0 0 0
+Ns 40
+d 1
 map_Kd true/31.jpg
-map_bump true/31_normal.png
 
 newmtl mat_6
 Ka 0.34901960784313724 0.2 0.2
 Kd 1 1 1
 Ks 0.8980392156862745 0.8980392156862745 0.8980392156862745
+Ke 0 0 0
+Ns 40
+d 1
 map_Kd true/210.jpg
-map_bump true/210_normal.png
 

@@ -1,8 +1,8 @@
 import type { FC } from 'react';
 import { useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { EffectComposer, Bloom, ToneMapping } from '@react-three/postprocessing';
-import { ToneMappingMode } from 'postprocessing';
+import { EffectComposer, Bloom, ToneMapping, SMAA } from '@react-three/postprocessing';
+import { ToneMappingMode, EdgeDetectionMode, PredicationMode } from 'postprocessing';
 import { Mesh } from 'three';
 import { useGameStore } from '../store/gameStore';
 
@@ -32,6 +32,10 @@ export const SimpleEffects: FC = () => {
 
     return (
         <EffectComposer multisampling={0} enableNormalPass={false}>
+            <SMAA 
+                edgeDetectionMode={EdgeDetectionMode.COLOR} 
+                predicationMode={PredicationMode.DEPTH}
+            />
             <Bloom intensity={bloomIntensity} luminanceThreshold={0.18} luminanceSmoothing={0.08} mipmapBlur />
             <ToneMapping mode={ToneMappingMode.ACES_FILMIC} exposure={exposure} adaptive={false} />
         </EffectComposer>

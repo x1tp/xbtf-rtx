@@ -1,11 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
 import type { NavTarget } from '../store/gameStore';
+import { UNIVERSE_SECTORS_XT } from '../config/universe_xtension';
 
 interface SectorObject {
     name: string;
     position: [number, number, number];
     type: 'station' | 'gate' | 'ship' | 'planet' | 'asteroid';
+    targetSectorId?: string;
 }
 
 interface SectorMapProps {
@@ -67,6 +69,9 @@ type AxisView = 'xz' | 'xy' | 'yz';
 export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition = [0, 0, 0] }) => {
     const sectorMapOpen = useGameStore((s) => s.sectorMapOpen);
     const setSectorMapOpen = useGameStore((s) => s.setSectorMapOpen);
+    const setUniverseMapOpen = useGameStore((s) => s.setUniverseMapOpen);
+    const setCurrentSectorId = useGameStore((s) => s.setCurrentSectorId);
+    const currentSectorId = useGameStore((s) => s.currentSectorId);
     const setSelectedTarget = useGameStore((s) => s.setSelectedTarget);
     const selectedTarget = useGameStore((s) => s.selectedTarget);
     const storePosition = useGameStore((s) => s.position);
@@ -176,6 +181,7 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
             name: obj.name,
             position: obj.position,
             type: obj.type,
+            targetSectorId: obj.targetSectorId,
         };
         setSelectedTarget(target);
     };
@@ -304,19 +310,49 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
                             {formatDistance(rangeH)}
                         </span>
                     </div>
-                    <button
-                        onClick={handleClose}
-                        style={{
-                            background: 'none',
-                            border: '1px solid #4a6a80',
-                            color: '#8ac0e0',
-                            padding: '4px 12px',
-                            cursor: 'pointer',
-                            fontSize: 11,
-                        }}
-                    >
-                        ✕
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <button
+                            onClick={() => { setSectorMapOpen(false); setUniverseMapOpen(true); }}
+                            style={{
+                                background: 'none',
+                                border: '1px solid #4a6a80',
+                                color: '#8ac0e0',
+                                padding: '4px 10px',
+                                cursor: 'pointer',
+                                fontSize: 11,
+                            }}
+                        >
+                            {'<'}
+                        </button>
+                        <button
+                            onClick={() => { if (selectedTarget && selectedTarget.type === 'gate' && selectedTarget.targetSectorId) { setCurrentSectorId(selectedTarget.targetSectorId); setSectorMapOpen(false); setUniverseMapOpen(false); } }}
+                            disabled={!(selectedTarget && selectedTarget.type === 'gate' && selectedTarget.targetSectorId)}
+                            style={{
+                                background: 'none',
+                                border: '1px solid #4a6a80',
+                                color: '#8ac0e0',
+                                padding: '4px 10px',
+                                cursor: 'pointer',
+                                fontSize: 11,
+                                opacity: (selectedTarget && selectedTarget.type === 'gate' && selectedTarget.targetSectorId) ? 1 : 0.5,
+                            }}
+                        >
+                            Jump
+                        </button>
+                        <button
+                            onClick={handleClose}
+                            style={{
+                                background: 'none',
+                                border: '1px solid #4a6a80',
+                                color: '#8ac0e0',
+                                padding: '4px 12px',
+                                cursor: 'pointer',
+                                fontSize: 11,
+                            }}
+                        >
+                            ✕
+                        </button>
+                    </div>
                 </div>
 
                 {/* Map View */}
@@ -532,7 +568,7 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
                     }}
                 >
                     <span style={{ color: '#ff9944', fontSize: 14, fontWeight: 'bold' }}>
-                        Seizewell
+                        {(() => { const s = UNIVERSE_SECTORS_XT.find((x) => x.id === (currentSectorId || 'seizewell')); return s ? s.name : (currentSectorId || 'seizewell'); })()}
                     </span>
                     <span style={{ color: '#6090a0', fontSize: 10 }}>
                         &lt;&lt; Select a position &gt;&gt;

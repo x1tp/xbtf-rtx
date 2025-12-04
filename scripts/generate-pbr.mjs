@@ -18,7 +18,7 @@ async function callOpenRouterImage(prompt, mime = 'image/png') {
     } catch { }
   }
   if (!key) throw new Error('missing_openrouter_key');
-  const model = process.env.OPENROUTER_MODEL || 'google/gemini-2.5-flash-image';
+  const model = process.env.OPENROUTER_MODEL || 'google/gemini-3-pro-image-preview';
   const url = 'https://openrouter.ai/api/v1/chat/completions';
   const body = { model, messages: [{ role: 'user', content: prompt }], modalities: ['image', 'text'] };
   const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` };
@@ -73,7 +73,7 @@ async function callGemini(prompt, mime = 'image/png', temperature = 0.7) {
   try { console.log(JSON.stringify({ model: preferred, auth: hasBearer ? 'bearer' : 'api_key', endpoint: url })); } catch { }
   let res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
   if (!hasBearer && res.status === 401) {
-    const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
+    const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
     try { console.log(JSON.stringify({ fallback_model: 'models/gemini-1.5-flash', endpoint: fallbackUrl })); } catch { }
     res = await fetch(fallbackUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   }
@@ -220,33 +220,68 @@ async function generateProceduralBase(name, prompt, resolution) {
 async function generateEarthBase(resolution) {
   const width = resolution; const height = resolution; const channels = 3;
   const buf = Buffer.alloc(width * height * channels);
-  const ocean = [46, 90, 168];
-  const land1 = [60, 110, 60];
-  const land2 = [120, 100, 60];
-  const ice = [210, 230, 240];
+  const oceanDeep = [40, 85, 150];
+  const oceanShallow = [70, 120, 185];
+  const landLow = [60, 100, 70];
+  const landMid = [110, 120, 80];
+  const landHigh = [160, 150, 130];
+  const ice = [215, 235, 245];
   const sx = Math.max(8, Math.floor(resolution / 16));
   const sy = Math.max(8, Math.floor(resolution / 16));
+  const fbm = (x, y, ox, oy, oct = 5) => {
+    let v = 0; let a = 0.5; let fx = 1; let fy = 1;
+    for (let i = 0; i < oct; i++) {
+      v += valueNoise(x * fx + ox, y * fy + oy, sx / fx, sy / fy, width) * a;
+      a *= 0.5; fx *= 2; fy *= 2;
+    }
+    return v;
+  };
+  const warpAmp = Math.max(4, Math.floor(Math.min(sx, sy) * 0.75));
   for (let y = 0; y < height; y++) {
     const lat = (y / height) * 2 - 1;
-    const latIce = Math.max(0, Math.abs(lat) - 0.75) * 4;
+    const latIce = Math.max(0, Math.abs(lat) - 0.72) * 5;
     for (let x = 0; x < width; x++) {
-      // Pass width as wrapW to enforce seamless horizontal wrapping
-      const f1 = valueNoise(x, y, sx, sy, width);
-      const f2 = valueNoise(x + sx * 0.5, y + sy * 0.5, sx * 2, sy * 2, width);
-      const mask = clamp(f1 * 0.7 + f2 * 0.3 - 0.52, 0, 1);
-      let c = ocean;
-      if (latIce > 0.3) c = ice;
-      else if (mask > 0) {
-        const arid = Math.max(0, 1 - Math.abs(lat) * 1.4);
-        const mix = clamp(arid, 0, 1);
-        c = [
-          Math.round(lerp(land1[0], land2[0], mix)),
-          Math.round(lerp(land1[1], land2[1], mix)),
-          Math.round(lerp(land1[2], land2[2], mix))
-        ];
+      const wx = fbm(x, y, 123.4, 567.8, 3);
+      const wy = fbm(x, y, 911.7, 311.2, 3);
+      const hx = x + (wx - 0.5) * warpAmp;
+      const hy = y + (wy - 0.5) * warpAmp;
+      const h1 = fbm(hx, hy, 37.1, 91.7, 5);
+      const h2 = fbm(hx, hy, 97.8, 73.2, 4);
+      const heightN = clamp(h1 * 0.65 + h2 * 0.35, 0, 1);
+      const waterLevel = 0.52;
+      const coastWidth = 0.04;
+      const nearCoast = clamp((heightN - (waterLevel - coastWidth)) / (coastWidth * 2), 0, 1);
+      let r = 0, g = 0, b = 0;
+      if (latIce > 0.35) {
+        r = ice[0]; g = ice[1]; b = ice[2];
+      } else if (heightN < waterLevel) {
+        const d = clamp((waterLevel - heightN) / waterLevel, 0, 1);
+        r = Math.round(lerp(oceanShallow[0], oceanDeep[0], d));
+        g = Math.round(lerp(oceanShallow[1], oceanDeep[1], d));
+        b = Math.round(lerp(oceanShallow[2], oceanDeep[2], d));
+        const coastMix = nearCoast * 0.35;
+        r = Math.round(lerp(r, oceanShallow[0], coastMix));
+        g = Math.round(lerp(g, oceanShallow[1], coastMix));
+        b = Math.round(lerp(b, oceanShallow[2], coastMix));
+      } else {
+        const t = clamp((heightN - waterLevel) / (1 - waterLevel), 0, 1);
+        const arid = clamp(1 - Math.abs(lat) * 1.25, 0, 1);
+        const lowR = Math.round(lerp(landLow[0], landMid[0], arid));
+        const lowG = Math.round(lerp(landLow[1], landMid[1], arid));
+        const lowB = Math.round(lerp(landLow[2], landMid[2], arid));
+        const highR = landHigh[0];
+        const highG = landHigh[1];
+        const highB = landHigh[2];
+        r = Math.round(lerp(lowR, highR, t));
+        g = Math.round(lerp(lowG, highG, t));
+        b = Math.round(lerp(lowB, highB, t));
+        const coastTint = clamp(1 - t, 0, 1) * nearCoast * 0.25;
+        r = Math.round(lerp(r, lowR, coastTint));
+        g = Math.round(lerp(g, lowG, coastTint));
+        b = Math.round(lerp(b, lowB, coastTint));
       }
       const i = (y * width + x) * channels;
-      buf[i] = c[0]; buf[i + 1] = c[1]; buf[i + 2] = c[2];
+      buf[i] = r; buf[i + 1] = g; buf[i + 2] = b;
     }
   }
   fixHorizontalSeam(buf, width, height, channels, 6);
@@ -255,14 +290,26 @@ async function generateEarthBase(resolution) {
 async function generateCloudsAlpha(resolution) {
   const width = resolution; const height = resolution; const channels = 1;
   const buf = Buffer.alloc(width * height * channels);
-  const sx = Math.max(6, Math.floor(resolution / 12));
-  const sy = Math.max(6, Math.floor(resolution / 12));
+  const sx = Math.max(6, Math.floor(resolution / 14));
+  const sy = Math.max(6, Math.floor(resolution / 14));
+  const fbm = (x, y, ox, oy, oct = 4) => {
+    let v = 0; let a = 0.5; let fx = 1; let fy = 1;
+    for (let i = 0; i < oct; i++) {
+      v += valueNoise(x * fx + ox, y * fy + oy, sx / fx, sy / fy, width) * a;
+      a *= 0.5; fx *= 2; fy *= 2;
+    }
+    return v;
+  };
+  const warpAmp = Math.max(3, Math.floor(Math.min(sx, sy) * 0.6));
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      // Pass width as wrapW
-      const o1 = valueNoise(x, y, sx, sy, width);
-      const o2 = valueNoise(x + sx, y + sy, sx * 2, sy * 2, width);
-      const v = clamp(o1 * 0.7 + o2 * 0.3 - 0.55, 0, 1);
+      const wx = fbm(x, y, 13.4, 51.7, 3);
+      const wy = fbm(x, y, 97.2, 73.9, 3);
+      const hx = x + (wx - 0.5) * warpAmp;
+      const hy = y + (wy - 0.5) * warpAmp;
+      const c1 = fbm(hx, hy, 31.1, 71.3, 4);
+      const c2 = fbm(hx, hy, 91.7, 17.9, 3);
+      const v = clamp(c1 * 0.6 + c2 * 0.4 - 0.58, 0, 1);
       buf[(y * width + x) * channels] = Math.round(lerp(0, 255, v));
     }
   }

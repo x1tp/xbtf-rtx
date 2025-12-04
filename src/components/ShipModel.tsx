@@ -2,10 +2,10 @@ import type { FC } from 'react';
 import { useEffect, useMemo, useRef } from 'react';
 import { useLoader, useFrame, useThree } from '@react-three/fiber';
 import { OBJLoader, MTLLoader } from 'three-stdlib';
-import { EnginePlume } from './EnginePlume';
+import { NebulaPlume } from './NebulaPlume';
 import { AdditiveBlending, Box3, CanvasTexture, Color, Group, SpriteMaterial, Vector3, Texture, LinearMipmapLinearFilter, LinearFilter, SRGBColorSpace, LinearSRGBColorSpace, Mesh, RepeatWrapping, DoubleSide, Material, TextureLoader, MeshPhongMaterial } from 'three';
 import { useGameStore } from '../store/gameStore';
-import { PLUME_PRESETS } from '../config/plumes';
+import { getAllPresets } from '../config/plumes';
 
 
 interface ShipModelProps {
@@ -17,9 +17,10 @@ interface ShipModelProps {
     plumePositions?: { x: number; y: number; z: number; type?: string }[];
     cockpitPosition?: { x: number; y: number; z: number };
     weaponPositions?: { x: number; y: number; z: number }[];
+    throttle?: number;
 }
 
-export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'ShipModel', modelPath, editorMode = false, markerOverrides, plumePositions, cockpitPosition, weaponPositions }) => {
+export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'ShipModel', modelPath, editorMode = false, markerOverrides, plumePositions, cockpitPosition, weaponPositions, throttle }) => {
     const objPath = modelPath || '/models/00000.obj';
     const mtlPath = objPath.endsWith('.obj') ? objPath.replace('.obj', '.mtl') : '/models/00000.mtl';
     // Most converted BOD models need flipY disabled to display textures correctly
@@ -100,6 +101,9 @@ export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'Shi
 
             // Apply settings to normal map
             applyTextureSettings(m.normalMap, false);
+
+            // Ensure ship writes to depth buffer so it occludes plumes
+            (m as Material).depthWrite = true;
         });
     }, [gl, materials, objPath, needsFlipYFix]);
     useEffect(() => {
@@ -211,7 +215,7 @@ export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'Shi
         const rawInit = typeof window !== 'undefined' ? window.localStorage.getItem('ship:engineMarkers:' + objPath) : null;
         if (rawInit) {
             try {
-                const parsed = JSON.parse(rawInit) as { positions?: { x: number; y: number; z: number }[] };
+                const parsed = JSON.parse(rawInit) as { positions?: { x: number; y: number; z: number; type?: string }[] };
                 return parsed.positions || [];
             } catch { return []; }
         }
@@ -248,24 +252,16 @@ export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'Shi
         return t;
     }, []);
     const spriteMatRef = useRef<SpriteMaterial | null>(null);
-    const spriteMat = useMemo(() => new SpriteMaterial({ map: glowTex, blending: AdditiveBlending, transparent: true, depthWrite: false, color: new Color('#9bd0ff') }), [glowTex]);
+    const spriteMat = useMemo(() => new SpriteMaterial({ map: glowTex, blending: AdditiveBlending, transparent: true, depthWrite: false, depthTest: true, color: new Color('#9bd0ff') }), [glowTex]);
     useEffect(() => { spriteMatRef.current = spriteMat; }, [spriteMat]);
     const groupsRef = useRef<Record<number, Group | null>>({});
-    const computeEnginePower = () => {
-        const state = useGameStore.getState();
-        const throttle = Math.max(0, state.throttle);
-        const speedFactor = state.maxSpeed > 0 ? Math.min(1, state.speed / state.maxSpeed) : 0;
-        return Math.max(throttle, speedFactor);
-    };
-    useEffect(() => {
-        if (!editorMode) return;
-        const store = useGameStore.getState();
-        const prev = store.throttle;
-        store.setThrottle(0.75);
-        return () => store.setThrottle(prev);
-    }, [editorMode]);
+
+    // Use passed throttle or fallback to store (legacy/player)
+    const storeThrottle = useGameStore((state) => state.throttle);
+    const currentThrottle = throttle !== undefined ? throttle : storeThrottle;
+
     useFrame(() => {
-        const k = computeEnginePower();
+        const k = Math.max(0, currentThrottle);
         const lx = 1.0 + 0.8 * k;
         const ry = 1.0 + 0.25 * k;
         const rz = 1.0 + 0.25 * k;
@@ -278,7 +274,10 @@ export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'Shi
     useFrame(() => {
         const m = spriteMatRef.current;
         if (!m) return;
-        m.opacity = computeEnginePower() * 0.85 + 0.15;
+        const k = Math.max(0, currentThrottle);
+        // Turn off plumes if throttle is near zero
+        if (k <= 0.01) m.opacity = 0;
+        else m.opacity = k * 0.85 + 0.15;
     });
 
 
@@ -286,22 +285,38 @@ export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'Shi
         <group position={[0, -0.3, 0.0]} name={name}>
             <primitive object={obj} />
             {markers.map((m, i) => {
-                const config = PLUME_PRESETS[m.type || 'standard'] || PLUME_PRESETS['standard'];
+                const allPresets = getAllPresets();
+                const config = allPresets[m.type || 'standard'] || allPresets['standard'];
                 return (
                     <group key={`fx-${i}`} ref={(g) => { groupsRef.current[i] = g; }} frustumCulled={false} position={[m.x, m.y, m.z]}>
-                        <EnginePlume
-                            position={[0, 0, 0]}
-                            length={config.length}
-                            radius={config.radius}
-                            color={config.color}
-                            density={config.density}
-                            glow={config.glow}
-                            noiseScale={config.noiseScale}
-                            shock={config.shock}
+                        <NebulaPlume
+                            position={[0, 0, 0.6]}
+                            length={config.length ?? 2.5}
+                            radius={config.radius ?? 0.5}
+                            color={config.color ?? '#76baff'}
+                            throttle={currentThrottle}
+                            particleCount={config.particleCount ?? 10}
+                            emissionRate={config.emissionRate ?? 0.075}
+                            particleLife={config.particleLife ?? 0.75}
+                            startScale={config.startScale ?? 2.0}
+                            endScale={config.endScale ?? 0.3}
+                            startAlpha={config.startAlpha ?? 0.8}
+                            velocity={config.velocity ?? 15}
+                            spread={config.spread ?? 12}
+                            textureSoftness={config.textureSoftness ?? 0.5}
                         />
-                        <sprite name="EngineGlow" position={[0, 0, 0]} scale={[config.radius * 2.4, config.radius * 2.4, 1]} frustumCulled={false}>
+                        <sprite name="EngineGlow" position={[0, 0, 0.8]} scale={[config.radius * 2.4, config.radius * 2.4, 1]} frustumCulled={false} renderOrder={2}>
                             <primitive object={spriteMat} attach="material" />
                         </sprite>
+                        {enableLights && (
+                            <pointLight
+                                position={[0, 0, 0.5]}
+                                intensity={config.glow * currentThrottle * 2.0}
+                                distance={8}
+                                decay={2}
+                                color={config.color}
+                            />
+                        )}
                     </group>
                 );
             })}
@@ -319,12 +334,10 @@ export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'Shi
             ))}
             {enableLights && (
                 <>
-                    <pointLight position={[0, 1.2, -0.8]} intensity={1.6} distance={8} decay={2} color="#bcdfff" />
-                    <pointLight position={[0, -0.3, -1.1]} intensity={1} distance={6} decay={2} color="#ffc372" />
-                    <pointLight position={[0, 0.6, 0.8]} intensity={0.7} distance={5} decay={2} color="#9fc4ff" />
+                    {/* Ambient fill */}
+                    <pointLight position={[0, 2, 0]} intensity={0.5} distance={10} decay={2} color="#ffffff" />
                 </>
             )}
         </group>
     );
 };
-

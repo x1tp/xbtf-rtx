@@ -85,3 +85,162 @@
   - Phase 3: events, hazards, contraband, equipment dock sinks
   - Phase 4: player automation, station building, balance polish
 
+- Data Model (TypeScript)
+```ts
+type WareCategory = 'primary' | 'food' | 'intermediate' | 'end'
+
+interface Ware {
+  id: string
+  name: string
+  category: WareCategory
+  basePrice: number
+  volume: number
+}
+
+interface RecipeInput {
+  wareId: string
+  amount: number
+}
+
+interface Recipe {
+  id: string
+  productId: string
+  inputs: RecipeInput[]
+  cycleTimeSec: number
+  batchSize: number
+  productStorageCap: number
+  inputStorageCaps?: Record<string, number>
+  race?: 'argon' | 'boron' | 'paranid' | 'split' | 'teladi' | 'pirate'
+}
+
+interface Station {
+  id: string
+  name: string
+  recipeId: string
+  sectorId: string
+  inventory: Record<string, number>
+  reorderLevel: Record<string, number>
+  reserveLevel: Record<string, number>
+  priceBands?: Record<string, { min: number; max: number }>
+}
+
+interface Sector {
+  id: string
+  name: string
+  neighbors: string[]
+  risk: number
+}
+
+interface Order {
+  id: string
+  type: 'buy' | 'sell'
+  stationId: string
+  wareId: string
+  qty: number
+  limitPrice: number
+  ttlTicks: number
+}
+
+interface Fleet {
+  id: string
+  capacity: number
+  speed: number
+  homeSector: string
+  behavior: 'npc' | 'player'
+  cargo: Record<string, number>
+  assignedOrderId?: string
+}
+```
+
+- Price Function
+  - P(s,w) = basePrice(w) × clamp(1 + α × shortage(s,w) + β × flow(s,w) + γ × event(s,w), bandMin(w), bandMax(w))
+  - shortage(s,w) = (targetStock(w) − stock(s,w)) / max(targetStock(w), 1)
+  - flow(s,w) = (recentDemand(w) − recentSupply(w)) / flowNorm(w)
+  - α, β, γ tuned per category
+
+- Order Generation
+  - For each station input ware, if stock < reorderLevel, create buy order up to target
+  - For station product ware, if stock > reserveLevel, create sell order for surplus
+  - Orders carry limitPrice from current sector price
+
+- Matching and Routing
+  - Match buy and sell orders across connected sectors
+  - Route score = (sellPrice − buyPrice − transportCost) × min(qty, capacity)
+  - transportCost = distanceFactor × volume × hazardFactor
+  - Assign fleets to highest score routes within range
+
+- Tick Pseudocode
+```ts
+function tick(state: State) {
+  for (const station of state.stations) {
+    const r = state.recipes[station.recipeId]
+    const canRun = r.inputs.every(x => (station.inventory[x.wareId] || 0) >= x.amount)
+    if (canRun) {
+      for (const x of r.inputs) station.inventory[x.wareId] -= x.amount
+      station.inventory[r.productId] = (station.inventory[r.productId] || 0) + r.batchSize
+    }
+  }
+
+  for (const station of state.stations) {
+    const r = state.recipes[station.recipeId]
+    for (const x of r.inputs) {
+      const stock = station.inventory[x.wareId] || 0
+      const rl = station.reorderLevel[x.wareId] || 0
+      if (stock < rl) createBuyOrder(state, station, x.wareId, rl - stock)
+    }
+    const prodStock = station.inventory[r.productId] || 0
+    const reserve = station.reserveLevel[r.productId] || 0
+    if (prodStock > reserve) createSellOrder(state, station, r.productId, prodStock - reserve)
+  }
+
+  recomputePrices(state)
+  matchOrdersAndAssignFleets(state)
+  advanceShipMovements(state)
+  resolveLossesAndDeliveries(state)
+}
+```
+
+- Examples (JSON)
+```json
+{
+  "wares": [
+    { "id": "energy_cells", "name": "Energy Cells", "category": "primary", "basePrice": 16, "volume": 1 },
+    { "id": "crystals", "name": "Crystals", "category": "intermediate", "basePrice": 1684, "volume": 1 },
+    { "id": "meatsteak", "name": "Meatsteak Cahoonas", "category": "food", "basePrice": 72, "volume": 1 }
+  ],
+  "recipes": [
+    {
+      "id": "spp_argon",
+      "productId": "energy_cells",
+      "inputs": [ { "wareId": "crystals", "amount": 1 } ],
+      "cycleTimeSec": 60,
+      "batchSize": 10,
+      "productStorageCap": 5000
+    },
+    {
+      "id": "cahoona_bakery",
+      "productId": "meatsteak",
+      "inputs": [
+        { "wareId": "energy_cells", "amount": 15 },
+        { "wareId": "delexian_wheat", "amount": 20 },
+        { "wareId": "argnu_beef", "amount": 6 },
+        { "wareId": "stott_spices", "amount": 6 }
+      ],
+      "cycleTimeSec": 120,
+      "batchSize": 30,
+      "productStorageCap": 10000
+    }
+  ],
+  "stations": [
+    {
+      "id": "argon_spp_01",
+      "name": "Solar Power Plant",
+      "recipeId": "spp_argon",
+      "sectorId": "argon_prime",
+      "inventory": { "energy_cells": 0, "crystals": 10 },
+      "reorderLevel": { "crystals": 5 },
+      "reserveLevel": { "energy_cells": 100 }
+    }
+  ]
+}
+```

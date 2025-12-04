@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Economy View</title>
+<style>
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;background:#0b0d12;color:#e6e7ea}
+.app{display:grid;grid-template-columns:280px 1fr;grid-template-rows:auto 1fr;grid-template-areas:"header header" "sidebar main";height:100vh}
+.header{grid-area:header;display:flex;align-items:center;gap:12px;padding:12px 16px;background:#111522;border-bottom:1px solid #22283a}
+.title{font-size:16px;font-weight:600}
+.controls{margin-left:auto;display:flex;gap:8px}
+.select{appearance:none;border:1px solid #334;background:#0f131d;color:#e6e7ea;padding:8px 12px;border-radius:6px}
+.btn{appearance:none;border:1px solid #334;background:#151a28;color:#e6e7ea;padding:8px 12px;border-radius:6px;cursor:pointer}
+.btn:hover{background:#1a2032}
+.sidebar{grid-area:sidebar;overflow:auto;border-right:1px solid #22283a;background:#0f131d}
+.section{padding:12px 10px}
+.section h3{margin:0 0 8px 8px;font-size:13px;color:#aab}
+.ware-list{display:flex;flex-direction:column;gap:4px}
+.ware{padding:8px 10px;border-radius:6px;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+.ware:hover{background:#151b29}
+.ware.active{background:#1d2538;border:1px solid #2a3550}
+.badge{font-size:11px;color:#99a}
+.main{grid-area:main;overflow:auto}
+.pane{padding:16px}
+.panel{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.card{background:#0f131d;border:1px solid #22283a;border-radius:8px;padding:14px}
+.card h4{margin:0 0 10px 0;font-size:14px}
+.kv{display:grid;grid-template-columns:180px 1fr;gap:6px 10px}
+.kv div{padding:4px 0}
+.list{display:flex;flex-direction:column;gap:8px}
+.row{display:flex;justify-content:space-between;gap:8px}
+.small{font-size:12px;color:#b9bcc6}
+.muted{color:#8a8d99}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{background:#1a2032;border:1px solid #2a3550;color:#cbd;color:#cbd;padding:3px 6px;border-radius:999px;font-size:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.input{width:100%;padding:8px 10px;border-radius:6px;border:1px solid #334;background:#0f131d;color:#e6e7ea}
+.range{width:100%}
+.pill{padding:3px 8px;border-radius:999px;background:#151a28;border:1px solid #2a3550}
+.footer{margin-top:12px;font-size:12px;color:#8a8d99}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="title">Economy View</div>
+    <div class="controls">
+      <select class="select" id="sectorSelect"></select>
+      <button class="btn" id="tickBtn">Run 1 Cycle</button>
+      <button class="btn" id="runBtn">Run Tick</button>
+      <button class="btn" id="resetBtn">Reset Stocks</button>
+      <button class="btn" id="loadBtn">Load Data</button>
+      <input type="file" id="fileInput" multiple style="display:none" accept=".md,text/markdown">
+    </div>
+  </div>
+  <div class="sidebar" id="sidebar"></div>
+  <div class="main">
+    <div class="pane" id="main"></div>
+  </div>
+</div>
+<script>
+const data = (() => {
+  const wares = [
+    {id:'energy_cells',name:'Energy Cells',category:'primary',basePrice:16,volume:1},
+    {id:'crystals',name:'Crystals',category:'intermediate',basePrice:1684,volume:1},
+    {id:'ore',name:'Ore',category:'primary',basePrice:128,volume:1},
+    {id:'silicon_wafers',name:'Silicon Wafers',category:'primary',basePrice:504,volume:1},
+    {id:'meatsteak',name:'Meatsteak Cahoonas',category:'food',basePrice:72,volume:1},
+    {id:'delexian_wheat',name:'Delexian Wheat',category:'primary',basePrice:36,volume:1},
+    {id:'argnu_beef',name:'Argnu Beef',category:'food',basePrice:52,volume:1},
+    {id:'stott_spices',name:'Stott Spices',category:'food',basePrice:120,volume:1},
+    {id:'quantum_tubes',name:'Quantum Tubes',category:'intermediate',basePrice:2300,volume:1},
+    {id:'microchips',name:'Microchips',category:'intermediate',basePrice:13000,volume:1}
+  ]
+  const recipes = [
+    {id:'spp',productId:'energy_cells',inputs:[{wareId:'crystals',amount:1}],cycleTimeSec:60,batchSize:10,productStorageCap:5000},
+    {id:'cahoona',productId:'meatsteak',inputs:[{wareId:'energy_cells',amount:15},{wareId:'delexian_wheat',amount:20},{wareId:'argnu_beef',amount:6},{wareId:'stott_spices',amount:6}],cycleTimeSec:120,batchSize:30,productStorageCap:10000},
+    {id:'crystal_argon',productId:'crystals',inputs:[{wareId:'energy_cells',amount:20},{wareId:'silicon_wafers',amount:8},{wareId:'meatsteak',amount:10}],cycleTimeSec:180,batchSize:5,productStorageCap:2000},
+    {id:'ore_mine',productId:'ore',inputs:[{wareId:'energy_cells',amount:10}],cycleTimeSec:90,batchSize:20,productStorageCap:4000},
+    {id:'silicon_mine',productId:'silicon_wafers',inputs:[{wareId:'energy_cells',amount:12}],cycleTimeSec:100,batchSize:10,productStorageCap:3000},
+    {id:'q_tubes_argon',productId:'quantum_tubes',inputs:[{wareId:'energy_cells',amount:20},{wareId:'ore',amount:5},{wareId:'meatsteak',amount:10},{wareId:'silicon_wafers',amount:6}],cycleTimeSec:200,batchSize:4,productStorageCap:1200},
+    {id:'chip_argon',productId:'microchips',inputs:[{wareId:'energy_cells',amount:25},{wareId:'meatsteak',amount:12},{wareId:'silicon_wafers',amount:8}],cycleTimeSec:240,batchSize:2,productStorageCap:800}
+  ]
+  const stations = [
+    {id:'argon_spp_01',name:'Solar Power Plant',recipeId:'spp',sectorId:'argon_prime',inventory:{energy_cells:0,crystals:20},reorderLevel:{crystals:10},reserveLevel:{energy_cells:200}},
+    {id:'argon_crystal_01',name:'Crystal Fab',recipeId:'crystal_argon',sectorId:'argon_prime',inventory:{crystals:0,energy_cells:200,silicon_wafers:60,meatsteak:80},reorderLevel:{energy_cells:100,silicon_wafers:40,meatsteak:60},reserveLevel:{crystals:50}},
+    {id:'argon_ore_01',name:'Ore Mine',recipeId:'ore_mine',sectorId:'argon_prime',inventory:{ore:0,energy_cells:120},reorderLevel:{energy_cells:80},reserveLevel:{ore:100}},
+    {id:'argon_silicon_01',name:'Silicon Mine',recipeId:'silicon_mine',sectorId:'argon_prime',inventory:{silicon_wafers:0,energy_cells:120},reorderLevel:{energy_cells:80},reserveLevel:{silicon_wafers:80}},
+    {id:'argon_cahoona_01',name:'Cahoona Bakery',recipeId:'cahoona',sectorId:'argon_prime',inventory:{meatsteak:0,energy_cells:180,delexian_wheat:120,argnu_beef:60,stott_spices:60},reorderLevel:{energy_cells:120,delexian_wheat:80,argnu_beef:40,stott_spices:40},reserveLevel:{meatsteak:150}},
+    {id:'argon_qtubes_01',name:'Quantum Tube Fab',recipeId:'q_tubes_argon',sectorId:'argon_prime',inventory:{quantum_tubes:0,energy_cells:220,ore:80,meatsteak:100,silicon_wafers:70},reorderLevel:{energy_cells:140,ore:60,meatsteak:80,silicon_wafers:50},reserveLevel:{quantum_tubes:60}},
+    {id:'argon_chip_01',name:'Chip Plant',recipeId:'chip_argon',sectorId:'argon_prime',inventory:{microchips:0,energy_cells:180,meatsteak:120,silicon_wafers:80},reorderLevel:{energy_cells:120,meatsteak:80,silicon_wafers:60},reserveLevel:{microchips:20}}
+  ]
+  const sectors = [{id:'argon_prime',name:'Argon Prime',neighbors:[],risk:0.05}]
+  return {wares,recipes,stations,sectors}
+})();
+const state = (() => JSON.parse(JSON.stringify(data)))()
+let orders = []
+let logs = []
+let currentSectorId = state.sectors[0].id
+const bands = {
+  primary:{min:0.8,max:1.2,alpha:0.6,beta:0.2,gamma:0.2},
+  food:{min:0.7,max:1.5,alpha:0.8,beta:0.3,gamma:0.3},
+  intermediate:{min:0.6,max:1.8,alpha:1.0,beta:0.4,gamma:0.4},
+  end:{min:0.6,max:2.2,alpha:1.2,beta:0.5,gamma:0.5}
+}
+function clamp(v,min,max){return Math.max(min,Math.min(max,v))}
+function getWare(id){return state.wares.find(w=>w.id===id)}
+function getRecipe(id){return state.recipes.find(r=>r.id===id)}
+function getStationsForProduct(wareId){return state.stations.filter(s=>getRecipe(s.recipeId).productId===wareId)}
+function getStationsConsuming(wareId){return state.stations.filter(s=>getRecipe(s.recipeId).inputs.some(i=>i.wareId===wareId))}
+function targetStock(ware){const c=ware.category;return c==='primary'?200:c==='food'?150:c==='intermediate'?100:60}
+function sectorStock(sectorId,wareId){let sum=0;for(const s of state.stations)if(s.sectorId===sectorId)sum+=(s.inventory[wareId]||0);return sum}
+function recentFlow(sectorId,wareId){return 0}
+function eventMod(sectorId,wareId){return 0}
+function priceFor(sectorId,ware){const cat=bands[ware.category]||bands.intermediate;const t=targetStock(ware);const stock=sectorStock(sectorId,ware.id);const shortage=(t-stock)/Math.max(t,1);const flow=recentFlow(sectorId,ware.id);const ev=eventMod(sectorId,ware.id);const mult=clamp(1+cat.alpha*shortage+cat.beta*flow+cat.gamma*ev,cat.min,cat.max);return Math.round(ware.basePrice*mult)
+}
+function runCycle(){for(const s of state.stations){const r=getRecipe(s.recipeId);let ok=true;for(const i of r.inputs){if((s.inventory[i.wareId]||0)<i.amount)ok=false}
+if(!ok)continue;for(const i of r.inputs){s.inventory[i.wareId]-=i.amount}const p=r.productId;s.inventory[p]=(s.inventory[p]||0)+r.batchSize}}
+function resetStocks(){Object.assign(state,JSON.parse(JSON.stringify(data)));orders=[];logs=[];currentSectorId=state.sectors[0].id;renderSectorSelect()}
+function createBuyOrder(station,wareId,qty){const w=getWare(wareId);const price=priceFor(station.sectorId,w);orders.push({id:'o'+Math.random(),type:'buy',stationId:station.id,sectorId:station.sectorId,wareId,qty,limitPrice:price})}
+function createSellOrder(station,wareId,qty){const w=getWare(wareId);const price=priceFor(station.sectorId,w);orders.push({id:'o'+Math.random(),type:'sell',stationId:station.id,sectorId:station.sectorId,wareId,qty,limitPrice:price})}
+function generateOrders(){orders=[];for(const s of state.stations){const r=getRecipe(s.recipeId);for(const i of r.inputs){const stock=s.inventory[i.wareId]||0;const rl=s.reorderLevel[i.wareId]||0;if(stock<rl)createBuyOrder(s,i.wareId,rl-stock)}const prod=r.productId;const ps=s.inventory[prod]||0;const res=s.reserveLevel[prod]||0;if(ps>res)createSellOrder(s,prod,ps-res)}}
+function pathDistance(a,b){if(a===b)return 0;const g={};for(const s of state.sectors){g[s.id]=s.neighbors||[]}const q=[a];const d={[a]:0};let i=0;while(i<q.length){const n=q[i++];for(const m of g[n]){if(d[m]==null){d[m]=d[n]+1;q.push(m)}}}
+return d[b]==null?3:d[b]}
+function transportCost(a,b,ware){const dist=pathDistance(a,b);const base=5*dist;const riskA=state.sectors.find(x=>x.id===a)?.risk||0;const riskB=state.sectors.find(x=>x.id===b)?.risk||0;const risk=(riskA+riskB)/2;return Math.round((base+base*risk)*(ware.volume||1))}
+function matchOrders(){const byWare={};for(const o of orders){byWare[o.wareId]=byWare[o.wareId]||{buy:[],sell:[]};byWare[o.wareId][o.type].push(o)}
+for(const wareId in byWare){const group=byWare[wareId];group.buy.sort((a,b)=>b.limitPrice-a.limitPrice);group.sell.sort((a,b)=>a.limitPrice-b.limitPrice);let bi=0,si=0;while(bi<group.buy.length&&si<group.sell.length){const b=group.buy[bi],s=group.sell[si];const qty=Math.min(b.qty,s.qty);const ware=getWare(wareId);const buyPrice=b.limitPrice;const sellPrice=s.limitPrice;const cost=transportCost(s.sectorId,b.sectorId,ware);const margin=buyPrice-sellPrice-cost;if(margin<=0){si++;continue}
+const bs=state.stations.find(x=>x.id===b.stationId);const ss=state.stations.find(x=>x.id===s.stationId);if((ss.inventory[wareId]||0)<qty){si++;continue}
+ss.inventory[wareId]-=qty;bs.inventory[wareId]=(bs.inventory[wareId]||0)+qty;b.qty-=qty;s.qty-=qty;logs.unshift({ts:Date.now(),ware:ware.name,qty,buyStation:bs.name,buySector:bs.sectorId,sellStation:ss.name,sellSector:ss.sectorId,buyPrice,sellPrice,margin,cost});if(b.qty<=0)bi++;if(s.qty<=0)si++}
+}}
+function el(tag,props,children){const e=document.createElement(tag);if(props)for(const k in props){const v=props[k];if(k==='class')e.className=v;else if(k==='text')e.textContent=v;else if(k==='html')e.innerHTML=v;else e.setAttribute(k,v)}
+if(children){for(const c of children){e.appendChild(typeof c==='string'?document.createTextNode(c):c)}}return e}
+function renderSidebar(selectedWare){const cont=document.getElementById('sidebar');cont.innerHTML='';const groups={};for(const w of state.wares){groups[w.category]=groups[w.category]||[];groups[w.category].push(w)}
+const order=['primary','food','intermediate','end'];for(const key of order){const list=groups[key];if(!list)continue;const sec=el('div',{class:'section'},[el('h3',{text:key[0].toUpperCase()+key.slice(1)})])
+const ul=el('div',{class:'ware-list'});for(const w of list.sort((a,b)=>a.name.localeCompare(b.name))){const active=selectedWare&&selectedWare.id===w.id;const row=el('div',{class:'ware'+(active?' active':''),id:'ware_'+w.id},[el('div',{text:w.name}),el('div',{class:'badge',text:w.category})]);row.onclick=()=>selectWare(w.id);ul.appendChild(row)}
+sec.appendChild(ul);cont.appendChild(sec)}
+}
+function renderMain(selectedWare){const cont=document.getElementById('main');cont.innerHTML='';if(!selectedWare){cont.appendChild(el('div',{class:'card'},[el('h4',{text:'Select a ware'}),el('div',{class:'muted',text:'Choose a ware from the left to view producers, consumers, and prices.'})]));return}
+const sector=state.sectors.find(x=>x.id===currentSectorId)||state.sectors[0];const price=priceFor(sector.id,selectedWare);const producers=getStationsForProduct(selectedWare.id);const consumers=getStationsConsuming(selectedWare.id)
+const info=el('div',{class:'card'},[el('h4',{text:selectedWare.name}),el('div',{class:'kv'},[el('div',{class:'muted',text:'Category'}),el('div',{text:selectedWare.category}),el('div',{class:'muted',text:'Base Price'}),el('div',{text:String(selectedWare.basePrice)}),el('div',{class:'muted',text:'Sector Price'}),el('div',{text:String(price)}),el('div',{class:'muted',text:'Sector'}),el('div',{text:sector.name})])])
+const prodList=el('div',{class:'card'},[el('h4',{text:'Produced At'}),producers.length?el('div',{class:'list'},producers.map(s=>{const r=getRecipe(s.recipeId);const inputs=r.inputs.map(i=>`${getWare(i.wareId)?.name||i.wareId} × ${i.amount}`).join(', ');return el('div',{class:'row'},[el('div',{text:s.name}),el('div',{class:'small',text:inputs})])})):el('div',{class:'muted',text:'None'})])
+const consList=el('div',{class:'card'},[el('h4',{text:'Consumed By'}),consumers.length?el('div',{class:'list'},consumers.map(s=>{const r=getRecipe(s.recipeId);return el('div',{class:'row'},[el('div',{text:s.name}),el('div',{class:'small',text:r.productId.split('_').map(x=>x[0].toUpperCase()+x.slice(1)).join(' ')})])})):el('div',{class:'muted',text:'None'})])
+const inv=el('div',{class:'card'},[el('h4',{text:'Sector Stocks'}),el('div',{class:'grid'},state.stations.filter(s=>s.sectorId===sector.id).map(s=>{return el('div',{class:'kv'},[el('div',{class:'muted',text:s.name}),el('div',{text:String(s.inventory[selectedWare.id]||0)})])}))])
+const panel=el('div',{class:'panel'},[info,inv])
+const wareOrders=orders.filter(o=>o.wareId===selectedWare.id)
+const buyOs=wareOrders.filter(o=>o.type==='buy')
+const sellOs=wareOrders.filter(o=>o.type==='sell')
+const buyCard=el('div',{class:'card'},[el('h4',{text:'Buy Orders'}),buyOs.length?el('div',{class:'list'},buyOs.map(o=>{const st=state.stations.find(s=>s.id===o.stationId);return el('div',{class:'row'},[el('div',{text:st?.name||o.stationId}),el('div',{class:'small',text:`${o.qty} @ ${o.limitPrice}`})])})):el('div',{class:'muted',text:'None'})])
+const sellCard=el('div',{class:'card'},[el('h4',{text:'Sell Orders'}),sellOs.length?el('div',{class:'list'},sellOs.map(o=>{const st=state.stations.find(s=>s.id===o.stationId);return el('div',{class:'row'},[el('div',{text:st?.name||o.stationId}),el('div',{class:'small',text:`${o.qty} @ ${o.limitPrice}`})])})):el('div',{class:'muted',text:'None'})])
+const logsCard=el('div',{class:'card'},[el('h4',{text:'Trade Log'}),logs.length?el('div',{class:'list'},logs.slice(0,12).map(l=>el('div',{class:'row'},[el('div',{text:`${l.ware}`}),el('div',{class:'small',text:`${l.qty} ${l.sellStation} [${l.sellSector}] → ${l.buyStation} [${l.buySector}] (${l.sellPrice}→${l.buyPrice}, cost ${l.cost})`})]))):el('div',{class:'muted',text:'No trades'})])
+const panel3=el('div',{class:'panel'},[buyCard,sellCard])
+const panel4=el('div',{class:'panel'},[logsCard])
+cont.appendChild(panel);const panel2=el('div',{class:'panel'},[prodList,consList]);cont.appendChild(panel2)
+cont.appendChild(panel3);cont.appendChild(panel4)
+}
+function selectWare(id){const w=getWare(id);renderSidebar(w);renderMain(w)}
+document.getElementById('tickBtn').onclick=()=>{runCycle();const sel=document.querySelector('.ware.active');const id=sel?sel.id.replace('ware_',''):null;selectWare(id||state.wares[0].id)}
+document.getElementById('runBtn').onclick=()=>{runCycle();generateOrders();matchOrders();const sel=document.querySelector('.ware.active');const id=sel?sel.id.replace('ware_',''):null;selectWare(id||state.wares[0].id)}
+document.getElementById('resetBtn').onclick=()=>{resetStocks();const sel=document.querySelector('.ware.active');const id=sel?sel.id.replace('ware_',''):null;selectWare(id||state.wares[0].id)}
+document.getElementById('sectorSelect').onchange=(e)=>{currentSectorId=e.target.value;const sel=document.querySelector('.ware.active');const id=sel?sel.id.replace('ware_',''):null;selectWare(id||state.wares[0].id)}
+document.getElementById('loadBtn').onclick=()=>{document.getElementById('fileInput').click()}
+document.getElementById('fileInput').addEventListener('change',async(e)=>{await loadFromFiles(e.target.files);renderSectorSelect();const sel=document.querySelector('.ware.active');const id=sel?sel.id.replace('ware_',''):null;selectWare(id||state.wares[0].id)})
+function renderSectorSelect(){const sel=document.getElementById('sectorSelect');sel.innerHTML='';for(const s of state.sectors){const o=document.createElement('option');o.value=s.id;o.textContent=s.name;sel.appendChild(o)}sel.value=currentSectorId}
+async function readFile(f){return new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsText(f)})}
+function norm(name){return name.trim().toLowerCase()}
+function categorize(name){const n=norm(name);const prim=['energy cells','ore','silicon wafers','teladianium','warheads','delexian wheat'];const food=['meatsteak cahoonas','bofu','soja husk','rastar oil','nostrop oil','plankton','scruffin fruits','stott spices','maja snails','sunrise flowers','swamp plants','chelts meat','soy beans','bogas'];const interm=['crystals','quantum tubes','microchips','computer components','cloth rimes','majaglit'];const end=['space fuel','spaceweed','alpha','beta','gamma','shield','missile','impulse ray emitter','particle accelerator','high energy plasma'];if(prim.some(x=>n.includes(x)))return 'primary';if(food.some(x=>n.includes(x)))return 'food';if(interm.some(x=>n.includes(x)))return 'intermediate';if(end.some(x=>n.includes(x)))return 'end';return 'intermediate'}
+function amountForInput(name){const n=norm(name);if(n.includes('energy cells'))return 10;if(n.includes('crystals'))return 1;if(n.includes('ore'))return 5;if(n.includes('silicon wafers'))return 6;if(n.includes('warheads'))return 3;if(n.includes('quantum tubes'))return 4;if(n.includes('microchips'))return 2;if(n.includes('delexian wheat'))return 8;return 6}
+function batchForProduct(name){const c=categorize(name);if(c==='primary'){if(norm(name).includes('energy'))return 10;if(norm(name).includes('ore'))return 20;if(norm(name).includes('silicon'))return 10;return 12}if(c==='food')return 30;if(c==='intermediate')return 5;return 2}
+async function loadFromFiles(fileList){const files=Array.from(fileList);const stationsFile=files.find(f=>/stations/i.test(f.name));const productsFile=files.find(f=>/products/i.test(f.name));const stationsMd=stationsFile?await readFile(stationsFile):'';const lines=String(stationsMd).split(/\r?\n/);const stations=[];let cur=null;for(const line of lines){if(/^\-\s+/.test(line)){cur={name:line.replace(/^\-\s+/,'').trim(),sells:null,buys:[]};stations.push(cur)}else if(/\s\-\s+Sells:\s*/i.test(line)){const m=line.match(/Sells:\s*(.*)$/i);if(m)cur.sells=m[1].trim()}else if(/\s\-\s+Buys:\s*/i.test(line)){const m=line.match(/Buys:\s*(.*)$/i);if(m){cur.buys=m[1].split(/,\s*/).map(x=>x.trim()).filter(Boolean)}}}
+const wareSet=new Map();function ensureWare(name){const id=norm(name).replace(/[^a-z0-9]+/g,'_');if(!wareSet.has(id)){wareSet.set(id,{id,name,category:categorize(name),basePrice:100,volume:1})}return wareSet.get(id)}
+const recipes=[];for(const s of stations){if(!s.sells)continue;const prod=ensureWare(s.sells);const inputs=(s.buys||[]).map(b=>({ware:ensureWare(b),amount:amountForInput(b)}));const rid=norm(s.name).replace(/[^a-z0-9]+/g,'_');recipes.push({id:rid,product:prod,inputs})}
+const sectors=[{id:'argon_prime',name:'Argon Prime',neighbors:['boron_prime','paranid_prime'],risk:0.05},{id:'boron_prime',name:'Boron Prime',neighbors:['argon_prime','teladi_gain'],risk:0.04},{id:'paranid_prime',name:'Paranid Prime',neighbors:['argon_prime','split_fire'],risk:0.07},{id:'split_fire',name:'Split Fire',neighbors:['paranid_prime','teladi_gain'],risk:0.09},{id:'teladi_gain',name:'Teladi Gain',neighbors:['split_fire','boron_prime'],risk:0.06}]
+const stationsOut=[];let idx=0;for(const r of recipes.slice(0,40)){const sec=sectors[idx++%sectors.length];const inv={};inv[r.product.id]=0;for(const i of r.inputs){inv[i.ware.id]=amountForInput(i.ware.name)*12}
+const reorder={};for(const i of r.inputs){reorder[i.ware.id]=amountForInput(i.ware.name)*8}
+const reserve={};reserve[r.product.id]=batchForProduct(r.product.name)*6
+stationsOut.push({id:'st_'+r.id,name:r.product.name+' Plant',recipeId:r.id,sectorId:sec.id,inventory:inv,reorderLevel:reorder,reserveLevel:reserve})}
+state.wares=Array.from(wareSet.values())
+state.recipes=recipes.map(r=>({id:r.id,productId:r.product.id,inputs:r.inputs.map(i=>({wareId:i.ware.id,amount:i.amount})),cycleTimeSec:120,batchSize:batchForProduct(r.product.name),productStorageCap:5000}))
+state.stations=stationsOut
+state.sectors=sectors
+orders=[];logs=[];currentSectorId=state.sectors[0].id
+}
+renderSectorSelect()
+renderSidebar(null);renderMain(null)
+</script>
+</body>
+</html>
