@@ -305,8 +305,8 @@ export const PlumeEditor: React.FC = () => {
             </div>
             <input 
               type="range" 
-              min="2" 
-              max="30" 
+              min="5" 
+              max="100" 
               step="1" 
               value={particleCount} 
               onChange={(e) => setParticleCount(parseInt(e.target.value))}

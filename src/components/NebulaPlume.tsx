@@ -1,55 +1,42 @@
+import { useRef, useEffect, useMemo } from 'react'
 import type { FC } from 'react'
-import { useRef, useEffect } from 'react'
 import { useThree, useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import Nebula, {
-  Emitter,
-  Rate,
-  Span,
-  Position,
-  Mass,
-  Body,
-  Radius,
-  Life,
-  RadialVelocity,
-  PointZone,
-  Vector3D,
-  Alpha,
-  Scale,
-  Color as NebulaColor,
-  SpriteRenderer,
-  ease
-} from 'three-nebula'
 
-// Create a soft circular particle texture
-function createParticleTexture(softness: number = 0.5): THREE.CanvasTexture {
+// Simple particle data structure
+interface Particle {
+  position: THREE.Vector3
+  velocity: THREE.Vector3
+  age: number
+  life: number
+  active: boolean
+  spriteIndex: number
+}
+
+// Create a soft circular particle texture (cached)
+let cachedTexture: THREE.CanvasTexture | null = null
+function getParticleTexture(): THREE.CanvasTexture {
+  if (cachedTexture) return cachedTexture
+  
   const canvas = document.createElement('canvas')
   canvas.width = 64
   canvas.height = 64
   const ctx = canvas.getContext('2d')
   if (ctx) {
-    // Create a soft radial gradient for a round particle
     const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32)
-    
-    // Softer falloff for more natural looking particles
-    const innerRadius = 0.1 + softness * 0.15
-    const midRadius = 0.3 + softness * 0.2
-    
     gradient.addColorStop(0, 'rgba(255, 255, 255, 1)')
-    gradient.addColorStop(innerRadius, 'rgba(255, 255, 255, 0.95)')
-    gradient.addColorStop(midRadius, 'rgba(255, 255, 255, 0.6)')
-    gradient.addColorStop(0.6, 'rgba(255, 255, 255, 0.25)')
-    gradient.addColorStop(0.8, 'rgba(255, 255, 255, 0.08)')
+    gradient.addColorStop(0.2, 'rgba(255, 255, 255, 0.8)')
+    gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.3)')
+    gradient.addColorStop(0.8, 'rgba(255, 255, 255, 0.05)')
     gradient.addColorStop(1, 'rgba(255, 255, 255, 0)')
-    
     ctx.fillStyle = gradient
     ctx.beginPath()
     ctx.arc(32, 32, 32, 0, Math.PI * 2)
     ctx.fill()
   }
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.needsUpdate = true
-  return texture
+  cachedTexture = new THREE.CanvasTexture(canvas)
+  cachedTexture.needsUpdate = true
+  return cachedTexture
 }
 
 interface NebulaPlumeProps {
@@ -58,7 +45,6 @@ interface NebulaPlumeProps {
   radius?: number
   color?: string
   throttle?: number
-  // Advanced particle controls
   particleCount?: number
   emissionRate?: number
   particleLife?: number
@@ -76,155 +62,188 @@ export const NebulaPlume: FC<NebulaPlumeProps> = ({
   radius = 0.5,
   color = '#76baff',
   throttle = 1.0,
-  particleCount = 10,
-  emissionRate = 0.075,
-  particleLife = 0.75,
-  startScale = 2.0,
-  endScale = 0.3,
-  startAlpha = 0.8,
-  velocity = 15,
-  spread = 12,
-  textureSoftness = 0.5,
+  particleCount = 40,
+  emissionRate = 0.02,
+  particleLife = 0.6,
+  startScale = 1.5,
+  endScale = 0.1,
+  startAlpha = 0.9,
+  velocity = 20,
+  spread = 8,
 }) => {
   const groupRef = useRef<THREE.Group>(null)
+  const particlesRef = useRef<Particle[]>([])
+  const spritesRef = useRef<THREE.Sprite[]>([])
+  const emitTimerRef = useRef(0)
   const { scene } = useThree()
-  const nebulaRef = useRef<Nebula | null>(null)
-  const emitterRef = useRef<Emitter | null>(null)
-  const textureRef = useRef<THREE.CanvasTexture | null>(null)
-
+  
+  // Clamp values
+  const maxParticles = Math.min(Math.max(1, particleCount), 200)
+  const safeEmissionRate = Math.min(Math.max(0.01, emissionRate), 1.5)
+  const safeLife = Math.min(Math.max(0.1, particleLife), 5)
+  
+  // Reusable vectors
+  const worldPos = useMemo(() => new THREE.Vector3(), [])
+  const worldQuat = useMemo(() => new THREE.Quaternion(), [])
+  const baseDir = useMemo(() => new THREE.Vector3(), [])
+  const tempVel = useMemo(() => new THREE.Vector3(), [])
+  
+  // Create material once
+  const material = useMemo(() => {
+    return new THREE.SpriteMaterial({
+      map: getParticleTexture(),
+      color: new THREE.Color(color),
+      blending: THREE.AdditiveBlending,
+      transparent: true,
+      depthWrite: false,
+      depthTest: true,
+    })
+  }, [color])
+  
+  // Update material color when it changes
   useEffect(() => {
-    if (!scene || !groupRef.current) return
-
-    // Clean up any existing nebula first
-    if (nebulaRef.current) {
-      nebulaRef.current.destroy()
-      nebulaRef.current = null
-      emitterRef.current = null
-    }
-
-    try {
-      // Get world position of the group
-      const worldPos = new THREE.Vector3()
-      groupRef.current.getWorldPosition(worldPos)
-
-      // Create texture for particles
-      const texture = createParticleTexture(textureSoftness)
-      textureRef.current = texture
-
-      // Create material for our custom sprite
-      const material = new THREE.SpriteMaterial({
-        map: texture,
-        color: new THREE.Color(color),
-        blending: THREE.AdditiveBlending,
-        transparent: true,
-        depthWrite: false,
-        depthTest: true,
-      })
+    material.color.set(color)
+  }, [color, material])
+  
+  // Initialize sprites when maxParticles changes
+  useEffect(() => {
+    const sprites = spritesRef.current
+    const particles = particlesRef.current
+    
+    // Add more sprites if needed
+    while (sprites.length < maxParticles) {
+      const sprite = new THREE.Sprite(material.clone())
+      sprite.visible = false
+      scene.add(sprite)
+      sprites.push(sprite)
       
-      // Create the template sprite that nebula will clone
-      const sprite = new THREE.Sprite(material)
-
-      // Parse color for behaviors
-      const threeColor = new THREE.Color(color)
-
-      // Create emitter with Body initializer for custom sprite
-      const emitter = new Emitter()
-        .setRate(new Rate(new Span(particleCount * 0.8, particleCount * 1.2), new Span(emissionRate * 0.8, emissionRate * 1.2)))
-        .setInitializers([
-          new Position(new PointZone(0, 0, 0)),
-          new Mass(1),
-          new Body(sprite),
-          new Radius(radius * 1.2, radius * 1.8),
-          new Life(particleLife * 0.8, particleLife * 1.2),
-          new RadialVelocity(
-            new Span(length * velocity * 0.8, length * velocity * 1.2),
-            new Vector3D(0, 0, 1),
-            spread
-          ),
-        ])
-        .setBehaviours([
-          new Alpha(startAlpha, 0, Infinity, ease.easeOutQuad),
-          new Scale(startScale, endScale, Infinity, ease.easeOutCubic),
-          new NebulaColor(threeColor, threeColor.clone().multiplyScalar(0.4), Infinity, ease.easeOutQuad),
-        ])
-        .setPosition({ x: worldPos.x, y: worldPos.y, z: worldPos.z })
-        .emit()
-
-      emitterRef.current = emitter
-
-      // Create renderer
-      const renderer = new SpriteRenderer(scene, THREE)
-
-      // Create nebula system
-      const nebula = new Nebula()
-      nebula.addEmitter(emitter)
-      nebula.addRenderer(renderer)
-
-      nebulaRef.current = nebula
-    } catch (error) {
-      console.error('NebulaPlume initialization error:', error)
+      // Add corresponding particle slot
+      particles.push({
+        position: new THREE.Vector3(),
+        velocity: new THREE.Vector3(),
+        age: 0,
+        life: 1,
+        active: false,
+        spriteIndex: sprites.length - 1
+      })
     }
-
+    
+    // Hide excess sprites if maxParticles decreased
+    for (let i = maxParticles; i < sprites.length; i++) {
+      sprites[i].visible = false
+      particles[i].active = false
+    }
+  }, [maxParticles, material, scene])
+  
+  // Cleanup
+  useEffect(() => {
     return () => {
-      // Clean up
-      if (nebulaRef.current) {
-        nebulaRef.current.destroy()
-        nebulaRef.current = null
-      }
-      if (textureRef.current) {
-        textureRef.current.dispose()
-        textureRef.current = null
-      }
+      spritesRef.current.forEach(sprite => {
+        sprite.removeFromParent()
+        sprite.material.dispose()
+      })
+      spritesRef.current = []
+      particlesRef.current = []
+      material.dispose()
     }
-  }, [scene, color, length, radius, particleCount, emissionRate, particleLife, startScale, endScale, startAlpha, velocity, spread, textureSoftness])
-
+  }, [material])
+  
   useFrame((_, delta) => {
-    if (!nebulaRef.current || !emitterRef.current || !groupRef.current) return
-
-    // Update emitter position to follow the group
-    const worldPos = new THREE.Vector3()
+    if (!groupRef.current) return
+    
+    const currentThrottle = Math.max(0, throttle ?? 1.0)
+    
+    // Get world transform
     groupRef.current.getWorldPosition(worldPos)
-    emitterRef.current.setPosition({ x: worldPos.x, y: worldPos.y, z: worldPos.z })
-
-    // Update velocity direction based on ship's rotation
-    const worldQuat = new THREE.Quaternion()
     groupRef.current.getWorldQuaternion(worldQuat)
     
-    // Base direction is +Z (backwards from ship)
-    const baseDir = new THREE.Vector3(0, 0, 1)
-    baseDir.applyQuaternion(worldQuat)
-
-    // Update the RadialVelocity direction
-    const velocityBehavior = emitterRef.current.initializers.find(
-      (init: unknown) => init instanceof RadialVelocity
-    ) as RadialVelocity | undefined
+    // Calculate emission direction
+    baseDir.set(0, 0, 1).applyQuaternion(worldQuat)
     
-    if (velocityBehavior) {
-      // Update direction vector
-      velocityBehavior.dir.x = baseDir.x
-      velocityBehavior.dir.y = baseDir.y
-      velocityBehavior.dir.z = baseDir.z
-
-      // Update throttle by modifying velocity
-      const currentThrottle = Math.max(0, throttle ?? 1.0)
-      velocityBehavior.radiusPan.a = length * velocity * 0.8 * currentThrottle
-      velocityBehavior.radiusPan.b = length * velocity * 1.2 * currentThrottle
+    const particles = particlesRef.current
+    const sprites = spritesRef.current
+    
+    // Count active particles
+    const activeCount = particles.filter(p => p.active).length
+    if (particles.length > 0 && Math.random() < 0.01) {
+      console.log(`Particles: ${activeCount}/${particles.length}, max: ${maxParticles}, rate: ${safeEmissionRate}, throttle: ${currentThrottle}`)
     }
-
-    // Handle throttle emission
-    const currentThrottle = Math.max(0, throttle ?? 1.0)
+    
+    // Emit new particles
     if (currentThrottle > 0.1) {
-      if (!emitterRef.current.isEmitting) {
-        emitterRef.current.emit()
-      }
-    } else {
-      if (emitterRef.current.isEmitting) {
-        emitterRef.current.stopEmit()
+      emitTimerRef.current += delta
+      while (emitTimerRef.current >= safeEmissionRate) {
+        emitTimerRef.current -= safeEmissionRate
+        
+        // Find inactive particle slot from pre-allocated pool
+        let particle: Particle | undefined
+        for (let i = 0; i < Math.min(particles.length, maxParticles); i++) {
+          if (!particles[i].active) {
+            particle = particles[i]
+            break
+          }
+        }
+        
+        if (!particle) {
+          // All particles active, wait
+          emitTimerRef.current = 0
+          break
+        }
+        
+        const spriteIndex = particle.spriteIndex
+        
+        // Initialize/reset particle
+        const spreadRad = (spread * Math.PI / 180)
+        const randomSpread = (Math.random() - 0.5) * spreadRad
+        const randomAngle = Math.random() * Math.PI * 2
+        
+        tempVel.copy(baseDir)
+        tempVel.x += Math.sin(randomAngle) * Math.sin(randomSpread)
+        tempVel.y += Math.cos(randomAngle) * Math.sin(randomSpread)
+        tempVel.normalize().multiplyScalar(length * velocity * (0.8 + Math.random() * 0.4) * currentThrottle)
+        
+        particle.position.copy(worldPos)
+        particle.velocity.copy(tempVel)
+        particle.age = 0
+        particle.life = safeLife * (0.8 + Math.random() * 0.4)
+        particle.active = true
+        
+        if (sprites[spriteIndex]) {
+          sprites[spriteIndex].visible = true
+        }
       }
     }
-
-    nebulaRef.current.update(delta)
+    
+    // Update all particles
+    for (let i = 0; i < Math.min(particles.length, maxParticles); i++) {
+      const p = particles[i]
+      if (!p.active) continue
+      
+      const sprite = sprites[p.spriteIndex]
+      if (!sprite) continue
+      
+      p.age += delta
+      
+      if (p.age >= p.life) {
+        // Deactivate particle
+        p.active = false
+        sprite.visible = false
+        continue
+      }
+      
+      // Update position
+      p.position.addScaledVector(p.velocity, delta)
+      
+      // Update sprite
+      const t = p.age / p.life
+      const scale = startScale + (endScale - startScale) * t
+      const alpha = startAlpha * (1 - t * t) // Quadratic falloff
+      
+      sprite.position.copy(p.position)
+      sprite.scale.set(scale * radius, scale * radius, 1)
+      sprite.material.opacity = alpha
+    }
   })
-
-  return <group ref={groupRef} position={position} renderOrder={100} />
+  
+  return <group ref={groupRef} position={position} />
 }

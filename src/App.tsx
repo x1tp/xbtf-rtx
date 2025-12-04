@@ -26,7 +26,7 @@ import { useGameStore } from './store/gameStore';
 import { EnginePlume } from './components/EnginePlume';
 import { UniverseMap } from './components/UniverseMap';
 import { EconomyTicker } from './components/EconomyTicker';
-import { PLUME_PRESETS } from './config/plumes';
+import { PLUME_PRESETS, getAllPresets } from './config/plumes';
 
 function App() {
   const sceneRef = useRef<ThreeScene | null>(null);
@@ -346,6 +346,7 @@ function ShipEditorCanvas({ modelPath }: { modelPath?: string }) {
 
   const [mode, setMode] = useState<'plume' | 'cockpit' | 'weapon'>('plume');
   const [selectedPlumeType, setSelectedPlumeType] = useState('standard');
+  const [allPlumePresets, setAllPlumePresets] = useState(() => getAllPresets());
   const [status, setStatus] = useState<string | null>(null);
 
   const sceneRef = useRef<ThreeScene | null>(null);
@@ -584,30 +585,38 @@ function ShipEditorCanvas({ modelPath }: { modelPath?: string }) {
       {mode === 'plume' && (
         <div style={{ position: 'absolute', top: 20, right: 20, width: 220, background: 'rgba(12,22,32,0.9)', padding: 12, borderRadius: 6, border: '1px solid #184b6a', display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ color: '#c3e7ff', fontFamily: 'monospace', marginBottom: 4 }}>Plume Type</div>
-          {Object.keys(PLUME_PRESETS).map((type) => (
-            <div
-              key={type}
-              onClick={() => setSelectedPlumeType(type)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: 4,
-                cursor: 'pointer',
-                background: selectedPlumeType === type ? '#1a3b50' : 'transparent',
-                border: selectedPlumeType === type ? '1px solid #3fb6ff' : '1px solid transparent',
-                borderRadius: 4
-              }}
-            >
-              <div style={{ width: 40, height: 40, background: '#000', position: 'relative', overflow: 'hidden', borderRadius: 4 }}>
-                <Canvas camera={{ position: [0, 0, 5], fov: 45 }}>
-                  <ambientLight intensity={0.5} />
-                  <EnginePlume position={[0, -1, 0]} {...PLUME_PRESETS[type]} />
-                </Canvas>
+          <div style={{ maxHeight: 400, overflowY: 'auto' }}>
+            {Object.keys(allPlumePresets).map((type) => (
+              <div
+                key={type}
+                onClick={() => setSelectedPlumeType(type)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: 4,
+                  cursor: 'pointer',
+                  background: selectedPlumeType === type ? '#1a3b50' : 'transparent',
+                  border: selectedPlumeType === type ? '1px solid #3fb6ff' : '1px solid transparent',
+                  borderRadius: 4
+                }}
+              >
+                <div style={{ width: 40, height: 40, background: '#000', position: 'relative', overflow: 'hidden', borderRadius: 4 }}>
+                  <Canvas camera={{ position: [0, 0, 5], fov: 45 }}>
+                    <ambientLight intensity={0.5} />
+                    <EnginePlume position={[0, -1, 0]} {...allPlumePresets[type]} />
+                  </Canvas>
+                </div>
+                <span style={{ color: '#c3e7ff', fontFamily: 'monospace', fontSize: 12 }}>{type}</span>
               </div>
-              <span style={{ color: '#c3e7ff', fontFamily: 'monospace', fontSize: 12 }}>{type}</span>
-            </div>
-          ))}
+            ))}
+          </div>
+          <button 
+            onClick={() => setAllPlumePresets(getAllPresets())} 
+            style={{ marginTop: 8, padding: '4px 8px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff', fontSize: 11, cursor: 'pointer' }}
+          >
+            Refresh Presets
+          </button>
         </div>
       )}
     </>

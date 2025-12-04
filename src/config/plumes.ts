@@ -69,7 +69,8 @@ function loadCustomPresets(): Record<string, PlumeConfig> {
 export const PLUME_PRESETS: Record<string, PlumeConfig> = {
     'standard': {
         length: 3.8, radius: 0.58, color: '#4a9eff', density: 1.05, glow: 3.0, noiseScale: 2.4, shock: 1.2,
-        shockFrequency: 20.0, animationSpeed: 10.0, smoothness: 0.5
+        shockFrequency: 20.0, animationSpeed: 10.0, smoothness: 0.5,
+        particleCount: 40, emissionRate: 0.02, particleLife: 0.6, startScale: 1.5, endScale: 0.1, startAlpha: 0.9, velocity: 20, spread: 8, textureSoftness: 0.5
     },
     'chemical': {
         length: 4.2, radius: 0.65, color: '#ff6600', density: 1.5, glow: 1.5, noiseScale: 6.0, shock: 0.5,
