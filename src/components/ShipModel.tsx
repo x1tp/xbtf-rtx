@@ -5,6 +5,7 @@ import { OBJLoader, MTLLoader } from 'three-stdlib';
 import { EnginePlume } from './EnginePlume';
 import { AdditiveBlending, Box3, CanvasTexture, Color, Group, SpriteMaterial, Vector3, Texture, LinearMipmapLinearFilter, LinearFilter, SRGBColorSpace, LinearSRGBColorSpace, Mesh, RepeatWrapping, DoubleSide, Material, TextureLoader, MeshPhongMaterial } from 'three';
 import { useGameStore } from '../store/gameStore';
+import { PLUME_PRESETS } from '../config/plumes';
 
 
 interface ShipModelProps {
@@ -12,10 +13,13 @@ interface ShipModelProps {
     editorMode?: boolean;
     name?: string;
     modelPath?: string;
-    markerOverrides?: { x: number; y: number; z: number }[];
+    markerOverrides?: { x: number; y: number; z: number; type?: string }[];
+    plumePositions?: { x: number; y: number; z: number; type?: string }[];
+    cockpitPosition?: { x: number; y: number; z: number };
+    weaponPositions?: { x: number; y: number; z: number }[];
 }
 
-export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'ShipModel', modelPath, editorMode = false, markerOverrides }) => {
+export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'ShipModel', modelPath, editorMode = false, markerOverrides, plumePositions, cockpitPosition, weaponPositions }) => {
     const objPath = modelPath || '/models/00000.obj';
     const mtlPath = objPath.endsWith('.obj') ? objPath.replace('.obj', '.mtl') : '/models/00000.mtl';
     // Most converted BOD models need flipY disabled to display textures correctly
@@ -211,9 +215,10 @@ export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'Shi
                 return parsed.positions || [];
             } catch { return []; }
         }
-        return [] as { x: number; y: number; z: number }[];
+        return [] as { x: number; y: number; z: number; type?: string }[];
     }, [objPath]);
     const markers = useMemo(() => {
+        if (plumePositions) return plumePositions;
         if (markerOverrides) return markerOverrides;
         if (initialMarkers.length > 0) return initialMarkers;
         const box = new Box3().setFromObject(obj);
@@ -223,10 +228,10 @@ export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'Shi
         const y = center.y - size.y * 0.04;
         const spread = Math.max(size.x * 0.28, 0.6);
         return [
-            { x: center.x - spread, y, z: zBack },
-            { x: center.x + spread, y, z: zBack }
+            { x: center.x - spread, y, z: zBack, type: 'standard' },
+            { x: center.x + spread, y, z: zBack, type: 'standard' }
         ];
-    }, [initialMarkers, markerOverrides, obj]);
+    }, [initialMarkers, markerOverrides, plumePositions, obj]);
     const glowTex = useMemo(() => {
         const c = document.createElement('canvas');
         c.width = 128; c.height = 128;
@@ -280,14 +285,37 @@ export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'Shi
     return (
         <group position={[0, -0.3, 0.0]} name={name}>
             <primitive object={obj} />
-            {markers.map((m, i) => (
-                <group key={`fx-${i}`} ref={(g) => { groupsRef.current[i] = g; }} frustumCulled={false} position={[m.x, m.y, m.z]}>
-                    <EnginePlume position={[0, 0, 0]} length={3.8} radius={0.58} color="#9bd0ff" density={1.05} steps={72} glow={5.0} noiseScale={2.4} shock={1.2} />
-                    <EnginePlume position={[0, 0, 0]} length={5.0} radius={1.35} color="#76baff" density={0.6} steps={52} glow={3.0} noiseScale={1.7} shock={0.7} />
-                    <sprite name="EngineGlow" position={[0, 0, 0]} scale={[1.2, 1.2, 1]} frustumCulled={false}>
-                        <primitive object={spriteMat} attach="material" />
-                    </sprite>
-                </group>
+            {markers.map((m, i) => {
+                const config = PLUME_PRESETS[m.type || 'standard'] || PLUME_PRESETS['standard'];
+                return (
+                    <group key={`fx-${i}`} ref={(g) => { groupsRef.current[i] = g; }} frustumCulled={false} position={[m.x, m.y, m.z]}>
+                        <EnginePlume
+                            position={[0, 0, 0]}
+                            length={config.length}
+                            radius={config.radius}
+                            color={config.color}
+                            density={config.density}
+                            glow={config.glow}
+                            noiseScale={config.noiseScale}
+                            shock={config.shock}
+                        />
+                        <sprite name="EngineGlow" position={[0, 0, 0]} scale={[config.radius * 2.4, config.radius * 2.4, 1]} frustumCulled={false}>
+                            <primitive object={spriteMat} attach="material" />
+                        </sprite>
+                    </group>
+                );
+            })}
+            {editorMode && cockpitPosition && (
+                <mesh position={[cockpitPosition.x, cockpitPosition.y, cockpitPosition.z]}>
+                    <boxGeometry args={[0.5, 0.5, 0.5]} />
+                    <meshBasicMaterial color="#00ff00" wireframe />
+                </mesh>
+            )}
+            {editorMode && weaponPositions && weaponPositions.map((p, i) => (
+                <mesh key={`wp-${i}`} position={[p.x, p.y, p.z]}>
+                    <sphereGeometry args={[0.2, 8, 8]} />
+                    <meshBasicMaterial color="#ff0000" wireframe />
+                </mesh>
             ))}
             {enableLights && (
                 <>
@@ -299,3 +327,4 @@ export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'Shi
         </group>
     );
 };
+

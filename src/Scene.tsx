@@ -40,7 +40,7 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
     const place = (p: [number, number, number]): [number, number, number] => [p[0] * spacing, p[1] * spacing, p[2] * spacing];
     const placedShips = React.useMemo(
         () => layout ? layout.ships.map((s) => ({ ...s, placedPosition: place(s.position) })) : [],
-        [layout, spacing]
+        [layout]
     );
     const initialShipPos: [number, number, number] = layout ? place(layout.playerStart || [0, 10, 450]) : [0, 10, 450];
     const [shipPos, setShipPos] = useState<[number, number, number]>(initialShipPos);
@@ -202,8 +202,10 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
             vec2 uv = oct(nd);
             float s = stars(uv, uDensity);
             float m = milky(nd, uOrientation);
-            float sunDot = max(dot(nd, normalize(uSunDir)), 0.0);
-          float viewFade = 1.0; // force starfield always visible while we debug darkening
+          float sunDot = max(dot(nd, normalize(uSunDir)), 0.0);
+          // Fade stars when looking toward the sun to mimic camera contrast washout
+          float glare = smoothstep(uViewFadeMin, uViewFadeMax, uCamSunDot) * uSunVisible;
+          float viewFade = mix(1.0, 0.25, glare * 0.7);
           vec3 col = (vec3(s * uBrightness) + vec3(m * uMilkyWayStrength)) * viewFade;
           gl_FragColor = vec4(col, 1.0);
           }
@@ -274,6 +276,7 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
                                 navGraph={navData.graph}
                                 obstacles={navData.obstacles}
                                 maxSpeed={(s.scale ?? 24) * 1.2}
+                                size={s.scale ?? 24}
                             />
                         ))}
                     </>

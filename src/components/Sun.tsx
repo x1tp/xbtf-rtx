@@ -89,9 +89,9 @@ export const Sun: React.FC<SunProps> = ({
         const ctx = canvas.getContext('2d');
         if (ctx) {
             const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
-            g.addColorStop(0.0, 'rgba(255,221,170,0.6)');
-            g.addColorStop(0.6, 'rgba(255,221,170,0.2)');
-            g.addColorStop(1.0, 'rgba(255,221,170,0.0)');
+            g.addColorStop(0.0, 'rgba(255,235,210,0.8)');
+            g.addColorStop(0.4, 'rgba(255,230,200,0.35)');
+            g.addColorStop(1.0, 'rgba(255,230,200,0.0)');
             ctx.fillStyle = g;
             ctx.fillRect(0, 0, s, s);
         }
@@ -100,6 +100,7 @@ export const Sun: React.FC<SunProps> = ({
         return new SpriteMaterial({ map: tex, transparent: true, depthWrite: false, blending: AdditiveBlending });
     }, []);
 
+    // Soft flare used for multiple ghosts along the lens axis
     const flareMaterial = useMemo(() => {
         const s = 256;
         const canvas = document.createElement('canvas');
@@ -108,8 +109,8 @@ export const Sun: React.FC<SunProps> = ({
         const ctx = canvas.getContext('2d');
         if (ctx) {
             const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
-            g.addColorStop(0.0, 'rgba(255,221,170,0.4)');
-            g.addColorStop(0.4, 'rgba(255,221,170,0.2)');
+            g.addColorStop(0.0, 'rgba(255,221,170,0.35)');
+            g.addColorStop(0.35, 'rgba(255,221,170,0.18)');
             g.addColorStop(1.0, 'rgba(255,221,170,0.0)');
             ctx.fillStyle = g;
             ctx.fillRect(0, 0, s, s);
@@ -121,26 +122,69 @@ export const Sun: React.FC<SunProps> = ({
             transparent: true,
             depthWrite: false,
             blending: AdditiveBlending,
-            opacity: hdr ? 0.75 : 0.5
+            opacity: hdr ? 0.85 : 0.6
+        });
+    }, [hdr]);
+
+    // Harder-edged hex flare to mimic camera iris reflections
+    const hexFlareMaterial = useMemo(() => {
+        const s = 256;
+        const canvas = document.createElement('canvas');
+        canvas.width = s;
+        canvas.height = s;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+            ctx.translate(s / 2, s / 2);
+            const radius = s * 0.38;
+            const sides = 6;
+            const path = new Path2D();
+            for (let i = 0; i < sides; i++) {
+                const a = (Math.PI * 2 * i) / sides;
+                const x = Math.cos(a) * radius;
+                const y = Math.sin(a) * radius;
+                if (i === 0) path.moveTo(x, y); else path.lineTo(x, y);
+            }
+            path.closePath();
+            const grd = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
+            grd.addColorStop(0.0, 'rgba(120,170,255,0.4)');
+            grd.addColorStop(0.65, 'rgba(120,170,255,0.14)');
+            grd.addColorStop(1.0, 'rgba(120,170,255,0.0)');
+            ctx.fillStyle = grd;
+            ctx.fill(path);
+        }
+        const tex = new CanvasTexture(canvas);
+        tex.colorSpace = SRGBColorSpace;
+        return new SpriteMaterial({
+            map: tex,
+            transparent: true,
+            depthWrite: false,
+            blending: AdditiveBlending,
+            opacity: hdr ? 0.9 : 0.75
         });
     }, [hdr]);
 
     const flareOffsets = useMemo(() => {
         const dir = sunDir.clone().multiplyScalar(-1);
+        // Mix soft ghosts and harder hex ghosts along the axis back toward the camera
         return [
-            { scale: size * 0.55, offset: size * 0.6 },
-            { scale: size * 0.25, offset: size * 1.8 },
-            { scale: size * 0.15, offset: size * -1.2 },
-            { scale: size * 0.08, offset: size * 3.4 }
+            { scale: size * 0.7, offset: size * 0.55, material: flareMaterial },
+            { scale: size * 0.3, offset: size * 1.4, material: hexFlareMaterial },
+            { scale: size * 0.22, offset: size * -1.0, material: flareMaterial },
+            { scale: size * 0.14, offset: size * 2.6, material: hexFlareMaterial },
+            { scale: size * 0.1, offset: size * -2.4, material: flareMaterial },
+            { scale: size * 0.08, offset: size * 4.6, material: hexFlareMaterial }
         ].map((entry) => ({
             scale: entry.scale,
-            pos: dir.clone().multiplyScalar(entry.offset)
+            pos: dir.clone().multiplyScalar(entry.offset),
+            material: entry.material
         }));
-    }, [sunDir, size]);
+    }, [sunDir, size, flareMaterial, hexFlareMaterial]);
 
     // Keep the light close enough for stable shadows, but aligned with the sun direction
     const lightDistance = 150000;
     const lightPosition = sunDir.clone().multiplyScalar(lightDistance);
+
+    const flareVisibility = sunIntensity; // Stronger when looking near the sun
 
     return (
         <>
@@ -149,18 +193,19 @@ export const Sun: React.FC<SunProps> = ({
                 <mesh ref={meshRef} name="SunMesh">
                     <sphereGeometry args={[dynamicSize, 32, 32]} />
                     {hdr ? <primitive object={limbMaterial} attach="material" /> : (
-                        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={50} toneMapped={false} />
+                        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={200} toneMapped={false} />
                     )}
                 </mesh>
 
-                {hdr && <sprite scale={[dynamicSize * 4, dynamicSize * 4, 1]}>
+                {/* Veiling glare halo to mimic camera washout near the sun */}
+                <sprite scale={[dynamicSize * (hdr ? 6 : 5), dynamicSize * (hdr ? 6 : 5), 1]}>
                     <primitive attach="material" object={haloMaterial} />
-                </sprite>}
+                </sprite>
 
-                {/* Simple lens flare sprites aligned toward the scene origin; gives sun streaks without a heavy post effect */}
+                {/* Lens flare sprites aligned toward the scene origin */}
                 {lensFlares && flareOffsets.map((entry, idx) => (
-                    <sprite key={idx} position={entry.pos} scale={[entry.scale, entry.scale, 1]}>
-                        <primitive attach="material" object={flareMaterial} />
+                    <sprite key={idx} position={entry.pos} scale={[entry.scale * (1 + flareVisibility), entry.scale * (1 + flareVisibility), 1]}>
+                        <primitive attach="material" object={entry.material} />
                     </sprite>
                 ))}
 

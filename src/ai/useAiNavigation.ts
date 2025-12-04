@@ -17,7 +17,10 @@ export const useAiNavigation = (layout: SeizewellLayout | null, spacing: number)
 
   useEffect(() => {
     if (!layout) {
-      setNavData({ graph: null, nodes: [], obstacles: [] });
+      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+      timerRef.current = window.setTimeout(() => {
+        setNavData({ graph: null, nodes: [], obstacles: [] });
+      }, 0);
       return;
     }
     let cancelled = false;

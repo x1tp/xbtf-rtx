@@ -22,6 +22,8 @@ import { SectorMap2D } from './components/SectorMap2D';
 import { OffScreenArrow } from './components/NavigationIndicator';
 import { SEIZEWELL_BLUEPRINT } from './config/seizewell';
 import { useGameStore } from './store/gameStore';
+import { PLUME_PRESETS } from './config/plumes';
+import { EnginePlume } from './components/EnginePlume';
 
 function App() {
   const sceneRef = useRef<ThreeScene | null>(null);
@@ -304,24 +306,34 @@ function Dimensions({ center, dims }: { center: [number, number, number]; dims: 
   );
 }
 function ShipEditorCanvas({ modelPath }: { modelPath?: string }) {
-  const key = 'ship:engineMarkers:' + (modelPath || '/models/00000.obj');
-  const rawInit = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
-  let initialMarkers: { x: number; y: number; z: number }[] = [];
-  if (rawInit) {
-    try {
-      const parsed = JSON.parse(rawInit) as { positions?: { x: number; y: number; z: number }[] };
-      initialMarkers = parsed.positions || [];
-    } catch { initialMarkers = []; }
-  }
-  const [markers, setMarkers] = useState<{ x: number; y: number; z: number }[]>(initialMarkers);
-  const [status, setStatus] = useState<string | null>(initialMarkers.length > 0 ? `Loaded ${initialMarkers.length} markers` : null);
+  const model = modelPath || '/models/00000.obj';
+  const plumeKey = 'ship:engineMarkers:' + model;
+  const cockpitKey = 'ship:cockpit:' + model;
+  const weaponKey = 'ship:weapons:' + model;
+
+  const loadList = (k: string) => {
+    try { return JSON.parse(localStorage.getItem(k) || '{}').positions || []; } catch { return []; }
+  };
+  const loadSingle = (k: string) => {
+    try { return JSON.parse(localStorage.getItem(k) || '{}').position || null; } catch { return null; }
+  };
+
+  const [plumes, setPlumes] = useState<{ x: number; y: number; z: number; type?: string }[]>(() => loadList(plumeKey));
+  const [cockpit, setCockpit] = useState<{ x: number; y: number; z: number } | null>(() => loadSingle(cockpitKey));
+  const [weapons, setWeapons] = useState<{ x: number; y: number; z: number }[]>(() => loadList(weaponKey));
+
+  const [mode, setMode] = useState<'plume' | 'cockpit' | 'weapon'>('plume');
+  const [selectedPlumeType, setSelectedPlumeType] = useState('standard');
+  const [status, setStatus] = useState<string | null>(null);
+
   const sceneRef = useRef<ThreeScene | null>(null);
   const cameraRef = useRef<PerspectiveCamera | null>(null);
   const arcballRef = useRef<ArcballControlsImpl | null>(null);
-  const markerRefs = useRef<Record<number, Object3D | null>>({});
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const markerRefs = useRef<Record<string, Object3D | null>>({});
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedObject, setSelectedObject] = useState<Object3D | null>(null);
   const isTransformingRef = useRef(false);
+
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
       if (e.button !== 2) return; // only right click adds markers
@@ -335,9 +347,12 @@ function ShipEditorCanvas({ modelPath }: { modelPath?: string }) {
       const y = -(e.clientY / window.innerHeight) * 2 + 1;
       const rc = new Raycaster();
       rc.setFromCamera(new Vector2(x, y), c);
+
+      // Check if we clicked an existing marker
       const markerObjects = Object.values(markerRefs.current).filter(Boolean) as Object3D[];
       const markerHits = markerObjects.length > 0 ? rc.intersectObjects(markerObjects, true) : [];
       if (markerHits.length > 0) return;
+
       const target = s.getObjectByName('ShipModelEditor');
       if (!target) return;
       const hits = rc.intersectObject(target, true);
@@ -345,11 +360,16 @@ function ShipEditorCanvas({ modelPath }: { modelPath?: string }) {
         const p = hits[0].point.clone();
         const parent = target.parent || s;
         parent.worldToLocal(p);
-        setMarkers((m) => {
-          const next = [...m, { x: p.x, y: p.y, z: p.z }];
-          setSelectedIndex(next.length - 1);
-          return next;
-        });
+        const pos = { x: p.x, y: p.y, z: p.z };
+
+        if (mode === 'plume') {
+          setPlumes(prev => [...prev, { ...pos, type: selectedPlumeType }]);
+        } else if (mode === 'cockpit') {
+          setCockpit(pos);
+          setSelectedId('cockpit');
+        } else if (mode === 'weapon') {
+          setWeapons(prev => [...prev, pos]);
+        }
       }
     };
     const preventContextMenu = (e: MouseEvent) => {
@@ -363,16 +383,32 @@ function ShipEditorCanvas({ modelPath }: { modelPath?: string }) {
       window.removeEventListener('mousedown', onDown);
       window.removeEventListener('contextmenu', preventContextMenu);
     };
-  }, []);
-  useEffect(() => {
-    void selectedIndex;
-    void markers.length;
-  }, [markers.length, selectedIndex]);
+  }, [mode]);
+
   useEffect(() => {
     if (!status) return;
     const t = setTimeout(() => setStatus(null), 2000);
     return () => clearTimeout(t);
   }, [status]);
+
+  const save = () => {
+    try {
+      localStorage.setItem(plumeKey, JSON.stringify({ positions: plumes }));
+      localStorage.setItem(cockpitKey, JSON.stringify({ position: cockpit }));
+      localStorage.setItem(weaponKey, JSON.stringify({ positions: weapons }));
+      setStatus('Saved all');
+    } catch { setStatus('Save failed'); }
+  };
+
+  const clear = () => {
+    if (mode === 'plume') setPlumes([]);
+    if (mode === 'cockpit') setCockpit(null);
+    if (mode === 'weapon') setWeapons([]);
+    setSelectedId(null);
+    setSelectedObject(null);
+    setStatus(`Cleared ${mode}`);
+  };
+
   return (
     <>
       <Canvas
@@ -389,28 +425,75 @@ function ShipEditorCanvas({ modelPath }: { modelPath?: string }) {
           <hemisphereLight args={["#bcdfff", "#223344", 0.2]} />
           <directionalLight position={[10, 12, 10]} intensity={1.4} color="#ffffff" castShadow />
           <ambientLight intensity={0.1} />
-          <ShipModel enableLights={false} editorMode name="ShipModelEditor" modelPath={modelPath} markerOverrides={markers} />
-          {markers.map((m, i) => (
+          <ShipModel
+            enableLights={false}
+            editorMode
+            name="ShipModelEditor"
+            modelPath={modelPath}
+            plumePositions={plumes}
+            cockpitPosition={cockpit || undefined}
+            weaponPositions={weapons}
+          />
+
+          {/* Plume Markers */}
+          {plumes.map((m, i) => {
+            const id = `plume-${i}`;
+            const isSel = selectedId === id;
+            return (
+              <group
+                key={id}
+                ref={(ref) => { markerRefs.current[id] = ref; }}
+                position={[m.x, m.y, m.z]}
+                onClick={(e) => { e.stopPropagation(); setSelectedId(id); setSelectedObject(markerRefs.current[id] || null); }}
+              >
+                <mesh>
+                  <sphereGeometry args={[0.25, 16, 16]} />
+                  <meshBasicMaterial color={isSel ? "#9bffb0" : "#76baff"} />
+                </mesh>
+                {isSel && (
+                  <mesh>
+                    <boxGeometry args={[1, 1, 1]} />
+                    <meshBasicMaterial color="#7bffb0" wireframe opacity={0.35} transparent />
+                  </mesh>
+                )}
+              </group>
+            );
+          })}
+
+          {/* Cockpit Marker */}
+          {cockpit && (
             <group
-              key={i}
-              ref={(ref) => { markerRefs.current[i] = ref; }}
-              position={[m.x, m.y, m.z]}
-              onClick={(e) => { e.stopPropagation(); setSelectedIndex(i); setSelectedObject(markerRefs.current[i] || null); }}
+              key="cockpit"
+              ref={(ref) => { markerRefs.current['cockpit'] = ref; }}
+              position={[cockpit.x, cockpit.y, cockpit.z]}
+              onClick={(e) => { e.stopPropagation(); setSelectedId('cockpit'); setSelectedObject(markerRefs.current['cockpit'] || null); }}
             >
               <mesh>
-                <sphereGeometry args={[0.25, 16, 16]} />
-                <meshBasicMaterial color={selectedIndex === i ? "#9bffb0" : "#76baff"} />
-              </mesh>
-              <mesh>
-                <boxGeometry args={[1, 1, 1]} />
-                <meshBasicMaterial color={selectedIndex === i ? "#7bffb0" : "#3fb6ff"} wireframe opacity={0.35} transparent />
-              </mesh>
-              <mesh onPointerDown={(e) => { e.stopPropagation(); setSelectedIndex(i); }}>
-                <boxGeometry args={[1.4, 1.4, 1.4]} />
-                <meshBasicMaterial transparent opacity={0.01} />
+                <boxGeometry args={[0.4, 0.4, 0.4]} />
+                <meshBasicMaterial color={selectedId === 'cockpit' ? "#ffff00" : "#00ff00"} />
               </mesh>
             </group>
-          ))}
+          )}
+
+          {/* Weapon Markers */}
+          {weapons.map((m, i) => {
+            const id = `weapon-${i}`;
+            const isSel = selectedId === id;
+            return (
+              <group
+                key={id}
+                ref={(ref) => { markerRefs.current[id] = ref; }}
+                position={[m.x, m.y, m.z]}
+                onClick={(e) => { e.stopPropagation(); setSelectedId(id); setSelectedObject(markerRefs.current[id] || null); }}
+              >
+                <mesh>
+                  <sphereGeometry args={[0.15, 16, 16]} />
+                  <meshBasicMaterial color={isSel ? "#ff9b9b" : "#ff0000"} />
+                </mesh>
+              </group>
+            );
+          })}
+
           {selectedObject && (
             <TransformControls
               object={selectedObject || undefined}
@@ -420,27 +503,84 @@ function ShipEditorCanvas({ modelPath }: { modelPath?: string }) {
               onMouseUp={() => { isTransformingRef.current = false; if (arcballRef.current) arcballRef.current.enabled = true; }}
               onObjectChange={() => {
                 const obj = selectedObject;
-                if (!obj) return;
+                if (!obj || !selectedId) return;
                 const { x, y, z } = obj.position;
-                setMarkers((m) => m.map((mm, idx) => (idx === selectedIndex ? { x, y, z } : mm)));
+
+                if (selectedId.startsWith('plume-')) {
+                  const idx = parseInt(selectedId.split('-')[1]);
+                  setPlumes(prev => prev.map((p, i) => i === idx ? { ...p, x, y, z } : p));
+                } else if (selectedId === 'cockpit') {
+                  setCockpit({ x, y, z });
+                } else if (selectedId.startsWith('weapon-')) {
+                  const idx = parseInt(selectedId.split('-')[1]);
+                  setWeapons(prev => prev.map((p, i) => i === idx ? { x, y, z } : p));
+                }
               }}
             />
           )}
           <ArcballControls ref={arcballRef} makeDefault enablePan enableZoom dampingFactor={0.08} minDistance={2} maxDistance={500} />
         </Suspense>
       </Canvas>
-      <div className="ship-editor-ui" style={{ position: 'absolute', top: 20, left: 20, display: 'flex', gap: '8px', fontFamily: 'monospace', alignItems: 'center', background: 'rgba(12,22,32,0.8)', padding: '8px 10px', borderRadius: 6, border: '1px solid #184b6a' }}>
-        <button onClick={() => { try { window.localStorage.setItem(key, JSON.stringify({ positions: markers })); setStatus(`Saved ${markers.length} markers`); } catch { setStatus('Save failed'); } }} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Save</button>
-        <button onClick={() => { setMarkers([]); setSelectedIndex(null); setSelectedObject(null); window.localStorage.removeItem(key); setStatus('Cleared'); }} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Clear</button>
-        <button onClick={() => { navigator.clipboard.writeText(JSON.stringify({ positions: markers })); }} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Copy JSON</button>
-        <span style={{ color: '#8ab6d6', fontSize: 13 }}>Right-click the hull to add markers. Left-click a marker to select and drag it.</span>
-        {status && <span style={{ marginLeft: 8, color: '#8ab6d6' }}>{status}</span>}
+      <div className="ship-editor-ui" style={{ position: 'absolute', top: 20, left: 20, display: 'flex', flexDirection: 'column', gap: 8, fontFamily: 'monospace', background: 'rgba(12,22,32,0.9)', padding: 12, borderRadius: 6, border: '1px solid #184b6a' }}>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => setMode('plume')} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: mode === 'plume' ? '#3fb6ff' : '#0f2230', color: mode === 'plume' ? '#001216' : '#c3e7ff' }}>Plumes</button>
+          <button onClick={() => setMode('cockpit')} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: mode === 'cockpit' ? '#3fb6ff' : '#0f2230', color: mode === 'cockpit' ? '#001216' : '#c3e7ff' }}>Cockpit</button>
+          <button onClick={() => setMode('weapon')} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: mode === 'weapon' ? '#3fb6ff' : '#0f2230', color: mode === 'weapon' ? '#001216' : '#c3e7ff' }}>Weapons</button>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={save} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Save All</button>
+          <button onClick={clear} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Clear {mode}</button>
+          <button onClick={() => { navigator.clipboard.writeText(JSON.stringify({ plumes, cockpit, weapons }, null, 2)); }} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Copy JSON</button>
+          <button onClick={() => {
+            const p = new URLSearchParams(window.location.search);
+            const page = p.get('page') || '0';
+            window.location.href = `/admin?tab=ships&page=${page}`;
+          }} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Back</button>
+        </div>
+        <span style={{ color: '#8ab6d6', fontSize: 13 }}>Right-click hull to add {mode}. Click marker to edit.</span>
+        {status && <span style={{ color: '#8ab6d6' }}>{status}</span>}
       </div>
+      {mode === 'plume' && (
+        <div style={{ position: 'absolute', top: 20, right: 20, width: 220, background: 'rgba(12,22,32,0.9)', padding: 12, borderRadius: 6, border: '1px solid #184b6a', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ color: '#c3e7ff', fontFamily: 'monospace', marginBottom: 4 }}>Plume Type</div>
+          {Object.keys(PLUME_PRESETS).map((type) => (
+            <div
+              key={type}
+              onClick={() => setSelectedPlumeType(type)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: 4,
+                cursor: 'pointer',
+                background: selectedPlumeType === type ? '#1a3b50' : 'transparent',
+                border: selectedPlumeType === type ? '1px solid #3fb6ff' : '1px solid transparent',
+                borderRadius: 4
+              }}
+            >
+              <div style={{ width: 40, height: 40, background: '#000', position: 'relative', overflow: 'hidden', borderRadius: 4 }}>
+                <Canvas camera={{ position: [0, 0, 5], fov: 45 }}>
+                  <ambientLight intensity={0.5} />
+                  <EnginePlume position={[0, -1, 0]} {...PLUME_PRESETS[type]} />
+                </Canvas>
+              </div>
+              <span style={{ color: '#c3e7ff', fontFamily: 'monospace', fontSize: 12 }}>{type}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </>
   );
 }
 function AdminHome() {
-  const [tab, setTab] = useState<'root' | 'ships'>('root');
+  const [tab, setTab] = useState<'root' | 'ships'>(() => {
+    const p = new URLSearchParams(window.location.search);
+    return (p.get('tab') as 'root' | 'ships') || 'root';
+  });
+  const [page, setPage] = useState(() => {
+    const p = new URLSearchParams(window.location.search);
+    return parseInt(p.get('page') || '0', 10);
+  });
   const [model, setModel] = useState('/models/00000.obj');
   if (tab === 'root') {
     return (
@@ -464,12 +604,20 @@ function AdminHome() {
           <input value={model} onChange={(e) => setModel(e.target.value)} placeholder="/models/00000.obj" style={{ flex: 1, padding: '6px 10px', background: '#0f2230', border: '1px solid #3fb6ff', color: '#c3e7ff' }} />
         </label>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => { window.location.href = `/admin/ship?model=${encodeURIComponent(model)}`; }} style={{ padding: '8px 12px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Open Editor</button>
+          <button onClick={() => { window.location.href = `/admin/ship?model=${encodeURIComponent(model)}&page=${page}`; }} style={{ padding: '8px 12px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Open Editor</button>
           <button onClick={() => setTab('root')} style={{ padding: '8px 12px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Back</button>
         </div>
         <div style={{ marginTop: 16, flex: 1, overflowY: 'auto', minHeight: 0 }}>
           <div style={{ marginBottom: 8, color: '#8ab6d6' }}>Select Model</div>
-          <ModelGrid onSelect={(path) => setModel(path)} currentModel={model} />
+          <ModelGrid
+            onSelect={(path) => {
+              setModel(path);
+              window.location.assign(`/admin/ship?model=${encodeURIComponent(path)}&page=${page}`);
+            }}
+            currentModel={model}
+            page={page}
+            onPageChange={setPage}
+          />
         </div>
       </div>
     </div>

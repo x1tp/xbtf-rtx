@@ -27,7 +27,9 @@ export interface SeizewellLayout {
 export const SEIZEWELL_BLUEPRINT: SeizewellLayout = {
     // Use a roughly Earth-sized planet (meters) but push it farther out so its
     // apparent size stays close to the previous view.
-    sun: { position: [12000, 8000, 6000], size: 900, color: '#ffdfc4', intensity: 8.0 },
+    // Push the sun to a near-realistic scale: ~1 AU from the origin along the original direction vector,
+    // with an actual solar radius so its apparent size matches reality.
+    sun: { position: [115_200_000_000, 76_800_000_000, 57_600_000_000], size: 696_340_000, color: '#ffdfc4', intensity: 14.0 },
     planet: { position: [-4534400, -1700400, -19838000], size: 6371000 },
     asteroids: { count: 520, range: 1400, center: [40, 40, -160] },
     playerStart: [0, 50, 900],

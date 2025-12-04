@@ -186,45 +186,45 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
 
         return () => {
             cancelled = true;
-        if (shipBodyRef.current) {
-            const w = getWorldSync();
-            if (w) {
-                w.removeRigidBody(shipBodyRef.current);
-            }
-            shipBodyRef.current = null;
-            shipColliderRef.current = null;
-            characterControllerRef.current = null;
+            if (shipBodyRef.current) {
+                const w = getWorldSync();
+                if (w) {
+                    w.removeRigidBody(shipBodyRef.current);
+                }
+                shipBodyRef.current = null;
+                shipColliderRef.current = null;
+                characterControllerRef.current = null;
             hullColliderRef.current = null;
-        }
-    };
-
-    function buildConvexHullCollider(RAPIER: unknown, world: RAPIERType.World): RAPIERType.Collider | null {
-        if (!shipRef.current || !shipBodyRef.current) return null;
-        shipRef.current.updateWorldMatrix(true, true);
-        const shipInv = new Matrix4().copy(shipRef.current.matrixWorld).invert();
-        const verts: number[] = [];
-        const v = new Vector3();
-        shipRef.current.traverse((o) => {
-            const m = o as Mesh;
-            const g = m.geometry as BufferGeometry | undefined;
-            if (!g || !g.attributes?.position) return;
-            const pos = g.getAttribute('position');
-            for (let i = 0; i < pos.count; i++) {
-                v.set(pos.getX(i), pos.getY(i), pos.getZ(i))
-                    .applyMatrix4(m.matrixWorld)
-                    .applyMatrix4(shipInv); // convert to ship-local space for collider
-                verts.push(v.x, v.y, v.z);
             }
-        });
-        if (verts.length < 9) return null;
-        const hullDescUnknown = (RAPIER as RapierExports).ColliderDesc.convexHull(new Float32Array(verts));
-        if (!hullDescUnknown) return null;
-        const hullDesc = hullDescUnknown as unknown as RAPIERType.ColliderDesc;
-        hullDesc.setFriction(0.6).setRestitution(0.2);
-        const hullCollider = world.createCollider(hullDesc, shipBodyRef.current);
-        hullColliderRef.current = hullCollider;
-        return hullCollider;
-    }
+        };
+
+        function buildConvexHullCollider(RAPIER: unknown, world: RAPIERType.World): RAPIERType.Collider | null {
+            if (!shipRef.current || !shipBodyRef.current) return null;
+            shipRef.current.updateWorldMatrix(true, true);
+            const shipInv = new Matrix4().copy(shipRef.current.matrixWorld).invert();
+            const verts: number[] = [];
+            const v = new Vector3();
+            shipRef.current.traverse((o) => {
+                const m = o as Mesh;
+                const g = m.geometry as BufferGeometry | undefined;
+                if (!g || !g.attributes?.position) return;
+                const pos = g.getAttribute('position');
+                for (let i = 0; i < pos.count; i++) {
+                    v.set(pos.getX(i), pos.getY(i), pos.getZ(i))
+                        .applyMatrix4(m.matrixWorld)
+                        .applyMatrix4(shipInv); // convert to ship-local space for collider
+                    verts.push(v.x, v.y, v.z);
+                }
+            });
+            if (verts.length < 9) return null;
+            const hullDescUnknown = (RAPIER as RapierExports).ColliderDesc.convexHull(new Float32Array(verts));
+            if (!hullDescUnknown) return null;
+            const hullDesc = hullDescUnknown as unknown as RAPIERType.ColliderDesc;
+            hullDesc.setFriction(0.6).setRestitution(0.2);
+            const hullCollider = world.createCollider(hullDesc, shipBodyRef.current);
+            hullColliderRef.current = hullCollider;
+            return hullCollider;
+        }
     }, [scene]);
 
     useFrame((state, rawDelta) => {
@@ -311,11 +311,11 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
         }
 
         // Input-driven throttle changes
-        if (keys.current['KeyW']) {
+        if (keys.current['KeyZ']) {
             if (timeScale > 1.0) setTimeScale(1.0);
             setThrottle(throttle + delta * 0.5);
             brakeRef.current = false;
-        } else if (keys.current['KeyS']) {
+        } else if (keys.current['KeyX']) {
             if (timeScale > 1.0) setTimeScale(1.0);
             setThrottle(throttle - delta * 0.5);
             brakeRef.current = false;
@@ -373,19 +373,32 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
         // Damp toward the desired forward/reverse speed
         velocity.z = MathUtils.damp(velocity.z, targetForwardSpeed, 2.5, delta);
 
-        const strafeInput = (keys.current['KeyD'] ? 1 : 0) - (keys.current['KeyA'] ? 1 : 0);
-        const maxStrafeSpeed = maxSpeed * 0.6;
-        const strafeTarget = strafeInput * maxStrafeSpeed;
+        const strafeXInput = (keys.current['KeyD'] ? 1 : 0) - (keys.current['KeyA'] ? 1 : 0);
+        const strafeYInput = (keys.current['KeyW'] ? 1 : 0) - (keys.current['KeyS'] ? 1 : 0);
 
-        if (strafeInput !== 0) {
-            velocity.x = MathUtils.damp(velocity.x, strafeTarget, 10, delta);
+        const maxStrafeSpeed = maxSpeed * 0.6;
+        const strafeXTarget = strafeXInput * maxStrafeSpeed;
+        const strafeYTarget = strafeYInput * maxStrafeSpeed;
+
+        if (strafeXInput !== 0) {
+            velocity.x = MathUtils.damp(velocity.x, strafeXTarget, 10, delta);
         } else {
             velocity.x = MathUtils.damp(velocity.x, 0, 4, delta); // counter-drift when no strafe input
         }
 
+        if (strafeYInput !== 0) {
+            velocity.y = MathUtils.damp(velocity.y, strafeYTarget, 10, delta);
+        } else {
+            velocity.y = MathUtils.damp(velocity.y, 0, 4, delta);
+        }
+
         const moveX = velocity.x * delta;
+        const moveY = velocity.y * delta;
         const moveZ = velocity.z * delta;
-        const move = new Vector3().copy(right).multiplyScalar(moveX).add(new Vector3().copy(forward).multiplyScalar(moveZ));
+        const move = new Vector3()
+            .copy(right).multiplyScalar(moveX)
+            .add(new Vector3().copy(up).multiplyScalar(moveY))
+            .add(new Vector3().copy(forward).multiplyScalar(moveZ));
         const origin = ship.position.clone();
         const dest = origin.clone().add(move);
 

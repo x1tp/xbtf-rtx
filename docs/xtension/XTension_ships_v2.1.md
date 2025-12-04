@@ -1,0 +1,643 @@
+# X-Tension v2.1 Ship Stats
+
+- Argon Discoverer
+  - Maximum speed at sale: 82 m/s
+  - Speed upgradeable to: 490 m/s
+  - Number of upgrade steps: 50
+  - Acceleration: 11 m/s²
+  - Maximum steering at sale: 25 %
+  - Steering upgradeable to: 150 %
+  - Power generator: 100 MW
+  - Cargobay at sale: 10 U
+  - Cargobay upgradeable to: 50 U
+  - Maximum lasers: 2 x G.I.R.E.
+  - Maximum missile: Dragonfly
+  - Maximum shields: 2 x 1 MW
+  - Price Model S: 36.885.-
+  - Price Model M: 47.321.-
+  - Price Model L: 55.409.-
+
+- Boron Octopus
+  - Maximum speed at sale: 270 m/s
+  - Speed upgradeable to: 541 m/s
+  - Number of upgrade steps: 10
+  - Acceleration: 184 m/s²
+  - Maximum steering at sale: 171 %
+  - Steering upgradeable to: 682 %
+  - Power generator: 100 MW
+  - Cargobay at sale: 5 U
+  - Cargobay upgradeable to: 5 U
+  - Maximum lasers: 3 x B.I.R.E.
+  - Maximum missile: Dragonfly
+  - Maximum shields: 1 x 1 MW
+  - Price Model S: 56.146.-
+  - Price Model M: 60.178.-
+  - Price Model L: 64.222.-
+
+- Paranid Pegasus
+  - Maximum speed at sale: 315 m/s
+  - Speed upgradeable to: 1261 m/s
+  - Number of upgrade steps: 30
+  - Acceleration: 226 m/s²
+  - Maximum steering at sale: 201 %
+  - Steering upgradeable to: 802 %
+  - Power generator: 100 MW
+  - Cargobay at sale: 2 U
+  - Cargobay upgradeable to: 5 U
+  - Maximum lasers: 1 x G.I.R.E.
+  - Maximum missile: Dragonfly
+  - Maximum shields: 1 x 1 MW
+  - Price Model S: 59.955.-
+  - Price Model M: 62.647.-
+  - Price Model L: 66.691.-
+
+- Pirate Mandalay
+  - Maximum speed (new ship): 131 m/s
+  - Speed upgradeable to: 260 m/s
+  - Number of upgrade steps: 10
+  - Acceleration: 27 m/s²
+  - Steering (new ship): 25 %
+  - Steering upgradeable to: 51 %
+  - Power generator: 20 MW
+  - Cargobay (new ship): 20 U
+  - Cargobay upgradeable to: 90 U
+  - Maximum lasers: 2 x G.I.R.E.
+  - Maximum missile: Dragonfly
+  - Maximum shields: 2 x 1 MW
+  - Selling price: ca. 33.000.-
+
+- Split Wolf
+  - Maximum speed at sale: 110 m/s
+  - Speed upgradeable to: 440 m/s
+  - Number of upgrade steps: 30
+  - Acceleration: 24 m/s²
+  - Maximum steering at sale: 35 %
+  - Steering upgradeable to: 140 %
+  - Power generator: 100 MW
+  - Cargobay at sale: 10 U
+  - Cargobay upgradeable to: 50 U
+  - Maximum lasers: 2 x G.I.R.E.
+  - Maximum missile: Dragonfly
+  - Maximum shields: 2 x 1 MW
+  - Price Model S: 32.960.-
+  - Price Model M: 43.396.-
+  - Price Model L: 51.484.-
+
+- Teladi Bat
+  - Maximum speed at sale: 85 m/s
+  - Speed upgradeable to: 340 m/s
+  - Number of upgrade steps: 30
+  - Acceleration: 18 m/s²
+  - Maximum steering at sale: 25 %
+  - Steering upgradeable to: 101 %
+  - Power generator: 100 MW
+  - Cargobay at sale: 10 U
+  - Cargobay upgradeable to: 50 U
+  - Maximum lasers: 2 x G.I.R.E.
+  - Maximum missile: Dragonfly
+  - Maximum shields: 2 x 1 MW
+  - Price Model S: 63.733.-
+  - Price Model M: 74.169.-
+  - Price Model L: 82.257.-
+
+- Xenon N
+  - Maximum speed (new ship): 93 m/s
+  - Speed upgradeable to: 371 m/s
+  - Number of upgrade steps: 30
+  - Acceleration: 16 m/s²
+  - Steering (new ship): 76 %
+  - Steering upgradeable to: 302 %
+  - Power generator: 100 MW
+  - Cargobay (new ship): 10 U
+  - Cargobay upgradeable to: 50 U
+  - Maximum lasers: 2 x G.I.R.E.
+  - Maximum missile: Dragonfly
+  - Maximum shields: 2 x 1 MW
+  - Selling price: ca. 23.800.-
+
+- Argon Buster
+  - Maximum speed at sale: 55 m/s
+  - Speed upgradeable to: 143 m/s
+  - Number of upgrade steps: 16
+  - Acceleration: 7 m/s²
+  - Maximum steering at sale: 15 %
+  - Steering upgradeable to: 60 %
+  - Power generator: 100 MW
+  - Cargobay at sale: 15 U
+  - Cargobay upgradeable to: 100 U
+  - Maximum lasers: 2 x G.P.A.C.
+  - Maximum missile: Silkworm
+  - Maximum shields: 2 x 5 MW
+  - Price Model S: 278.945.-
+  - Price Model M: 348.005.-
+  - Price Model L: 529.933.-
+
+- Boron Piranha
+  - Maximum speed at sale: 55 m/s
+  - Speed upgradeable to: 192 m/s
+  - Number of upgrade steps: 25
+  - Acceleration: 7 m/s²
+  - Maximum steering at sale: 50 %
+  - Steering upgradeable to: 200 %
+  - Power generator: 100 MW
+  - Cargobay at sale: 15 U
+  - Cargobay upgradeable to: 80 U
+  - Maximum lasers: 2 x G.P.A.C.
+  - Maximum missile: Silkworm
+  - Maximum shields: 2 x 5 MW
+  - Price Model S: 218.755.-
+  - Price Model M: 287.815.-
+  - Price Model L: 469.743.-
+
+- Paranid Poseidon
+  - Maximum speed at sale: 57 m/s
+  - Speed upgradeable to: 126 m/s
+  - Number of upgrade steps: 12
+  - Acceleration: 7 m/s²
+  - Maximum steering at sale: 50 %
+  - Steering upgradeable to: 200 %
+  - Power generator: 100 MW
+  - Cargobay at sale: 15 U
+  - Cargobay upgradeable to: 100 U
+  - Maximum lasers: 2 x G.P.A.C.
+  - Maximum missile: Silkworm
+  - Maximum shields: 2 x 5 MW
+  - Price Model S: 244.710.-
+  - Price Model M: 313.770.-
+  - Price Model L: 495.698.-
+
+- Pirate Bayamon
+  - Maximum speed (new ship): 104 m/s
+  - Speed upgradeable to: 206 m/s
+  - Number of upgrade steps: 10
+  - Acceleration: 8 m/s²
+  - Steering (new ship): 20 %
+  - Steering upgradeable to: 40 %
+  - Power generator: 20 MW
+  - Cargobay (new ship): 30 U
+  - Cargobay upgradeable to: 150 U
+  - Maximum lasers: 4 x A.P.A.C.
+  - Maximum missile: Wasp
+  - Maximum shields: 1 x 5 MW
+  - Selling price: ca. 128.000.-
+
+- Split Scorpion
+  - Maximum speed at sale: 30 m/s
+  - Speed upgradeable to: 75 m/s
+  - Number of upgrade steps: 15
+  - Acceleration: 7 m/s²
+  - Maximum steering at sale: 60 %
+  - Steering upgradeable to: 240 %
+  - Power generator: 100 MW
+  - Cargobay at sale: 15 U
+  - Cargobay upgradeable to: 100 U
+  - Maximum lasers: 2 x G.P.A.C.
+  - Maximum missile: Silkworm
+  - Maximum shields: 2 x 5 MW
+  - Price Model S: 187.806.-
+  - Price Model M: 256.866.-
+  - Price Model L: 438.794.-
+
+- Teladi Hawk
+  - Maximum speed at sale: 58 m/s
+  - Speed upgradeable to: 145 m/s
+  - Number of upgrade steps: 15
+  - Acceleration: 7 m/s²
+  - Maximum steering at sale: 20 %
+  - Steering upgradeable to: 80 %
+  - Power generator: 100 MW
+  - Cargobay at sale: 15 U
+  - Cargobay upgradeable to: 120 U
+  - Maximum lasers: 2 x G.P.A.C.
+  - Maximum missile: Silkworm
+  - Maximum shields: 2 x 5 MW
+  - Price Model S: 313.185.-
+  - Price Model M: 382.245.-
+  - Price Model L: 564.173.-
+
+- Xenon M
+  - Maximum speed (new ship): 65 m/s
+  - Speed upgradeable to: 142 m/s
+  - Number of upgrade steps: 12
+  - Acceleration: 7 m/s²
+  - Steering (new ship): 53 %
+  - Steering upgradeable to: 210 %
+  - Power generator: 100 MW
+  - Cargobay (new ship): 15 U
+  - Cargobay upgradeable to: 100 U
+  - Maximum lasers: 2 x G.P.A.C.
+  - Maximum missile: Silkworm
+  - Maximum shields: 2 x 5 MW
+  - Selling price: ca. 128.000.-
+
+- Argon Elite
+  - Maximum speed at sale: 70 m/s
+  - Speed upgradeable to: 125 m/s
+  - Number of upgrade steps: 8
+  - Acceleration: 7 m/s²
+  - Maximum steering at sale: 13 %
+  - Steering upgradeable to: 50 %
+  - Power generator: 100 MW
+  - Cargobay at sale: 20 U
+  - Cargobay upgradeable to: 200 U
+  - Maximum lasers: 2 x A.H.E.P.T.
+  - Maximum missile: Hornet
+  - Maximum shields: 2 x 25 MW
+  - Price Model S: 816.600.-
+  - Price Model M: 959.780.-
+  - Price Model L: 2.199.580.-
+
+- Xperimental
+  - Maximum speed: 90 m/s
+  - Speed upgradeable to: 306 m/s
+  - Number of upgrade steps: 24
+  - Acceleration: 9 m/s²
+  - Maximum steering: 15 %
+  - Steering upgradeable to: 60 %
+  - Power generator: 100 MW
+  - Cargobay: 30 U
+  - Cargobay upgradeable to: 100 U
+  - Maximum lasers: 2 x B.H.E.P.T.
+  - Maximum missile: Hornet
+  - Maximum shields: 2 x 25 MW
+
+- Boron Eel
+  - Maximum speed at sale: 68 m/s
+  - Speed upgradeable to: 123 m/s
+  - Number of upgrade steps: 8
+  - Acceleration: 7 m/s²
+  - Maximum steering at sale: 21 %
+  - Steering upgradeable to: 82 %
+  - Power generator: 100 MW
+  - Cargobay at sale: 20 U
+  - Cargobay upgradeable to: 200 U
+  - Maximum lasers: 2 x A.H.E.P.T.
+  - Maximum missile: Hornet
+  - Maximum shields: 2 x 25 MW
+  - Price Model S: 816.600.-
+  - Price Model M: 959.780.-
+  - Price Model L: 2.199.580.-
+
+- Paranid Prometheus
+  - Maximum speed at sale: 98 m/s
+  - Speed upgradeable to: 176 m/s
+  - Number of upgrade steps: 8
+  - Acceleration: 7 m/s²
+  - Maximum steering at sale: 21 %
+  - Steering upgradeable to: 82 %
+  - Power generator: 100 MW
+  - Cargobay at sale: 20 U
+  - Cargobay upgradeable to: 30 U
+  - Maximum lasers: 2 x A.H.E.P.T.
+  - Maximum missile: Hornet
+  - Maximum shields: 2 x 25 MW
+  - Price Model S: 946.448.-
+  - Price Model M: 1.089.628.-
+  - Price Model L: 2.329.428.-
+
+- Paranid Perseus
+  - Maximum speed (new ship): 98 m/s
+  - Speed upgradeable to: 245 m/s
+  - Number of upgrade steps: 15
+  - Acceleration: 7 m/s²
+  - Maximum steering (new ship): 21 %
+  - Steering upgradeable to: 82 %
+  - Power generator: 100 MW
+  - Cargobay at sale: 20 U
+  - Cargobay upgradeable to: 25 U
+  - Maximum lasers: 3 x A.H.E.P.T.
+  - Maximum missile: Silkworm
+  - Maximum shields: 3 x 25 MW
+  - Maximum shields (experimental): 2 x 125 MW
+
+- Pirate Orinoco
+  - Maximum speed (new ship): 72 m/s
+  - Speed upgradeable to: 93 m/s
+  - Number of upgrade steps: 3
+  - Acceleration: 7 m/s²
+  - Steering (new ship): 23 %
+  - Steering upgradeable to: 46 %
+  - Power generator: 100 MW
+  - Cargobay (new ship): 60 U
+  - Cargobay upgradeable to: 350 U
+  - Maximum lasers: 2 x G.P.A.C.
+  - Maximum missile: Dragonfly
+  - Maximum shields: 2 x 5 MW
+  - Selling price: 486.883.-
+
+- Split Mamba
+  - Maximum speed at sale: 115 m/s
+  - Speed upgradeable to: 286 m/s
+  - Number of upgrade steps: 15
+  - Acceleration: 11 m/s²
+  - Maximum steering at sale: 25 %
+  - Steering upgradeable to: 100 %
+  - Power generator: 100 MW
+  - Cargobay at sale: 20 U
+  - Cargobay upgradeable to: 200 U
+  - Maximum lasers: 2 x A.H.E.P.T.
+  - Maximum missile: Silkworm
+  - Maximum shields: 1 x 25 MW
+  - Price Model S: 1.206.140.-
+  - Price Model M: 1.288.680.-
+  - Price Model L: 2.029.864.-
+
+- Teladi Falcon
+  - Maximum speed at sale: 72 m/s
+  - Speed upgradeable to: 129 m/s
+  - Number of upgrade steps: 8
+  - Acceleration: 7 m/s²
+  - Maximum steering at sale: 23 %
+  - Steering upgradeable to: 92 %
+  - Power generator: 100 MW
+  - Cargobay at sale: 20 U
+  - Cargobay upgradeable to: 250 U
+  - Maximum lasers: 2 x A.H.E.P.T.
+  - Maximum missile: Hornet
+  - Maximum shields: 2 x 25 MW
+  - Price Model S: 1.076.296.-
+  - Price Model M: 1.219.476.-
+  - Price Model L: 2.459.276.-
+
+- Xenon L
+  - Maximum speed (new ship): 52 m/s
+  - Speed upgradeable to: 94 m/s
+  - Number of upgrade steps: 5
+  - Acceleration: 7 m/s²
+  - Steering (new ship): 46 %
+  - Steering upgradeable to: 182 %
+  - Power generator: 100 MW
+  - Cargobay (new ship): 20 U
+  - Cargobay upgradeable to: 200 U
+  - Maximum lasers: 2 x A.H.E.P.T.
+  - Maximum missile: Hornet
+  - Maximum shields: 2 x 25 MW
+  - Selling price: 486.883.-
+
+- Argon Mammoth
+  - Maximum speed at sale: 61 m/s
+  - Speed upgradeable to: 243 m/s
+  - Number of upgrade steps: 30
+  - Acceleration: 6 m/s²
+  - Maximum steering at sale: 0,7 %
+  - Steering upgradeable to: 1,9 %
+  - Power generator: 1.000 MW
+  - Cargobay at sale: 19.500 U
+  - Cargobay upgradeable to: 19.500 U
+  - Maximum lasers: none
+  - Maximum missile: Hornet
+  - Maximum shields: 5 x 125 MW
+  - Price: 45.446.720.-
+
+- Boron Orca
+  - Maximum speed at sale: 64 m/s
+  - Speed upgradeable to: 252 m/s
+  - Number of upgrade steps: 30
+  - Acceleration: 6 m/s²
+  - Maximum steering at sale: 0,6 %
+  - Steering upgradeable to: 1,6 %
+  - Power generator: 1.000 MW
+  - Cargobay at sale: 15.000 U
+  - Cargobay upgradeable to: 15.000 U
+  - Maximum lasers: none
+  - Maximum missile: Hornet
+  - Maximum shields: 5 x 125 MW
+  - Price: 25.969.552.-
+
+- Paranid Hercules
+  - Maximum speed at sale: 57 m/s
+  - Speed upgradeable to: 227 m/s
+  - Number of upgrade steps: 30
+  - Acceleration: 6 m/s²
+  - Maximum steering at sale: 0,6 %
+  - Steering upgradeable to: 1,6 %
+  - Power generator: 1.000 MW
+  - Cargobay at sale: 11.000 U
+  - Cargobay upgradeable to: 11.000 U
+  - Maximum lasers: none
+  - Maximum missile: Hornet
+  - Maximum shields: 5 x 125 MW
+  - Price: 16.230.972.-
+
+- Split Elephant
+  - Maximum speed at sale: 57 m/s
+  - Speed upgradeable to: 229 m/s
+  - Number of upgrade steps: 30
+  - Acceleration: 7 m/s²
+  - Maximum steering at sale: 0,3 %
+  - Steering upgradeable to: 1,3 %
+  - Power generator: 1.000 MW
+  - Cargobay at sale: 11.000 U
+  - Cargobay upgradeable to: 11.000 U
+  - Maximum lasers: none
+  - Maximum missile: Hornet
+  - Maximum shields: 5 x 125 MW
+  - Price: 19.477.164.-
+
+- Teladi Albatross
+  - Maximum speed at sale: 59 m/s
+  - Speed upgradeable to: 234 m/s
+  - Number of upgrade steps: 30
+  - Acceleration: 7 m/s²
+  - Maximum steering at sale: 0,7 %
+  - Steering upgradeable to: 1,9 %
+  - Power generator: 1.000 MW
+  - Cargobay at sale: 13.000 U
+  - Cargobay upgradeable to: 13.000 U
+  - Maximum lasers: none
+  - Maximum missile: Hornet
+  - Maximum shields: 5 x 125 MW
+  - Price: 32.461.944.-
+
+- Goner Ship
+  - Maximum speed (new ship): 55 m/s
+  - Speed upgradeable to: 216 m/s
+  - Number of upgrade steps: 30
+  - Acceleration: 3 m/s²
+  - Maximum steering (new ship): 15 %
+  - Steering upgradeable to: 30 %
+  - Power generator: 100 MW
+  - Cargobay (new ship): 150 U
+  - Cargobay upgradeable to: 400 U
+  - Maximum lasers: none
+  - Maximum missile: Dragonfly
+  - Maximum shields: 2 x 25 MW
+  - Selling price: 97.384.-
+
+- Argon Lifter
+  - Maximum speed at sale: 48 m/s
+  - Speed upgradeable to: 143 m/s
+  - Number of upgrade steps: 20
+  - Acceleration: 3 m/s²
+  - Maximum steering at sale: 5 %
+  - Steering upgradeable to: 14 %
+  - Power generator: 100 MW
+  - Cargobay at sale: 500 U
+  - Cargobay upgradeable to: 1500 U
+  - Maximum lasers: none
+  - Maximum missile: none
+  - Maximum shields: 2 x 25 MW
+  - Price Model S: 103.939.-
+  - Price Model M: 220.167.-
+  - Price Model L: 1.217.399.-
+
+- Boron Dolphin
+  - Maximum speed at sale: 47 m/s
+  - Speed upgradeable to: 70 m/s
+  - Number of upgrade steps: 5
+  - Acceleration: 3 m/s²
+  - Maximum steering at sale: 2 %
+  - Steering upgradeable to: 3 %
+  - Power generator: 100 MW
+  - Cargobay at sale: 800 U
+  - Cargobay upgradeable to: 3000 U
+  - Maximum lasers: none
+  - Maximum missile: none
+  - Maximum shields: 2 x 25 MW
+  - Price Model S: 165.877.-
+  - Price Model M: 282.105.-
+  - Price Model L: 1.279.337.-
+
+- Paranid Ganymede
+  - Maximum speed at sale: 49 m/s
+  - Speed upgradeable to: 97 m/s
+  - Number of upgrade steps: 10
+  - Acceleration: 3 m/s²
+  - Maximum steering at sale: 5 %
+  - Steering upgradeable to: 14 %
+  - Power generator: 100 MW
+  - Cargobay at sale: 600 U
+  - Cargobay upgradeable to: 1400 U
+  - Maximum lasers: none
+  - Maximum missile: none
+  - Maximum shields: 2 x 25 MW
+  - Price Model S: 103.939.-
+  - Price Model M: 220.167.-
+  - Price Model L: 1.217.399.-
+
+- Split Mule
+  - Maximum speed at sale: 49 m/s
+  - Speed upgradeable to: 97 m/s
+  - Number of upgrade steps: 10
+  - Acceleration: 3 m/s²
+  - Maximum steering at sale: 4 %
+  - Steering upgradeable to: 8 %
+  - Power generator: 100 MW
+  - Cargobay at sale: 800 U
+  - Cargobay upgradeable to: 1200 U
+  - Maximum lasers: none
+  - Maximum missile: none
+  - Maximum shields: 2 x 25 MW
+  - Price Model S: 97.006.-
+  - Price Model M: 213.234.-
+  - Price Model L: 1.210.466.-
+
+- Teladi Vulture
+  - Maximum speed at sale: 50 m/s
+  - Speed upgradeable to: 84 m/s
+  - Number of upgrade steps: 7
+  - Acceleration: 3 m/s²
+  - Maximum steering at sale: 1,5 %
+  - Steering upgradeable to: 3 %
+  - Power generator: 100 MW
+  - Cargobay at sale: 400 U
+  - Cargobay upgradeable to: 1600 U
+  - Maximum lasers: none
+  - Maximum missile: none
+  - Maximum shields: 2 x 25 MW
+  - Price Model S: 118.074.-
+  - Price Model M: 234.302.-
+  - Price Model L: 1.231.534.-
+
+- Pirate Freighter
+  - Maximum speed at sale: 58 m/s
+  - Speed upgradeable to: 58 m/s
+  - Number of upgrade steps: 0
+  - Acceleration: 3 m/s²
+  - Steering at sale: 6 %
+  - Steering upgradeable to: 12 %
+  - Power generator: 100 MW
+  - Cargobay at sale: 150 U
+  - Cargobay upgradeable to: 150 U
+  - Maximum lasers: 1 x G.H.E.P.T.
+  - Maximum missile: Silkworm
+  - Maximum shields: 1 x 5 MW
+  - Price Model S: 313.185.-
+  - Price Model M: 395.725.-
+  - Price Model L: 902.201.-
+
+- Pirate Ship (Lifter)
+  - Maximum speed (new ship): 56 m/s
+  - Speed upgradeable to: 56 m/s
+  - Number of upgrade steps: 0
+  - Acceleration: 3 m/s²
+  - Steering (new ship): 2,5 %
+  - Steering upgradeable to: 5 %
+  - Power generator: 100 MW
+  - Cargobay (new ship): 150 U
+  - Cargobay upgradeable to: 150 U
+  - Maximum lasers: 1 x A.H.E.P.T.
+  - Maximum missile: Hornet
+  - Maximum shields: 1 x 25 MW
+  - Price: 97.384.-
+
+- Pirate Ship (Dolphin)
+  - Maximum speed (new ship): 55 m/s
+  - Speed upgradeable to: 55 m/s
+  - Number of upgrade steps: 0
+  - Acceleration: 3 m/s²
+  - Steering (new ship): 2,5 %
+  - Steering upgradeable to: 5 %
+  - Power generator: 100 MW
+  - Cargobay (new ship): 200 U
+  - Cargobay upgradeable to: 200 U
+  - Maximum lasers: 1 x B.P.A.C.
+  - Maximum missile: Hornet
+  - Maximum shields: 1 x 25 MW
+  - Price: 97.384.-
+
+- Pirate Ship (Ganymede)
+  - Maximum speed (new ship): 57 m/s
+  - Speed upgradeable to: 57 m/s
+  - Number of upgrade steps: 0
+  - Acceleration: 3 m/s²
+  - Steering (new ship): 5 %
+  - Steering upgradeable to: 10 %
+  - Power generator: 100 MW
+  - Cargobay (new ship): 350 U
+  - Cargobay upgradeable to: 350 U
+  - Maximum lasers: 1 x B.P.A.C.
+  - Maximum missile: Hornet
+  - Maximum shields: 1 x 25 MW
+  - Price: 97.384.-
+
+- Pirate Ship (Mule)
+  - Maximum speed (new ship): 57 m/s
+  - Speed upgradeable to: 57 m/s
+  - Number of upgrade steps: 0
+  - Acceleration: 3 m/s²
+  - Steering (new ship): 5 %
+  - Steering upgradeable to: 10 %
+  - Power generator: 100 MW
+  - Cargobay (new ship): 300 U
+  - Cargobay upgradeable to: 300 U
+  - Maximum lasers: 1 x B.P.A.C.
+  - Maximum missile: Hornet
+  - Maximum shields: 1 x 25 MW
+  - Price: 97.384.-
+
+- Pirate Ship (Vulture)
+  - Maximum speed (new ship): 55 m/s
+  - Speed upgradeable to: 55 m/s
+  - Number of upgrade steps: 0
+  - Acceleration: 3 m/s²
+  - Steering (new ship): 4,5 %
+  - Steering upgradeable to: 9 %
+  - Power generator: 100 MW
+  - Cargobay (new ship): 200 U
+  - Cargobay upgradeable to: 200 U
+  - Maximum lasers: 1 x A.P.A.C.
+  - Maximum missile: Hornet
+  - Maximum shields: 1 x 25 MW
+  - Price: 97.384.-
+

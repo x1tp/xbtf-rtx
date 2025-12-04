@@ -14,11 +14,12 @@ interface AIShipProps {
   navGraph: NavGraph | null;
   obstacles: NavObstacle[];
   maxSpeed?: number;
+  size?: number;
 }
 
 const tmpVec = new Vector3();
 
-export const AIShip: FC<AIShipProps> = ({ name, modelPath, position, navGraph, obstacles, maxSpeed }) => {
+export const AIShip: FC<AIShipProps> = ({ name, modelPath, position, navGraph, obstacles, maxSpeed, size = 24 }) => {
   const shipRef = useRef<Group | null>(null);
   const velocityRef = useRef(new Vector3());
   const pathRef = useRef<Vector3[]>([]);
@@ -29,7 +30,13 @@ export const AIShip: FC<AIShipProps> = ({ name, modelPath, position, navGraph, o
   const timeScale = useGameStore((s) => s.timeScale);
 
   const cruiseSpeed = useMemo(() => maxSpeed ?? MathUtils.randFloat(26, 46), [maxSpeed]);
-  const turnRate = useMemo(() => MathUtils.randFloat(3.5, 5.5), []);
+
+  // Inertia calculations based on size
+  // Larger size -> smaller k -> slower response (more inertia)
+  // Base size 24 (fighter) -> k ~ 3.0
+  const inertiaFactor = useMemo(() => Math.max(0.2, 24 / size), [size]);
+  const velocityDampingK = 3.0 * inertiaFactor;
+  const rotationDampingK = 4.0 * inertiaFactor;
 
   // Store the initial spawn position in a ref so it only applies once
   const initialPositionRef = useRef<[number, number, number] | null>(null);
@@ -111,7 +118,9 @@ export const AIShip: FC<AIShipProps> = ({ name, modelPath, position, navGraph, o
 
     const desiredVel = desiredDir.multiplyScalar(cruiseSpeed);
     const vel = velocityRef.current;
-    const damping = 1 - Math.exp(-3 * delta);
+
+    // Apply inertia
+    const damping = 1 - Math.exp(-velocityDampingK * delta);
     vel.lerp(desiredVel, damping);
     ship.position.add(vel.clone().multiplyScalar(delta));
 
@@ -159,7 +168,7 @@ export const AIShip: FC<AIShipProps> = ({ name, modelPath, position, navGraph, o
     const forward = new Vector3(0, 0, -1);
     const moveDir = vel.lengthSq() > 1e-4 ? vel.clone().normalize() : desiredDir;
     const targetQuat = new Quaternion().setFromUnitVectors(forward, moveDir);
-    ship.quaternion.slerp(targetQuat, 1 - Math.exp(-turnRate * delta));
+    ship.quaternion.slerp(targetQuat, 1 - Math.exp(-rotationDampingK * delta));
   });
 
   return (

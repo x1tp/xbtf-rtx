@@ -5,11 +5,12 @@ import { ModelCard } from './ModelCard';
 interface ModelGridProps {
     onSelect: (modelPath: string) => void;
     currentModel?: string;
+    page: number;
+    onPageChange: (page: number) => void;
 }
 
-export function ModelGrid({ onSelect, currentModel }: ModelGridProps) {
+export function ModelGrid({ onSelect, currentModel, page, onPageChange }: ModelGridProps) {
     const [models, setModels] = useState<string[]>([]);
-    const [page, setPage] = useState(0);
     const [loading, setLoading] = useState(true);
     const pageSize = 12;
 
@@ -55,7 +56,7 @@ export function ModelGrid({ onSelect, currentModel }: ModelGridProps) {
             {totalPages > 1 && (
                 <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 8, alignItems: 'center' }}>
                     <button
-                        onClick={() => setPage(p => Math.max(0, p - 1))}
+                        onClick={() => onPageChange(Math.max(0, page - 1))}
                         disabled={page === 0}
                         style={{
                             padding: '6px 12px',
@@ -73,7 +74,7 @@ export function ModelGrid({ onSelect, currentModel }: ModelGridProps) {
                         Page {page + 1} of {totalPages}
                     </span>
                     <button
-                        onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                        onClick={() => onPageChange(Math.min(totalPages - 1, page + 1))}
                         disabled={page === totalPages - 1}
                         style={{
                             padding: '6px 12px',
