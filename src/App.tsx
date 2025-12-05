@@ -1,4 +1,5 @@
 import { Suspense, useRef, useState, useEffect } from 'react';
+import { persist } from './services/persist';
 import { Canvas, useThree } from '@react-three/fiber';
 import { Scene } from './Scene';
 import { ArcballControls, Grid, GizmoHelper, GizmoViewport, Text, OrthographicCamera, PerspectiveCamera as DreiPerspectiveCamera, Line, Environment, TransformControls, useProgress } from '@react-three/drei';
@@ -79,6 +80,7 @@ function App() {
   const currentSectorId = useGameStore((s) => s.currentSectorId);
 
   useEffect(() => {
+    persist.init();
     const layout = getSectorLayoutById(currentSectorId || 'seizewell');
     const spacing = 30;
     const place = (p: [number, number, number]): [number, number, number] => [p[0] * spacing, p[1] * spacing, p[2] * spacing];
@@ -369,20 +371,26 @@ function Dimensions({ center, dims }: { center: [number, number, number]; dims: 
 }
 function ShipEditorCanvas({ modelPath }: { modelPath?: string }) {
   const model = modelPath || '/models/00000.obj';
-  const plumeKey = 'ship:engineMarkers:' + model;
-  const cockpitKey = 'ship:cockpit:' + model;
-  const weaponKey = 'ship:weapons:' + model;
+  /* Unused keys removed */
+  // const plumeKey = 'ship:engineMarkers:' + model;
+  // const cockpitKey = 'ship:cockpit:' + model;
+  // const weaponKey = 'ship:weapons:' + model;
+  // const loadList = (k: string) => { ... }
+  // const loadSingle = (k: string) => { ... }
 
-  const loadList = (k: string) => {
-    try { return JSON.parse(localStorage.getItem(k) || '{}').positions || []; } catch { return []; }
-  };
-  const loadSingle = (k: string) => {
-    try { return JSON.parse(localStorage.getItem(k) || '{}').position || null; } catch { return null; }
-  };
+  /* Initial state load is fine, but we need to update if init() finishes late */
+  const [plumes, setPlumes] = useState<{ x: number; y: number; z: number; type?: string }[]>(() => persist.getPlumes(model));
+  const [cockpit, setCockpit] = useState<{ x: number; y: number; z: number } | null>(() => persist.getCockpit(model));
+  const [weapons, setWeapons] = useState<{ x: number; y: number; z: number }[]>(() => persist.getWeapons(model));
 
-  const [plumes, setPlumes] = useState<{ x: number; y: number; z: number; type?: string }[]>(() => loadList(plumeKey));
-  const [cockpit, setCockpit] = useState<{ x: number; y: number; z: number } | null>(() => loadSingle(cockpitKey));
-  const [weapons, setWeapons] = useState<{ x: number; y: number; z: number }[]>(() => loadList(weaponKey));
+  useEffect(() => {
+    const update = () => {
+      setPlumes(persist.getPlumes(model));
+      setCockpit(persist.getCockpit(model));
+      setWeapons(persist.getWeapons(model));
+    };
+    return persist.subscribe(update);
+  }, [model]);
 
   const [mode, setMode] = useState<'plume' | 'cockpit' | 'weapon'>('plume');
   const [selectedPlumeType, setSelectedPlumeType] = useState('standard');
@@ -472,11 +480,11 @@ function ShipEditorCanvas({ modelPath }: { modelPath?: string }) {
     return () => clearTimeout(t);
   }, [status]);
 
-  const save = () => {
+  const save = async () => {
     try {
-      localStorage.setItem(plumeKey, JSON.stringify({ positions: plumes }));
-      localStorage.setItem(cockpitKey, JSON.stringify({ position: cockpit }));
-      localStorage.setItem(weaponKey, JSON.stringify({ positions: weapons }));
+      await persist.setPlumes(model, plumes);
+      await persist.setCockpit(model, cockpit);
+      await persist.setWeapons(model, weapons);
       setStatus('Saved all');
     } catch { setStatus('Save failed'); }
   };

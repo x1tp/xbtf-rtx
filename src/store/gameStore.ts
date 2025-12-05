@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { SHIP_STATS } from '../config/ships';
 
 export interface NavTarget {
   name: string;
@@ -70,7 +71,7 @@ interface GameState {
 
 export const useGameStore = create<GameState>((set) => ({
   speed: 0,
-  maxSpeed: 50, // m/s
+  maxSpeed: SHIP_STATS['player'].maxSpeed, // m/s
   throttle: 0,
   rotation: { x: 0, y: 0, z: 0 },
   position: { x: 0, y: 0, z: 0 },

@@ -343,7 +343,6 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
                                 position={s.placedPosition}
                                 navGraph={navData.graph}
                                 obstacles={navData.obstacles}
-                                maxSpeed={(s.scale ?? 24) * 1.2}
                                 size={s.scale ?? 24}
                             />
                         ))}

@@ -6,6 +6,7 @@ import { ShipModel } from './ShipModel';
 import { findPath } from '../ai/navigation';
 import type { NavGraph, NavObstacle } from '../ai/navigation';
 import { useGameStore } from '../store/gameStore';
+import { getShipStats } from '../config/ships';
 
 interface AIShipProps {
   name: string;
@@ -29,14 +30,35 @@ export const AIShip: FC<AIShipProps> = ({ name, modelPath, position, navGraph, o
   const lastProgressSampleRef = useRef({ time: 0, pos: new Vector3(), stuckTime: 0 });
   const timeScale = useGameStore((s) => s.timeScale);
 
-  const cruiseSpeed = useMemo(() => maxSpeed ?? MathUtils.randFloat(26, 46), [maxSpeed]);
+  const stats = useMemo(() => getShipStats(modelPath || name), [modelPath, name]);
 
-  // Inertia calculations based on size
-  // Larger size -> smaller k -> slower response (more inertia)
-  // Base size 24 (fighter) -> k ~ 3.0
-  const inertiaFactor = useMemo(() => Math.max(0.2, 24 / size), [size]);
-  const velocityDampingK = 3.0 * inertiaFactor;
-  const rotationDampingK = 4.0 * inertiaFactor;
+  const cruiseSpeed = useMemo(() => {
+    if (maxSpeed) return maxSpeed;
+    // Add small variance to avoid artificial sync
+    return stats.maxSpeed * MathUtils.randFloat(0.9, 1.1);
+  }, [maxSpeed, stats]);
+
+  // Inertia calculations based on stats if available, otherwise fallback to size
+  const velocityDampingK = useMemo(() => {
+    if (stats.acceleration && stats.maxSpeed) {
+      // Time to reach max speed approx maxSpeed / acceleration
+      // dampening k approx 3 / time_to_reach
+      // Multiplier 2.0 to make it slightly snappier than pure physics
+      return 2.0 * (3.0 * stats.acceleration / stats.maxSpeed);
+    }
+    const inertiaFactor = Math.max(0.2, 24 / size);
+    return 3.0 * inertiaFactor;
+  }, [stats, size]);
+
+  const rotationDampingK = useMemo(() => {
+    if (stats.turnRate) {
+      // Base turn rate 1.0 -> k=4.0
+      // Multiplier 2.0 for responsiveness
+      return 2.0 * 4.0 * stats.turnRate;
+    }
+    const inertiaFactor = Math.max(0.2, 24 / size);
+    return 4.0 * inertiaFactor;
+  }, [stats, size]);
 
   // Store the initial spawn position in a ref so it only applies once
   const initialPositionRef = useRef<[number, number, number] | null>(null);

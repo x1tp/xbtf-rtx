@@ -40,7 +40,7 @@ Kd 0 0 0
 Ks 1 1 1
 Ke 0 0 0
 Ns 45
-d 0
+d 0.6
 
 newmtl mat_5
 Ka 0 0 0

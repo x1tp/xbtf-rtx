@@ -11,6 +11,7 @@ import { getAllPresets } from '../config/plumes';
 interface ShipModelProps {
     enableLights?: boolean;
     editorMode?: boolean;
+    disableTextures?: boolean;
     name?: string;
     modelPath?: string;
     markerOverrides?: { x: number; y: number; z: number; type?: string }[];
@@ -20,7 +21,7 @@ interface ShipModelProps {
     throttle?: number;
 }
 
-export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'ShipModel', modelPath, editorMode = false, markerOverrides, plumePositions, cockpitPosition, weaponPositions, throttle }) => {
+export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'ShipModel', modelPath, editorMode = false, disableTextures = false, markerOverrides, plumePositions, cockpitPosition, weaponPositions, throttle }) => {
     const objPath = modelPath || '/models/00000.obj';
     const mtlPath = objPath.endsWith('.obj') ? objPath.replace('.obj', '.mtl') : '/models/00000.mtl';
     // Most converted BOD models need flipY disabled to display textures correctly
@@ -31,8 +32,10 @@ export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'Shi
         loader.setCrossOrigin('anonymous');
     });
     const obj = useLoader(OBJLoader, objPath, (loader) => {
-        materials.preload();
-        loader.setMaterials(materials);
+        if (!disableTextures) {
+            materials.preload();
+            loader.setMaterials(materials);
+        }
     });
     useEffect(() => {
         obj.traverse((child) => {
@@ -79,34 +82,38 @@ export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'Shi
             };
             apply();
         };
-        materials.preload();
 
-        // Apply texture settings to all materials
-        Object.values(materials.materials).forEach((mat) => {
-            const m = mat as unknown as { map?: Texture | null; bumpMap?: Texture | null; normalMap?: Texture | null; emissiveMap?: Texture | null; side?: number };
-            // Enable double-sided rendering to match Blender's default behavior
-            m.side = DoubleSide;
+        if (!disableTextures) {
+            materials.preload();
 
-            // Apply settings to diffuse/albedo map
-            applyTextureSettings(m.map, true);
+            // Apply texture settings to all materials
+            Object.values(materials.materials).forEach((mat) => {
+                const m = mat as unknown as { map?: Texture | null; bumpMap?: Texture | null; normalMap?: Texture | null; emissiveMap?: Texture | null; side?: number };
+                // Enable double-sided rendering to match Blender's default behavior
+                m.side = DoubleSide;
 
-            // Apply settings to emissive map
-            applyTextureSettings(m.emissiveMap, true);
+                // Apply settings to diffuse/albedo map
+                applyTextureSettings(m.map, true);
 
-            // Convert bump map to normal map if no normal map exists
-            if (m.bumpMap && !m.normalMap) {
-                m.normalMap = m.bumpMap;
-                m.bumpMap = null;
-            }
+                // Apply settings to emissive map
+                applyTextureSettings(m.emissiveMap, true);
 
-            // Apply settings to normal map
-            applyTextureSettings(m.normalMap, false);
+                // Convert bump map to normal map if no normal map exists
+                if (m.bumpMap && !m.normalMap) {
+                    m.normalMap = m.bumpMap;
+                    m.bumpMap = null;
+                }
 
-            // Ensure ship writes to depth buffer so it occludes plumes
-            (m as Material).depthWrite = true;
-        });
-    }, [gl, materials, objPath, needsFlipYFix]);
+                // Apply settings to normal map
+                applyTextureSettings(m.normalMap, false);
+
+                // Ensure ship writes to depth buffer so it occludes plumes
+                (m as Material).depthWrite = true;
+            });
+        }
+    }, [gl, materials, objPath, needsFlipYFix, disableTextures]);
     useEffect(() => {
+        if (disableTextures) return;
         const run = async () => {
             const maxAniso = gl?.capabilities?.getMaxAnisotropy?.() ?? 4;
             const tloader = new TextureLoader();
@@ -210,7 +217,7 @@ export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'Shi
             });
         };
         void run();
-    }, [gl, materials, mtlPath, obj]);
+    }, [gl, materials, mtlPath, obj, disableTextures]);
     const initialMarkers = useMemo(() => {
         const rawInit = typeof window !== 'undefined' ? window.localStorage.getItem('ship:engineMarkers:' + objPath) : null;
         if (rawInit) {

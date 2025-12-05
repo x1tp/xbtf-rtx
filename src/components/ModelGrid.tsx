@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from 'react';
-import { ModelCard } from './ModelCard';
+import { ModelCard, CATEGORIES } from './ModelCard';
+import { persist } from '../services/persist';
 
 interface ModelGridProps {
     onSelect: (modelPath: string) => void;
@@ -12,6 +13,9 @@ interface ModelGridProps {
 export function ModelGrid({ onSelect, currentModel, page, onPageChange }: ModelGridProps) {
     const [models, setModels] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
+    const [filterCategory, setFilterCategory] = useState<string>('');
+    const [updateTrigger, setUpdateTrigger] = useState(0); // Force re-render on persist update
+
     const pageSize = 12;
 
     useEffect(() => {
@@ -27,16 +31,50 @@ export function ModelGrid({ onSelect, currentModel, page, onPageChange }: ModelG
             });
     }, []);
 
+    useEffect(() => {
+        return persist.subscribe(() => {
+            setUpdateTrigger(prev => prev + 1);
+        });
+    }, []);
+
     if (loading) {
         return <div style={{ color: '#8ab6d6', padding: 20 }}>Loading models...</div>;
     }
 
-    const totalPages = Math.ceil(models.length / pageSize);
+    const filteredModels = filterCategory
+        ? models.filter(path => (persist.getCategory(path) || 'Uncategorized') === filterCategory)
+        : models;
+
+    const totalPages = Math.ceil(filteredModels.length / pageSize);
     const start = page * pageSize;
-    const visibleModels = models.slice(start, start + pageSize);
+    const visibleModels = filteredModels.slice(start, start + pageSize);
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8 }}>
+                <span style={{ color: '#8ab6d6' }}>Filter by Category:</span>
+                <select
+                    value={filterCategory}
+                    onChange={(e) => {
+                        setFilterCategory(e.target.value);
+                        onPageChange(0); // Reset to first page on filter change
+                    }}
+                    style={{
+                        background: '#0f2230',
+                        border: '1px solid #3fb6ff',
+                        color: '#c3e7ff',
+                        padding: '6px 12px',
+                        borderRadius: 4
+                    }}
+                >
+                    <option value="">All Categories</option>
+                    <option value="Uncategorized">Uncategorized</option>
+                    {CATEGORIES.map(c => (
+                        <option key={c} value={c}>{c}</option>
+                    ))}
+                </select>
+            </div>
+
             <div style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',

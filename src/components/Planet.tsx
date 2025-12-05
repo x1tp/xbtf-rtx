@@ -144,13 +144,15 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, co
                 );
                 
                 // Detailed ridged mountains
-                float mountain = ridgedFbm(vRawPos * uScale + warp * 0.5, 8, 0.5, 2.0);
+                // Reduced octaves from 8 to 6 for perf
+                float mountain = ridgedFbm(vRawPos * uScale + warp * 0.5, 6, 0.5, 2.0);
                 
                 // Combine
                 float h = baseShape * 0.5 + mountain * 0.5;
                 
                 // Continents mask
-                float coastNoise = fbm(vRawPos * 30.0, 4, 0.5, 2.0);
+                // Reduced octaves from 4 to 2
+                float coastNoise = fbm(vRawPos * 30.0, 2, 0.5, 2.0);
                 float continents = smoothstep(-0.2, 0.2, baseShape + coastNoise * 0.1);
                 
                 // Final height
@@ -177,10 +179,11 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, co
                 vec3 col = uColorDeepOcean;
                 if (h_frag < 0.05) {
                     col = mix(uColorDeepOcean, uColorShallowOcean, smoothstep(-0.05, 0.05, h_frag));
-                } else if (h_frag < 0.08) {
-                    col = mix(uColorShallowOcean, uColorBeach, smoothstep(0.05, 0.08, h_frag));
+                } else if (h_frag < 0.1) {
+                    // Widened transition from 0.08 to 0.1 for smoother look
+                    col = mix(uColorShallowOcean, uColorBeach, smoothstep(0.05, 0.1, h_frag));
                 } else if (h_frag < 0.25) {
-                    col = mix(uColorBeach, uColorGrass, smoothstep(0.08, 0.25, h_frag));
+                    col = mix(uColorBeach, uColorGrass, smoothstep(0.1, 0.25, h_frag));
                 } else if (h_frag < 0.5) {
                     col = mix(uColorGrass, uColorForest, smoothstep(0.25, 0.5, h_frag));
                 } else if (h_frag < 0.8) {
@@ -191,28 +194,33 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, co
                 
                 // Land Detail (Grit)
                 if (h_frag >= 0.05) {
-                    float landDetail = fbm(vRawPos * 80.0, 4, 0.5, 2.0);
+                    // Reduced octaves from 4 to 2
+                    float landDetail = fbm(vRawPos * 80.0, 2, 0.5, 2.0);
                     col *= mix(0.9, 1.1, landDetail);
                 }
-                
-                // City Lights (Night Side)
-                // Generate city mask with clumping
-                float regionNoise = fbm(vRawPos * 20.0, 2, 0.5, 2.0); // Macro distribution
-                float streetNoise = fbm(vRawPos * 200.0, 4, 0.5, 2.0); // Micro details
-                
-                // Only show streets where regions are dense
-                float cityMask = smoothstep(0.5, 0.8, regionNoise) * smoothstep(0.4, 0.6, streetNoise);
-                // Mask by height (only on land, avoid high mountains/snow)
-                cityMask *= smoothstep(0.05, 0.06, h_frag) * (1.0 - smoothstep(0.8, 0.9, h_frag));
                 
                 // Day/Night cycle
                 vec3 sunDir = normalize(uSunPosition - vWorldPos);
                 float dayFactor = smoothstep(-0.2, 0.2, dot(normalize(vNormal), sunDir));
                 
-                vec3 cityColor = vec3(1.0, 0.8, 0.6); // Warm city lights
-                vec3 nightLights = cityColor * cityMask * (1.0 - dayFactor) * 2.0;
-                
-                col += nightLights;
+                // City Lights (Night Side)
+                // Optimization: Only calculate city noise if it's night and on land
+                if (dayFactor < 0.99 && h_frag >= 0.05) {
+                     // Generate city mask with clumping
+                     float regionNoise = fbm(vRawPos * 20.0, 2, 0.5, 2.0); // Macro distribution
+                     // Reduced octaves from 4 to 2
+                     float streetNoise = fbm(vRawPos * 200.0, 2, 0.5, 2.0); // Micro details
+                     
+                     // Only show streets where regions are dense
+                     // Lowered threshold to 0.4 for more cities
+                     float cityMask = smoothstep(0.4, 0.8, regionNoise) * smoothstep(0.4, 0.6, streetNoise);
+                     // Mask by height (only on land, avoid high mountains/snow)
+                     cityMask *= smoothstep(0.05, 0.06, h_frag) * (1.0 - smoothstep(0.8, 0.9, h_frag));
+                     
+                     vec3 cityColor = vec3(1.0, 0.8, 0.6); // Warm city lights
+                     vec3 nightLights = cityColor * cityMask * (1.0 - dayFactor) * 2.0;
+                     col += nightLights;
+                }
                 
                 // Atmosphere Glow (Fresnel)
                 // Use custom View Space position
@@ -236,7 +244,8 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, co
                 mat2 rot = mat2(c, -s, s, c);
                 cloudPos.xz = rot * cloudPos.xz;
                 
-                float cloudN = fbm(cloudPos + vec3(cloudTime, cloudTime * 0.2, 0.0), 6, 0.5, 2.0);
+                // Reduced octaves from 6 to 4
+                float cloudN = fbm(cloudPos + vec3(cloudTime, cloudTime * 0.2, 0.0), 4, 0.5, 2.0);
                 float cloudVal = smoothstep(0.3, 0.7, cloudN + uCloudDensity * 0.2);
                 
                 // Darken surface where clouds are
@@ -311,13 +320,16 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, co
                 mat2 rot = mat2(c, -s, s, c);
                 pos.xz = rot * pos.xz;
                 
-                float n = fbm(pos + vec3(time, time * 0.2, 0.0), 6, 0.5, 2.0);
+                // Reduced octaves from 6 to 4
+                float n = fbm(pos + vec3(time, time * 0.2, 0.0), 4, 0.5, 2.0);
                 // Detail noise for wispy look
-                float detail = fbm(pos * 4.0 + vec3(time * 2.0, 0.0, 0.0), 4, 0.5, 2.0);
+                // Reduced octaves from 4 to 3
+                float detail = fbm(pos * 4.0 + vec3(time * 2.0, 0.0, 0.0), 3, 0.5, 2.0);
                 // Edge erosion noise
-                float edgeNoise = fbm(pos * 10.0 + time, 4, 0.5, 2.0);
+                // Increased octaves to 3 and strength for rougher edges
+                float edgeNoise = fbm(pos * 10.0 + time, 3, 0.5, 2.0);
                 
-                float finalDensity = n + detail * 0.2 - edgeNoise * 0.1;
+                float finalDensity = n + detail * 0.2 - edgeNoise * 0.2;
                 float cloud = smoothstep(0.3, 0.7, finalDensity + uDensity * 0.2);
                 
                 if (cloud < 0.05) discard;
@@ -384,7 +396,8 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, co
     return (
         <group position={position} name="PlanetGroup">
             <group ref={planetRef} name="Planet">
-                <Icosahedron args={[size, 256]} castShadow receiveShadow>
+                {/* Reduced segments from 256 to 200 for perf */}
+                <Icosahedron args={[size, 200]} castShadow receiveShadow>
                     <meshPhysicalMaterial
                         color={new THREE.Color(0xffffff)}
                         roughness={0.8}
@@ -406,6 +419,55 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, co
                         />
                     </mesh>
                 )}
+                {/* Atmosphere Halo */}
+                <mesh scale={[1.03, 1.03, 1.03]}>
+                    <icosahedronGeometry args={[size, 64]} />
+                    <shaderMaterial
+                        blending={THREE.AdditiveBlending}
+                        side={THREE.BackSide}
+                        transparent
+                        depthWrite={false}
+                        uniforms={{
+                            uColor: { value: new THREE.Color(0.3, 0.6, 1.0) },
+                            uPower: { value: 6.0 }, // Sharper falloff
+                            uIntensity: { value: 1.5 },
+                            uSunPosition: { value: new THREE.Vector3(...(sunPosition ?? [10000, 0, 0])) }
+                        }}
+                        vertexShader={`
+                            varying vec3 vNormal;
+                            varying vec3 vWorldNormal;
+                            void main() {
+                                vNormal = normalize(normalMatrix * normal);
+                                vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
+                                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                            }
+                        `}
+                        fragmentShader={`
+                            uniform vec3 uColor;
+                            uniform float uPower;
+                            uniform float uIntensity;
+                            uniform vec3 uSunPosition;
+                            varying vec3 vNormal;
+                            varying vec3 vWorldNormal;
+                            void main() {
+                                vec3 viewDir = vec3(0.0, 0.0, 1.0); // Camera is at 0,0,0 looking down -Z
+                                vec3 normal = normalize(vNormal);
+                                
+                                // Fresnel glow (rim effect)
+                                // We are rendering BackSide, so normals point IN. 
+                                // But we want the rim, where normal is perpendicular to view.
+                                float viewDot = abs(dot(normal, viewDir)); // abs to handle backfaces correctly
+                                float fresnel = pow(1.0 - viewDot, uPower);
+                                
+                                // Day/Night masking
+                                vec3 sunDir = normalize(uSunPosition);
+                                float sunFactor = smoothstep(-0.3, 0.5, dot(vWorldNormal, sunDir));
+                                
+                                gl_FragColor = vec4(uColor, 1.0) * fresnel * uIntensity * sunFactor;
+                            }
+                        `}
+                    />
+                </mesh>
             </group>
         </group>
     );

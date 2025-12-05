@@ -18,9 +18,11 @@ function createUniverse() {
     ]
     const recipes: Recipe[] = [
       { id: 'spp_argon', productId: 'energy_cells', inputs: [{ wareId: 'crystals', amount: 1 }], cycleTimeSec: 60, batchSize: 10, productStorageCap: 5000 },
-      { id: 'cahoona_bakery', productId: 'meatsteak', inputs: [
-        { wareId: 'energy_cells', amount: 15 }
-      ], cycleTimeSec: 120, batchSize: 30, productStorageCap: 10000 }
+      {
+        id: 'cahoona_bakery', productId: 'meatsteak', inputs: [
+          { wareId: 'energy_cells', amount: 15 }
+        ], cycleTimeSec: 120, batchSize: 30, productStorageCap: 10000
+      }
     ]
     const stations: Station[] = [
       { id: 'argon_spp_01', name: 'Solar Power Plant', recipeId: 'spp_argon', sectorId: 'argon_prime', inventory: { energy_cells: 0, crystals: 10 }, reorderLevel: { crystals: 5 }, reserveLevel: { energy_cells: 100 } },
@@ -121,6 +123,55 @@ function universePlugin() {
   }
 }
 
+// ... existing imports
+import fs from 'fs';
+import path from 'path';
+
+// ... existing code
+
+function persistPlugin() {
+  return {
+    name: 'persist-middleware',
+    configureServer(server: ViteDevServer) {
+      server.middlewares.use((req: IncomingMessage, res: ServerResponse, next: () => void) => {
+        const url = req.url || '';
+        if (url.startsWith('/__persist/load') && req.method === 'GET') {
+          const p = path.join(process.cwd(), 'user-data.json');
+          if (fs.existsSync(p)) {
+            const data = fs.readFileSync(p, 'utf-8');
+            res.setHeader('content-type', 'application/json');
+            res.end(data);
+          } else {
+            res.setHeader('content-type', 'application/json');
+            res.end(JSON.stringify({}));
+          }
+          return;
+        }
+        if (url.startsWith('/__persist/save') && req.method === 'POST') {
+          const chunks: any[] = [];
+          req.on('data', (c) => chunks.push(c));
+          req.on('end', () => {
+            const body = Buffer.concat(chunks).toString();
+            try {
+              // Validate JSON
+              JSON.parse(body);
+              const p = path.join(process.cwd(), 'user-data.json');
+              fs.writeFileSync(p, body);
+              res.statusCode = 200;
+              res.end(JSON.stringify({ success: true }));
+            } catch (e) {
+              res.statusCode = 400;
+              res.end(JSON.stringify({ error: 'Invalid JSON' }));
+            }
+          });
+          return;
+        }
+        next();
+      });
+    }
+  };
+}
+
 export default defineConfig({
-  plugins: [react(), universePlugin()],
+  plugins: [react(), universePlugin(), persistPlugin()],
 })
