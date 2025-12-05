@@ -44,6 +44,10 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, co
             shader.uniforms.uScale = { value: config?.noiseScale ?? 3.0 };
             shader.uniforms.uBumpStrength = { value: (config?.bumpIntensity ?? 0.6) * 0.2 };
             shader.uniforms.uSeed = { value: config?.seed ?? Math.random() * 100.0 };
+            shader.uniforms.uOceanRoughness = { value: config?.oceanRoughness ?? 0.6 };
+            shader.uniforms.uLandRoughness = { value: config?.landRoughness ?? 0.9 };
+            shader.uniforms.uCloudDensity = { value: config?.cloudDensity ?? 0.5 };
+            shader.uniforms.uCloudOpacity = { value: cloudsParams?.opacity ?? 0.6 };
 
             const palette = config?.colorPalette ?? [
                 '#001a26', // Deep Ocean - Dark Teal
@@ -102,6 +106,10 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, co
                 uniform float uTime;
                 uniform float uScale;
                 uniform float uBumpStrength;
+                uniform float uOceanRoughness;
+                uniform float uLandRoughness;
+                uniform float uCloudDensity;
+                uniform float uCloudOpacity;
                 uniform vec3 uColorDeepOcean;
                 uniform vec3 uColorShallowOcean;
                 uniform vec3 uColorBeach;
@@ -185,6 +193,25 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, co
                 // Add glow to base color
                 col = mix(col, atmosphereColor, fresnel * 0.6);
                 
+                // Cloud Shadows
+                // Re-calculate cloud noise to determine shadows
+                // We use vRawPos (object space) to match the cloud sphere's coordinate system
+                // Cloud sphere is scaled 1.015, so we might need to adjust, but noise is 3D so it should be close enough.
+                vec3 cloudPos = vRawPos * 2.5; // Cloud scale is hardcoded to 2.5 in cloud shader
+                float cloudTime = uTime * 0.002;
+                float s = sin(cloudTime * 0.5);
+                float c = cos(cloudTime * 0.5);
+                mat2 rot = mat2(c, -s, s, c);
+                cloudPos.xz = rot * cloudPos.xz;
+                
+                float cloudN = fbm(cloudPos + vec3(cloudTime, cloudTime * 0.2, 0.0), 6, 0.5, 2.0);
+                float cloudVal = smoothstep(0.3, 0.7, cloudN + uCloudDensity * 0.2);
+                
+                // Darken surface where clouds are
+                // Only apply shadow if cloud opacity is high enough
+                // Increased shadow intensity (0.5 -> 0.3)
+                col *= mix(1.0, 0.3, cloudVal * uCloudOpacity); 
+                
                 diffuseColor.rgb = col;
                 `
             );
@@ -193,8 +220,8 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, co
                 '#include <roughnessmap_fragment>',
                 `
                 #include <roughnessmap_fragment>
-                float rVal = 0.9;
-                if (vHeight < 0.05) rVal = 0.6; // Ocean is much rougher to diffuse sun (was 0.4)
+                float rVal = uLandRoughness;
+                if (vHeight < 0.05) rVal = uOceanRoughness;
                 roughnessFactor = rVal;
                 `
             );
@@ -207,7 +234,7 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, co
             cloudShaderUniformsRef.current = shader.uniforms;
             shader.uniforms.uTime = { value: 0 };
             shader.uniforms.uScale = { value: 2.5 };
-            shader.uniforms.uDensity = { value: 0.3 };
+            shader.uniforms.uDensity = { value: config?.cloudDensity ?? 0.5 };
             shader.uniforms.uOpacity = { value: cloudsParams?.opacity ?? 0.6 };
 
             shader.vertexShader = `
@@ -314,7 +341,7 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, co
     return (
         <group position={position} name="PlanetGroup">
             <group ref={planetRef} name="Planet">
-                <Icosahedron args={[size, 128]} castShadow receiveShadow>
+                <Icosahedron args={[size, 256]} castShadow receiveShadow>
                     <meshPhysicalMaterial
                         color={new THREE.Color(0xffffff)}
                         roughness={0.8}

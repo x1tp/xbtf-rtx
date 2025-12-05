@@ -140,7 +140,7 @@ function App() {
       <Canvas
         shadows
         gl={{ logarithmicDepthBuffer: true, antialias: true }}
-        camera={{ fov: 75, near: 1, far: 600000000000 }}
+        camera={{ fov: 60, near: 1, far: 600000000000 }}
         onCreated={({ gl, scene, camera }) => {
           gl.outputColorSpace = SRGBColorSpace;
           gl.toneMapping = NoToneMapping;

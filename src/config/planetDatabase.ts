@@ -18,14 +18,15 @@ export const PLANET_DATABASE: Record<string, PlanetDatabaseEntry> = {
   seizewell: {
     seed: 983741,
     size: 6371000,
-    colorPalette: ['#264d73', '#346b6f', '#4e9152', '#a3b86b', '#d7c9a1'],
+    // X3 Style: Deep Teal, Cyan, Grey Sand, Muted Green, Dark Green, Grey Rock, White Snow
+    colorPalette: ['#001a26', '#004d66', '#8c99a6', '#2d4030', '#1a261a', '#555555', '#ffffff'],
     waterLevel: 0.48,
-    noiseScale: 2.4,
-    bumpIntensity: 0.6,
-    landRoughness: 0.85,
-    oceanRoughness: 0.2,
-    cloudDensity: 0.65,
-    cloudOpacity: 0.85,
+    noiseScale: 3.0, // More detail
+    bumpIntensity: 1.5,
+    landRoughness: 0.9,
+    oceanRoughness: 0.6, // Diffuse sun reflection
+    cloudDensity: 0.7, // Increased coverage
+    cloudOpacity: 0.8,
     rotationSpeed: 0.0011,
     cloudRotationSpeed: 0.0015,
     atmosphereEnabled: true
