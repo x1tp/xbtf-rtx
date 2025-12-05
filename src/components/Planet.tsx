@@ -31,7 +31,7 @@ interface PlanetProps {
 
 
 
-export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, config }) => {
+export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, config, sunPosition }) => {
     const surfaceShaderUniformsRef = useRef<Record<string, { value: unknown }> | null>(null);
 
     // Procedural Planet Shader Logic
@@ -48,6 +48,7 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, co
             shader.uniforms.uLandRoughness = { value: config?.landRoughness ?? 0.9 };
             shader.uniforms.uCloudDensity = { value: config?.cloudDensity ?? 0.5 };
             shader.uniforms.uCloudOpacity = { value: cloudsParams?.opacity ?? 0.6 };
+            shader.uniforms.uSunPosition = { value: new THREE.Vector3(...(sunPosition ?? [10000, 0, 0])) };
 
             const palette = config?.colorPalette ?? [
                 '#001a26', // Deep Ocean - Dark Teal
@@ -88,6 +89,7 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, co
                 varying float vHeight;
                 varying vec3 vRawPos;
                 varying vec3 vMyViewPosition;
+                varying vec3 vWorldPos;
                 
                 // Domain warping for more natural shapes
                 vec3 getWarp(vec3 p) {
@@ -110,6 +112,7 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, co
                 uniform float uLandRoughness;
                 uniform float uCloudDensity;
                 uniform float uCloudOpacity;
+                uniform vec3 uSunPosition;
                 uniform vec3 uColorDeepOcean;
                 uniform vec3 uColorShallowOcean;
                 uniform vec3 uColorBeach;
@@ -120,6 +123,7 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, co
                 varying float vHeight;
                 varying vec3 vRawPos;
                 varying vec3 vMyViewPosition;
+                varying vec3 vWorldPos;
             ` + shader.fragmentShader;
 
             shader.vertexShader = shader.vertexShader.replace(
@@ -127,6 +131,7 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, co
                 `
                 #include <begin_vertex>
                 vRawPos = normalize(position);
+                vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
                 
                 // Base low freq shape
                 float baseShape = fbm(vRawPos * (uScale * 0.5), 4, 0.5, 2.0);
@@ -145,7 +150,8 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, co
                 float h = baseShape * 0.5 + mountain * 0.5;
                 
                 // Continents mask
-                float continents = smoothstep(-0.2, 0.2, baseShape);
+                float coastNoise = fbm(vRawPos * 30.0, 4, 0.5, 2.0);
+                float continents = smoothstep(-0.2, 0.2, baseShape + coastNoise * 0.1);
                 
                 // Final height
                 float finalHeight = mix(baseShape * 0.2, mountain, continents);
@@ -170,11 +176,11 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, co
                 
                 vec3 col = uColorDeepOcean;
                 if (h_frag < 0.05) {
-                    col = mix(uColorDeepOcean, uColorShallowOcean, smoothstep(-0.1, 0.05, h_frag));
-                } else if (h_frag < 0.12) {
-                    col = mix(uColorShallowOcean, uColorBeach, smoothstep(0.05, 0.12, h_frag));
+                    col = mix(uColorDeepOcean, uColorShallowOcean, smoothstep(-0.05, 0.05, h_frag));
+                } else if (h_frag < 0.08) {
+                    col = mix(uColorShallowOcean, uColorBeach, smoothstep(0.05, 0.08, h_frag));
                 } else if (h_frag < 0.25) {
-                    col = mix(uColorBeach, uColorGrass, smoothstep(0.12, 0.25, h_frag));
+                    col = mix(uColorBeach, uColorGrass, smoothstep(0.08, 0.25, h_frag));
                 } else if (h_frag < 0.5) {
                     col = mix(uColorGrass, uColorForest, smoothstep(0.25, 0.5, h_frag));
                 } else if (h_frag < 0.8) {
@@ -183,15 +189,41 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, co
                     col = mix(uColorRock, uColorSnow, smoothstep(0.8, 1.0, h_frag));
                 }
                 
+                // Land Detail (Grit)
+                if (h_frag >= 0.05) {
+                    float landDetail = fbm(vRawPos * 80.0, 4, 0.5, 2.0);
+                    col *= mix(0.9, 1.1, landDetail);
+                }
+                
+                // City Lights (Night Side)
+                // Generate city mask with clumping
+                float regionNoise = fbm(vRawPos * 20.0, 2, 0.5, 2.0); // Macro distribution
+                float streetNoise = fbm(vRawPos * 200.0, 4, 0.5, 2.0); // Micro details
+                
+                // Only show streets where regions are dense
+                float cityMask = smoothstep(0.5, 0.8, regionNoise) * smoothstep(0.4, 0.6, streetNoise);
+                // Mask by height (only on land, avoid high mountains/snow)
+                cityMask *= smoothstep(0.05, 0.06, h_frag) * (1.0 - smoothstep(0.8, 0.9, h_frag));
+                
+                // Day/Night cycle
+                vec3 sunDir = normalize(uSunPosition - vWorldPos);
+                float dayFactor = smoothstep(-0.2, 0.2, dot(normalize(vNormal), sunDir));
+                
+                vec3 cityColor = vec3(1.0, 0.8, 0.6); // Warm city lights
+                vec3 nightLights = cityColor * cityMask * (1.0 - dayFactor) * 2.0;
+                
+                col += nightLights;
+                
                 // Atmosphere Glow (Fresnel)
                 // Use custom View Space position
                 vec3 viewDir = normalize(vMyViewPosition);
                 vec3 fresnelNormal = normalize(vNormal);
-                float fresnel = pow(1.0 - max(0.0, dot(viewDir, fresnelNormal)), 3.0);
-                vec3 atmosphereColor = vec3(0.4, 0.6, 1.0); // Sky blue glow
+                // Sharper, brighter rim for X3 style
+                float fresnel = pow(1.0 - max(0.0, dot(viewDir, fresnelNormal)), 4.0);
+                vec3 atmosphereColor = vec3(0.3, 0.6, 1.0) * 2.5; // Intense blue glow
                 
                 // Add glow to base color
-                col = mix(col, atmosphereColor, fresnel * 0.6);
+                col = mix(col, atmosphereColor, fresnel * 0.8);
                 
                 // Cloud Shadows
                 // Re-calculate cloud noise to determine shadows
@@ -221,7 +253,13 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, co
                 `
                 #include <roughnessmap_fragment>
                 float rVal = uLandRoughness;
-                if (vHeight < 0.05) rVal = uOceanRoughness;
+                if (vHeight < 0.05) {
+                    // Ocean Sparkles: Perturb roughness with high freq noise
+                    // Increased scale to 2000.0 for micro-surface sheen
+                    float wave = fbm(vRawPos * 2000.0 + uTime * 0.5, 2, 0.5, 2.0);
+                    // Mix between rough (0.6) and shiny (0.2) based on waves
+                    rVal = mix(uOceanRoughness, 0.2, wave * 0.5); 
+                }
                 roughnessFactor = rVal;
                 `
             );
@@ -274,8 +312,13 @@ export const Planet: React.FC<PlanetProps> = ({ position, size, cloudsParams, co
                 pos.xz = rot * pos.xz;
                 
                 float n = fbm(pos + vec3(time, time * 0.2, 0.0), 6, 0.5, 2.0);
+                // Detail noise for wispy look
+                float detail = fbm(pos * 4.0 + vec3(time * 2.0, 0.0, 0.0), 4, 0.5, 2.0);
+                // Edge erosion noise
+                float edgeNoise = fbm(pos * 10.0 + time, 4, 0.5, 2.0);
                 
-                float cloud = smoothstep(0.3, 0.7, n + uDensity * 0.2);
+                float finalDensity = n + detail * 0.2 - edgeNoise * 0.1;
+                float cloud = smoothstep(0.3, 0.7, finalDensity + uDensity * 0.2);
                 
                 if (cloud < 0.05) discard;
                 
