@@ -11,7 +11,7 @@
 
 export type OwnershipType = 'corporation' | 'guild' | 'family' | 'state' | 'independent' | 'player'
 export type RaceType = 'argon' | 'boron' | 'paranid' | 'split' | 'teladi' | 'pirate' | 'xenon'
-export type FleetBehavior = 'station-supply' | 'station-distribute' | 'corp-logistics' | 'guild-assigned' | 'freelance' | 'player-manual' | 'player-auto'
+export type FleetBehavior = 'station-supply' | 'station-distribute' | 'corp-logistics' | 'guild-assigned' | 'freelance' | 'player-manual' | 'player-auto' | 'patrol' | 'construction'
 
 export interface Corporation {
   id: string

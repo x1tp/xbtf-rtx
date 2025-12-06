@@ -19,6 +19,18 @@ type CloudsParams = {
     alphaTest?: number;
 };
 
+type AtmosphereParams = {
+    radiusMul: number;
+    rimPower: number;
+    rayleigh: number;
+    noiseScale: number;
+    noiseAmp: number;
+    sunMaskMin: number;
+    sunMaskMax: number;
+    innerColor: string;
+    outerColor: string;
+};
+
 interface PlanetProps {
     position: [number, number, number];
     size: number;
@@ -26,6 +38,8 @@ interface PlanetProps {
     hdr?: boolean;
     sunPosition?: [number, number, number];
     cloudsParams?: CloudsParams;
+    atmosphereParams?: AtmosphereParams;
+    atmosphereEnabled?: boolean;
     config?: PlanetDatabaseEntry;
 }
 

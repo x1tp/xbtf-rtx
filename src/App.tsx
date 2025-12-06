@@ -876,12 +876,7 @@ function EconomyAdmin() {
     }
   }
 
-  const formatTime = (ms: number) => {
-    const s = Math.floor(ms / 1000)
-    const m = Math.floor(s / 60)
-    const sec = s % 60
-    return m > 0 ? `${m}m ${sec}s` : `${sec}s`
-  }
+
   const formatDuration = (seconds: number) => {
     const totalSeconds = Math.max(0, Math.floor(seconds))
     const hrs = Math.floor(totalSeconds / 3600)
@@ -1078,14 +1073,11 @@ function EconomyAdmin() {
                     const cargoEntries = Object.entries(f.cargo)
                     const cargoTotal = cargoEntries.reduce((sum, [, qty]) => sum + qty, 0)
                     const now = Date.now()
-                    const transitProgress = f.state === 'in-transit' && f.departureTime && f.arrivalTime
-                      ? (now - f.departureTime) / (f.arrivalTime - f.departureTime)
-                      : 0
-                    const eta = f.arrivalTime ? Math.max(0, f.arrivalTime - now) : 0
+                    const timeInState = f.stateStartTime ? (now - f.stateStartTime) / 1000 : 0
 
                     return (
-                      <div key={f.id} style={{ border: '1px solid #184b6a', borderRadius: 6, padding: 10, background: '#0a1520' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <div key={f.id} style={{ border: '1px solid #184b6a', borderRadius: 6, padding: 10, background: '#0a1520', height: '220px', display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, flexShrink: 0 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <span style={{ color: getOwnerColor(f.ownerType), fontWeight: 'bold' }}>{f.name}</span>
                             <span style={{ color: '#6090a0', fontSize: 11 }}>{f.shipType}</span>
@@ -1093,23 +1085,27 @@ function EconomyAdmin() {
                           <span style={{ color: getStateColor(f.state), fontSize: 12, textTransform: 'uppercase' }}>{f.state}</span>
                         </div>
                         
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12, marginBottom: 8 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12, marginBottom: 8, flexShrink: 0 }}>
                           <div>
                             <span style={{ color: '#6090a0' }}>Location: </span>
                             <span style={{ color: '#c3e7ff' }}>{f.currentSectorId}</span>
                           </div>
-                          {f.destinationSectorId && f.state === 'in-transit' && (
-                            <div>
-                              <span style={{ color: '#6090a0' }}>→ </span>
-                              <span style={{ color: '#88cc44' }}>{f.destinationSectorId}</span>
-                            </div>
-                          )}
-                          {f.targetStationId && (
-                            <div>
-                              <span style={{ color: '#6090a0' }}>Target: </span>
-                              <span style={{ color: '#44aaff' }}>{f.targetStationId}</span>
-                            </div>
-                          )}
+                          <div style={{ height: 18 }}>
+                            {f.destinationSectorId && f.state === 'in-transit' && (
+                              <>
+                                <span style={{ color: '#6090a0' }}>→ </span>
+                                <span style={{ color: '#88cc44' }}>{f.destinationSectorId}</span>
+                              </>
+                            )}
+                          </div>
+                          <div style={{ height: 18 }}>
+                            {f.targetStationId && (
+                              <>
+                                <span style={{ color: '#6090a0' }}>Target: </span>
+                                <span style={{ color: '#44aaff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: '120px' }}>{f.targetStationId}</span>
+                              </>
+                            )}
+                          </div>
                           <div>
                             <span style={{ color: '#6090a0' }}>Cargo: </span>
                             <span style={{ color: cargoTotal > 0 ? '#ffaa44' : '#6090a0' }}>
@@ -1118,50 +1114,50 @@ function EconomyAdmin() {
                           </div>
                         </div>
 
-                        {/* Transit progress bar */}
-                        {f.state === 'in-transit' && (
-                          <div style={{ marginTop: 6 }}>
+                        {/* Transit progress bar - Fixed height container */}
+                        <div style={{ height: 24, marginBottom: 4, flexShrink: 0 }}>
+                          {f.state === 'in-transit' && (
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
-                              <span style={{ color: '#6090a0' }}>Transit progress</span>
-                              <span style={{ color: '#88cc44' }}>ETA: {formatTime(eta)}</span>
+                                <span style={{ color: '#6090a0' }}>In Transit</span>
+                                <span style={{ color: '#88cc44' }}>{timeInState.toFixed(0)}s</span>
                             </div>
-                            <div style={{ height: 6, background: '#1a2a3a', borderRadius: 3, overflow: 'hidden' }}>
-                              <div style={{ 
-                                height: '100%', 
-                                width: `${Math.min(100, transitProgress * 100)}%`, 
-                                background: 'linear-gradient(90deg, #44aa44, #88cc44)',
-                                transition: 'width 0.5s ease'
-                              }} />
-                            </div>
-                          </div>
-                        )}
+                          )}
+                        </div>
 
-                        {/* Cargo details */}
-                        {cargoEntries.length > 0 && (
-                          <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: '1fr auto', gap: 2, fontSize: 11 }}>
-                            {cargoEntries.map(([wareId, qty]) => (
-                              <Fragment key={wareId}>
-                                <span style={{ color: '#8ab6d6' }}>{wareMap.get(wareId) || wareId}</span>
-                                <span style={{ color: '#ffaa44', textAlign: 'right' }}>{qty}</span>
-                              </Fragment>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Current order info */}
-                        {f.currentOrder && (
-                          <div style={{ marginTop: 8, padding: 6, background: '#0f1a25', borderRadius: 4, fontSize: 11 }}>
-                            <div style={{ color: '#6090a0', marginBottom: 4 }}>Current Order:</div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 2 }}>
-                              <span>Buy {f.currentOrder.buyWareName}</span>
-                              <span style={{ color: '#ff6666' }}>-{f.currentOrder.buyPrice * f.currentOrder.buyQty}</span>
-                              <span>Sell @ {f.currentOrder.sellStationName}</span>
-                              <span style={{ color: '#66ff66' }}>+{f.currentOrder.sellPrice * f.currentOrder.sellQty}</span>
-                              <span style={{ color: '#8ab6d6' }}>Expected Profit</span>
-                              <span style={{ color: '#88cc44', fontWeight: 'bold' }}>{f.currentOrder.expectedProfit}</span>
+                        {/* Cargo details - Fixed height container (scrollable if needed) */}
+                        <div style={{ height: 20, marginBottom: 4, overflow: 'hidden', flexShrink: 0 }}>
+                          {cargoEntries.length > 0 && (
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 2, fontSize: 11 }}>
+                              {cargoEntries.map(([wareId, qty]) => (
+                                <Fragment key={wareId}>
+                                  <span style={{ color: '#8ab6d6' }}>{wareMap.get(wareId) || wareId}</span>
+                                  <span style={{ color: '#ffaa44', textAlign: 'right' }}>{qty}</span>
+                                </Fragment>
+                              ))}
                             </div>
-                          </div>
-                        )}
+                          )}
+                        </div>
+
+                        {/* Current order info - Fills remaining space */}
+                        <div style={{ flexGrow: 1, background: '#0f1a25', borderRadius: 4, padding: 6, fontSize: 11, overflow: 'hidden' }}>
+                          {f.currentOrder ? (
+                            <>
+                              <div style={{ color: '#6090a0', marginBottom: 4 }}>Current Order:</div>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 2 }}>
+                                <span>Buy {f.currentOrder.buyWareName}</span>
+                                <span style={{ color: '#ff6666' }}>-{f.currentOrder.buyPrice * f.currentOrder.buyQty}</span>
+                                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Sell @ {f.currentOrder.sellStationName}</span>
+                                <span style={{ color: '#66ff66' }}>+{f.currentOrder.sellPrice * f.currentOrder.sellQty}</span>
+                                <span style={{ color: '#8ab6d6' }}>Expected Profit</span>
+                                <span style={{ color: '#88cc44', fontWeight: 'bold' }}>{f.currentOrder.expectedProfit}</span>
+                              </div>
+                            </>
+                          ) : (
+                            <div style={{ color: '#3a4b5c', fontStyle: 'italic', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              No active orders
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )
                   })}

@@ -5,6 +5,8 @@ import type { NPCFleet } from '../types/simulation';
 import { UNIVERSE_SECTORS_XBTF } from '../config/universe_xbtf';
 import { getSectorLayoutById } from '../config/sector';
 
+import { useFleetPositions } from '../store/fleetPositions';
+
 interface SectorObject {
     name: string;
     position: [number, number, number];
@@ -80,6 +82,7 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
     const storePosition = useGameStore((s: GameState) => s.position);
     const storeObjects = useGameStore((s: GameState) => s.navObjects);
     const fleets = useGameStore((s: GameState) => s.fleets);
+    const fleetPositions = useFleetPositions(30); // Poll at 30fps
 
     const [activeTab, setActiveTab] = useState<TabType>('all');
     const [zoom, setZoom] = useState(1);
@@ -132,12 +135,12 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
         const sectorFleets = fleets.filter((f: NPCFleet) => f.currentSectorId === targetSectorId);
         const fleetObjects: SectorObject[] = sectorFleets.map((f: NPCFleet) => ({
             name: f.name,
-            position: f.position,
+            position: fleetPositions[f.id] || f.position,
             type: 'ship' as const
         }));
 
         return [...storeObjects, ...fleetObjects];
-    }, [objects, selectedSectorId, currentSectorId, storeObjects, fleets]);
+    }, [objects, selectedSectorId, currentSectorId, storeObjects, fleets, fleetPositions]);
 
     const mapRef = useRef<SVGSVGElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);

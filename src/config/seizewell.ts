@@ -55,8 +55,9 @@ export const SEIZEWELL_BLUEPRINT: SeizewellLayout = {
         { name: 'South Gate', modelPath: '/models/00088.obj', position: [0, 0, 3000], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, 0, 0], destinationSectorId: 'greater_profit', gateType: 'S' }
     ],
     ships: [
-        { name: 'Teladi Destroyer Phoenix (M2)', modelPath: '/models/00140.obj', position: [550, 10, 200], rotationAxis: 'y', rotationSpeed: 0, collisions: false },
-        { name: 'Albatross (TL)', modelPath: '/models/00187.obj', position: [590, 10, 300], rotationAxis: 'y', rotationSpeed: 0, collisions: false }
+        // Ships migrated to persistent NPC fleet system
+        // { name: 'Teladi Destroyer Phoenix (M2)', modelPath: '/models/00140.obj', position: [550, 10, 200], rotationAxis: 'y', rotationSpeed: 0, collisions: false },
+        // { name: 'Albatross (TL)', modelPath: '/models/00187.obj', position: [590, 10, 300], rotationAxis: 'y', rotationSpeed: 0, collisions: false }
     ],
     background: { type: 'nebula', texturePath: '/materials/skybox/seizewell_v3.png' }
 };

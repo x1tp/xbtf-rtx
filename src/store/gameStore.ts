@@ -105,7 +105,7 @@ export interface GameState {
   }) => Promise<void>;
 }
 
-export const useGameStore = create<GameState>((set) => ({
+export const useGameStore = create<GameState>((set, get) => ({
   speed: 0,
   maxSpeed: SHIP_STATS['player'].maxSpeed, // m/s
   throttle: 0,
@@ -213,17 +213,32 @@ export const useGameStore = create<GameState>((set) => ({
     try {
       const res = await fetch('/__universe/state')
       const data = await res.json()
-      set({ 
-        wares: data.wares || [], 
-        recipes: data.recipes || [], 
-        stations: data.stations || [], 
-        sectorPrices: data.sectorPrices || {}, 
-        timeScale: typeof data.timeScale === 'number' ? data.timeScale : 1,
-        elapsedTimeSec: typeof data.elapsedTimeSec === 'number' ? data.elapsedTimeSec : 0,
-        corporations: data.corporations || [],
-        fleets: data.fleets || [],
-        activeEvents: data.activeEvents || [],
-        tradeLog: data.tradeLog || [],
+      set((state) => {
+        // Merge fleets to preserve local positions for current sector
+        const backendFleets = data.fleets || [];
+        const currentSectorId = state.currentSectorId;
+        const mergedFleets = backendFleets.map((bFleet: NPCFleet) => {
+            if (currentSectorId && bFleet.currentSectorId === currentSectorId) {
+                const localFleet = state.fleets.find(f => f.id === bFleet.id);
+                if (localFleet) {
+                    return { ...bFleet, position: localFleet.position };
+                }
+            }
+            return bFleet;
+        });
+
+        return { 
+          wares: data.wares || [], 
+          recipes: data.recipes || [], 
+          stations: data.stations || [], 
+          sectorPrices: data.sectorPrices || {}, 
+          timeScale: typeof data.timeScale === 'number' ? data.timeScale : 1,
+          elapsedTimeSec: typeof data.elapsedTimeSec === 'number' ? data.elapsedTimeSec : 0,
+          corporations: data.corporations || [],
+          fleets: mergedFleets,
+          activeEvents: data.activeEvents || [],
+          tradeLog: data.tradeLog || [],
+        }
       })
     } catch {
       set(() => ({}))
@@ -240,11 +255,38 @@ export const useGameStore = create<GameState>((set) => ({
     try {
       const res = await fetch('/__universe/fleets')
       const data = await res.json()
-      set({ 
-        corporations: data.corporations || [],
-        fleets: data.fleets || [],
-        activeEvents: data.activeEvents || [],
-        tradeLog: data.tradeLog || [],
+      set((state) => {
+        // Check if selected target is a ship that has left the sector
+        let selectedTarget = state.selectedTarget;
+        if (selectedTarget && selectedTarget.type === 'ship') {
+           // Find the ship in the new data
+           const ship = (data.fleets || []).find((f: NPCFleet) => f.name === selectedTarget?.name);
+           // If ship not found, or ship is no longer in current sector, clear target
+           if (!ship || (ship.currentSectorId !== state.currentSectorId && state.currentSectorId)) {
+              selectedTarget = null;
+           }
+        }
+
+        // Merge fleets to preserve local positions for current sector
+        const backendFleets = data.fleets || [];
+        const currentSectorId = state.currentSectorId;
+        const mergedFleets = backendFleets.map((bFleet: NPCFleet) => {
+            if (currentSectorId && bFleet.currentSectorId === currentSectorId) {
+                const localFleet = state.fleets.find(f => f.id === bFleet.id);
+                if (localFleet) {
+                    return { ...bFleet, position: localFleet.position };
+                }
+            }
+            return bFleet;
+        });
+
+        return { 
+          corporations: data.corporations || [],
+          fleets: mergedFleets,
+          activeEvents: data.activeEvents || [],
+          tradeLog: data.tradeLog || [],
+          selectedTarget
+        };
       })
     } catch {
       // Fleets not available yet
@@ -300,9 +342,6 @@ export const useGameStore = create<GameState>((set) => ({
         }, 0),
       })),
       fleetsInTransit: inTransit.map(f => {
-        const now = Date.now()
-        const total = (f.arrivalTime || now) - (f.departureTime || now)
-        const elapsed = now - (f.departureTime || now)
         return {
           id: f.id,
           name: f.name,
@@ -310,8 +349,8 @@ export const useGameStore = create<GameState>((set) => ({
           fromSectorName: f.currentSectorId,
           toSectorId: f.destinationSectorId || '',
           toSectorName: f.destinationSectorId || '',
-          progress: total > 0 ? Math.min(1, elapsed / total) : 0,
-          etaSeconds: Math.max(0, ((f.arrivalTime || now) - now) / 1000),
+          progress: 0,
+          etaSeconds: 0,
           direction: f.destinationSectorId === sectorId ? 'incoming' as const : 'outgoing' as const,
         }
       }),
@@ -321,7 +360,7 @@ export const useGameStore = create<GameState>((set) => ({
   },
 
   getCorporation: (id: string) => {
-    return useGameStore.getState().corporations.find(c => c.id === id)
+    return get().corporations.find(c => c.id === id)
   },
   
   // Report ship actions to backend for autonomous ships

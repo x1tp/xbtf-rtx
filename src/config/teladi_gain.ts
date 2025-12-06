@@ -17,6 +17,7 @@ export const TELADI_GAIN_BLUEPRINT: SeizewellLayout = {
     { name: 'West Gate', modelPath: '/models/00088.obj', position: [-1200, 0, 0], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, Math.PI / 2, 0] },
   ],
   ships: [
-    { name: 'Osprey (M6)', modelPath: '/models/00141.obj', position: [480, 10, 220], scale: 18, rotationAxis: 'y', rotationSpeed: 0, collisions: false },
+    // Ships migrated to persistent NPC fleet system
+    // { name: 'Osprey (M6)', modelPath: '/models/00141.obj', position: [480, 10, 220], scale: 18, rotationAxis: 'y', rotationSpeed: 0, collisions: false },
   ],
 }

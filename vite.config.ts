@@ -10,7 +10,7 @@ type Station = { id: string; name: string; recipeId: string; sectorId: string; i
 // Fleet and Corporation types (mirroring simulation.ts but inline for vite backend)
 type FleetState = 'idle' | 'loading' | 'in-transit' | 'unloading' | 'docking' | 'undocking'
 type OwnershipType = 'corporation' | 'guild' | 'family' | 'state' | 'independent' | 'player'
-type FleetBehavior = 'station-supply' | 'station-distribute' | 'corp-logistics' | 'guild-assigned' | 'freelance' | 'player-manual' | 'player-auto'
+type FleetBehavior = 'station-supply' | 'station-distribute' | 'corp-logistics' | 'guild-assigned' | 'freelance' | 'player-manual' | 'player-auto' | 'patrol' | 'construction'
 type RaceType = 'argon' | 'boron' | 'paranid' | 'split' | 'teladi' | 'pirate' | 'xenon'
 
 // Ship command types for autonomous ships
@@ -87,13 +87,6 @@ function createUniverse() {
     'greater_profit': ['profit_share'],
   }
   
-  const SECTOR_NAMES: Record<string, string> = {
-    'seizewell': 'Seizewell',
-    'teladi_gain': 'Teladi Gain',
-    'profit_share': 'Profit Share',
-    'greater_profit': 'Greater Profit',
-  }
-  
   // Helper: Generate unique ID
   const genId = () => Math.random().toString(36).substr(2, 9)
   
@@ -104,24 +97,6 @@ function createUniverse() {
     (Math.random() - 0.5) * 600,   // Y: -300 to +300
     (Math.random() - 0.5) * 8000   // Z: -4000 to +4000
   ]
-  
-  // Helper: Find shortest path between sectors
-  const findPath = (from: string, to: string): string[] | null => {
-    if (from === to) return [from]
-    const visited = new Set<string>()
-    const queue: { sector: string; path: string[] }[] = [{ sector: from, path: [from] }]
-    while (queue.length > 0) {
-      const { sector, path } = queue.shift()!
-      if (visited.has(sector)) continue
-      visited.add(sector)
-      const neighbors = SECTOR_GRAPH[sector] || []
-      for (const n of neighbors) {
-        if (n === to) return [...path, n]
-        if (!visited.has(n)) queue.push({ sector: n, path: [...path, n] })
-      }
-    }
-    return null
-  }
   
   // Helper: Get ware name
   const getWareName = (wareId: string) => state.wares.find(w => w.id === wareId)?.name || wareId
@@ -213,15 +188,28 @@ function createUniverse() {
       { ownerId: null, ownerType: 'independent' as OwnershipType, behavior: 'freelance' as FleetBehavior, shipType: 'Vulture', capacity: 2800, speed: 1.05, autonomy: 1.0, profitShare: 1.0, homeSectorId: 'seizewell' },
       { ownerId: null, ownerType: 'independent' as OwnershipType, behavior: 'freelance' as FleetBehavior, shipType: 'Vulture', capacity: 2800, speed: 0.95, autonomy: 1.0, profitShare: 1.0, homeSectorId: 'profit_share' },
       { ownerId: null, ownerType: 'independent' as OwnershipType, behavior: 'freelance' as FleetBehavior, shipType: 'Vulture', capacity: 2800, speed: 1.0, autonomy: 1.0, profitShare: 1.0, homeSectorId: 'teladi_gain' },
+      
+      // === Military / Special Ships ===
+      // Seizewell: Teladi Destroyer Phoenix (M2)
+      { ownerId: 'teladi_company', ownerType: 'state' as OwnershipType, behavior: 'patrol' as FleetBehavior, shipType: 'Phoenix', capacity: 5000, speed: 0.6, autonomy: 0.9, profitShare: 0, homeSectorId: 'seizewell' },
+      // Seizewell: Albatross (TL) - Construction
+      { ownerId: 'teladi_company', ownerType: 'state' as OwnershipType, behavior: 'construction' as FleetBehavior, shipType: 'Albatross', capacity: 50000, speed: 0.4, autonomy: 0.8, profitShare: 0.5, homeSectorId: 'seizewell' },
+      // Teladi Gain: Osprey (M6)
+      { ownerId: 'teladi_company', ownerType: 'state' as OwnershipType, behavior: 'patrol' as FleetBehavior, shipType: 'Osprey', capacity: 1500, speed: 0.8, autonomy: 0.9, profitShare: 0, homeSectorId: 'teladi_gain' },
     ]
     
     // Spawn fleets
     const fleets: NPCFleet[] = fleetConfigs.map((cfg, i) => {
+      let modelPath = '/models/00007.obj' // Default Vulture
+      if (cfg.shipType === 'Phoenix') modelPath = '/models/00140.obj'
+      else if (cfg.shipType === 'Albatross') modelPath = '/models/00187.obj'
+      else if (cfg.shipType === 'Osprey') modelPath = '/models/00141.obj'
+      
       const fleet: NPCFleet = {
         id: `fleet_${genId()}`,
         name: `${cfg.shipType} ${cfg.ownerId ? corporations.find(c => c.id === cfg.ownerId)?.name?.split(' ')[0] || '' : 'Independent'}-${i + 1}`,
         shipType: cfg.shipType,
-        modelPath: '/models/00007.obj',
+        modelPath: modelPath,
         race: 'teladi',
         capacity: cfg.capacity,
         speed: cfg.speed,
@@ -303,7 +291,6 @@ function createUniverse() {
     
     // ============ Fleet Tick Logic ============
     const now = Date.now()
-    const timeScaleMultiplier = Math.max(0.1, state.timeScale)
     
     // Helper: Find best trade route for a fleet
     const findBestTradeRoute = (fleet: NPCFleet): TradeOrder | null => {
@@ -439,20 +426,79 @@ function createUniverse() {
       
       if (!hasQueuedCommands && !fleet.currentOrder) {
         // Fleet is idle and needs work
-        const order = findBestTradeRoute(fleet)
-        if (order) {
-          fleet.currentOrder = order
-          // Issue high-level trade command
-          // The frontend will handle navigation, docking, and loading
-          issueCommand(fleet.id, { 
-            type: 'trade-buy', 
-            targetStationId: order.buyStationId,
-            targetSectorId: order.buySectorId,
-            wareId: order.buyWareId, 
-            amount: order.buyQty 
-          })
-          fleet.state = 'in-transit' // Generic busy state
-          fleet.stateStartTime = now
+        
+        if (fleet.behavior === 'patrol') {
+          // Patrol logic: Fly to random station in current sector
+          const sectorStations = state.stations.filter(s => s.sectorId === fleet.currentSectorId)
+          if (sectorStations.length > 0) {
+            // 20% chance to switch sectors if connected, BUT only for smaller ships
+            // Capital ships (M1/M2/TL) should stay in home sector mostly
+            const isCapital = fleet.shipType === 'Phoenix' || fleet.shipType === 'Albatross' || fleet.shipType === 'Condor'
+            const switchChance = isCapital ? 0.01 : 0.2
+
+            if (Math.random() < switchChance) {
+              const neighbors = SECTOR_GRAPH[fleet.currentSectorId] || []
+              if (neighbors.length > 0) {
+                const nextSector = neighbors[Math.floor(Math.random() * neighbors.length)]
+                issueCommand(fleet.id, {
+                  type: 'goto-gate',
+                  targetSectorId: nextSector
+                })
+                issueCommand(fleet.id, {
+                  type: 'use-gate',
+                  targetSectorId: nextSector
+                })
+                fleet.state = 'in-transit'
+                fleet.stateStartTime = now
+                continue
+              }
+            }
+
+            const randomStation = sectorStations[Math.floor(Math.random() * sectorStations.length)]
+            // Don't just fly to the same station we are at
+            if (randomStation.id !== fleet.targetStationId) {
+              issueCommand(fleet.id, { 
+                type: 'goto-station', 
+                targetStationId: randomStation.id,
+                targetSectorId: fleet.currentSectorId
+              })
+              fleet.state = 'in-transit'
+              fleet.stateStartTime = now
+            }
+          }
+        } else if (fleet.behavior === 'construction') {
+          // Construction logic: Mostly idle, occasionally move
+          // For now, just stay put or move very rarely
+          if (Math.random() < 0.05) {
+             const sectorStations = state.stations.filter(s => s.sectorId === fleet.currentSectorId)
+             if (sectorStations.length > 0) {
+                const randomStation = sectorStations[Math.floor(Math.random() * sectorStations.length)]
+                issueCommand(fleet.id, { 
+                  type: 'goto-station', 
+                  targetStationId: randomStation.id,
+                  targetSectorId: fleet.currentSectorId
+                })
+                fleet.state = 'in-transit'
+                fleet.stateStartTime = now
+             }
+          }
+        } else {
+          // Trade logic
+          const order = findBestTradeRoute(fleet)
+          if (order) {
+            fleet.currentOrder = order
+            // Issue high-level trade command
+            // The frontend will handle navigation, docking, and loading
+            issueCommand(fleet.id, { 
+              type: 'trade-buy', 
+              targetStationId: order.buyStationId,
+              targetSectorId: order.buySectorId,
+              wareId: order.buyWareId, 
+              amount: order.buyQty 
+            })
+            fleet.state = 'in-transit' // Generic busy state
+            fleet.stateStartTime = now
+          }
         }
       }
     }
@@ -495,6 +541,7 @@ function createUniverse() {
     stationId?: string
     wareId?: string
     amount?: number
+    gateType?: string
     timestamp: number
   }) => {
     const fleet = state.fleets.find(f => f.id === report.fleetId)
@@ -504,7 +551,9 @@ function createUniverse() {
     fleet.position = report.position
     fleet.currentSectorId = report.sectorId
     
-    console.log(`[Universe] Ship report: ${fleet.name} - ${report.type}`)
+    if (report.type !== 'position-update') {
+      console.log(`[Universe] Ship report: ${fleet.name} - ${report.type}`)
+    }
     
     // Handle specific report types
     switch (report.type) {
@@ -523,6 +572,41 @@ function createUniverse() {
 
       case 'arrived-at-gate':
         fleet.state = 'in-transit'
+        break
+
+      case 'entered-sector':
+        if (report.stationId) {
+          fleet.currentSectorId = report.stationId
+          fleet.destinationSectorId = undefined
+          fleet.state = 'in-transit'
+          
+          // Calculate spawn position based on arrival gate
+          // If we left via North gate, we arrive at South gate of new sector
+          // Standard gate positions: N: [0,0,-3000], S: [0,0,3000], W: [-3000,0,0], E: [3000,0,0]
+          // We spawn slightly offset from the gate to avoid collision
+          
+          let spawnPos: [number, number, number] = [0, 0, 0]
+          const offset = 400 // Distance from gate center
+          
+          if (report.gateType === 'N') {
+             // Arrive at South Gate
+             spawnPos = [0, 0, 3000 - offset]
+          } else if (report.gateType === 'S') {
+             // Arrive at North Gate
+             spawnPos = [0, 0, -3000 + offset]
+          } else if (report.gateType === 'W') {
+             // Arrive at East Gate
+             spawnPos = [3000 - offset, 0, 0]
+          } else if (report.gateType === 'E') {
+             // Arrive at West Gate
+             spawnPos = [-3000 + offset, 0, 0]
+          } else {
+             // Fallback to random edge position if gate type unknown
+             spawnPos = randomPos()
+          }
+          
+          fleet.position = spawnPos
+        }
         break
 
       case 'cargo-loaded':
@@ -611,12 +695,6 @@ function createUniverse() {
         }
         break
         
-      case 'entered-sector':
-        if (report.stationId) {
-          fleet.currentSectorId = report.stationId
-          fleet.destinationSectorId = undefined
-          fleet.state = 'in-transit'
-        }
         break
     }
   }

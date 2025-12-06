@@ -8,6 +8,8 @@ import type { NPCFleet, ShipReportType } from '../types/simulation';
 import type { NavGraph, NavObstacle } from '../ai/navigation';
 import { findPath } from '../ai/navigation';
 
+import { updateFleetPosition } from '../store/fleetPositions';
+
 interface GateInfo {
   position: [number, number, number];
   destinationSectorId: string;
@@ -26,6 +28,7 @@ interface NPCTraderProps {
     stationId?: string;
     wareId?: string;
     amount?: number;
+    gateType?: string;
   }) => void;
 }
 
@@ -37,9 +40,9 @@ const DOCK_HOLD_DAMPING = 0.9; // How aggressively to damp velocity while docked
 const IDLE_DAMPING = 0.92;     // Idle damping to prevent jitter
 
 // Ship flight characteristics
-const ACCELERATION = 15;       // Units per second squared
+const BASE_ACCELERATION = 15;       // Units per second squared
 const MAX_SPEED = 180;         // Maximum velocity
-const TURN_RATE = 1.5;         // How fast ship can rotate (radians per second factor)
+const BASE_TURN_RATE = 1.5;         // How fast ship can rotate (radians per second factor)
 const BRAKE_DISTANCE = 300;    // Start slowing down at this distance
 
 /**
@@ -76,6 +79,8 @@ export const NPCTrader: FC<NPCTraderProps> = ({
   const holdDockRef = useRef(false);
   const idleAnchorRef = useRef<Vector3 | null>(null);
   const lastStateRef = useRef<typeof localState>('idle');
+  const lastPositionReportTimeRef = useRef(0);
+  const lastStoreUpdateTimeRef = useRef(0);
   const timeScale = useGameStore((s: GameState) => s.timeScale);
 
   // Local autonomous state
@@ -120,7 +125,14 @@ export const NPCTrader: FC<NPCTraderProps> = ({
       // Add slight offset based on ship id for variety
       const hash = fleet.id.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
       const angle = (hash % 360) * Math.PI / 180;
-      const dist = 30 + (hash % 50);
+      
+      // Capital ships should park further away (they don't dock inside)
+      const isCapital = ['Phoenix', 'Albatross', 'Condor', 'Titan', 'Colossus', 'Mammoth', 'Odysseus', 'Zeus', 'Hercules', 'Ray', 'Shark', 'Orca', 'Python', 'Raptor', 'Elephant'].includes(fleet.shipType);
+      
+      const baseDist = isCapital ? 800 : 30;
+      const varDist = isCapital ? 200 : 50;
+      
+      const dist = baseDist + (hash % varDist);
       return new Vector3(
         pos[0] + Math.cos(angle) * dist,
         pos[1] + (hash % 30) - 15,
@@ -128,7 +140,7 @@ export const NPCTrader: FC<NPCTraderProps> = ({
       );
     }
     return null;
-  }, [stationPositions, fleet.id]);
+  }, [stationPositions, fleet.id, fleet.shipType]);
 
   // Get gate data for a destination sector
   const getGateData = useCallback((destSectorId: string): { pos: Vector3; radius: number } | null => {
@@ -173,7 +185,7 @@ export const NPCTrader: FC<NPCTraderProps> = ({
     }));
   }, [fleet.id]);
 
-  const report = useCallback((type: ShipReportType, extra?: { stationId?: string; wareId?: string; amount?: number; sectorIdOverride?: string }) => {
+  const report = useCallback((type: ShipReportType, extra?: { stationId?: string; wareId?: string; amount?: number; sectorIdOverride?: string; gateType?: string }) => {
     const ship = shipRef.current;
     if (!ship || !onReport) return;
     const pos: [number, number, number] = [ship.position.x, ship.position.y, ship.position.z];
@@ -185,13 +197,14 @@ export const NPCTrader: FC<NPCTraderProps> = ({
       lastReportRef.current = reportKey;
     }
 
-    const { sectorIdOverride, ...restExtra } = extra || {};
+    const { sectorIdOverride, gateType, ...restExtra } = extra || {};
     const sectorId = sectorIdOverride || fleet.currentSectorId;
     const stationId = extra?.stationId || currentCommand?.targetStationId || fleet.targetStationId;
     const payload = {
       sectorId,
       position: pos,
       stationId,
+      gateType,
       ...restExtra,
     };
 
@@ -257,7 +270,15 @@ export const NPCTrader: FC<NPCTraderProps> = ({
 
   // Teleport through gate and update store/report
   const enterGate = useCallback((targetSectorId: string, gatePos: Vector3, shouldAdvance = true) => {
-    report('entered-sector', { stationId: targetSectorId, sectorIdOverride: targetSectorId });
+    // Determine gate type based on position (approximate)
+    let gateType = 'N';
+    if (Math.abs(gatePos.x) > Math.abs(gatePos.z)) {
+      gateType = gatePos.x > 0 ? 'E' : 'W';
+    } else {
+      gateType = gatePos.z > 0 ? 'S' : 'N';
+    }
+    
+    report('entered-sector', { stationId: targetSectorId, sectorIdOverride: targetSectorId, gateType });
     const destPos: [number, number, number] = [gatePos.x, gatePos.y, gatePos.z];
     useGameStore.setState((state: GameState) => ({
       fleets: state.fleets.map((f) => f.id === fleet.id ? {
@@ -415,8 +436,17 @@ export const NPCTrader: FC<NPCTraderProps> = ({
     if (!ship || localState === 'gone') return;
 
     const delta = rawDelta * timeScale;
+    
+    // Adjust physics based on ship class
+    let physicsMult = 1.0;
+    if (fleet.shipType === 'Phoenix' || fleet.shipType === 'Albatross') physicsMult = 0.15;
+    else if (fleet.shipType === 'Osprey') physicsMult = 0.4;
+    else if (fleet.shipType === 'Vulture') physicsMult = 0.8;
+
     const shipMaxSpeed = MAX_SPEED * fleet.speed;
-    const shipAccel = ACCELERATION * fleet.speed;
+    const shipAccel = BASE_ACCELERATION * fleet.speed * (0.5 + 0.5 * physicsMult);
+    const turnRate = BASE_TURN_RATE * (0.3 + 0.7 * physicsMult);
+
     const now = performance.now();
 
     // Simple stuck detection -> trigger a repath
@@ -488,7 +518,7 @@ export const NPCTrader: FC<NPCTraderProps> = ({
         if (speedSq > 1) {
           tmpDir.copy(velocityRef.current).normalize();
           const targetQuat = new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), tmpDir);
-          ship.quaternion.slerp(targetQuat, delta * TURN_RATE * 0.3);
+          ship.quaternion.slerp(targetQuat, delta * turnRate * 0.3);
         }
         break;
       }
@@ -554,7 +584,7 @@ export const NPCTrader: FC<NPCTraderProps> = ({
           if (currentSpeed > 5) {
             tmpDir.copy(velocityRef.current).normalize();
             const targetQuat = new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), tmpDir);
-            ship.quaternion.slerp(targetQuat, delta * TURN_RATE);
+            ship.quaternion.slerp(targetQuat, delta * turnRate);
           }
         } else {
           // Arrived at station - kill velocity
@@ -626,7 +656,7 @@ export const NPCTrader: FC<NPCTraderProps> = ({
           if (velocityRef.current.lengthSq() > 25) {
             tmpDir.copy(velocityRef.current).normalize();
             const targetQuat = new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), tmpDir);
-            ship.quaternion.slerp(targetQuat, delta * TURN_RATE);
+            ship.quaternion.slerp(targetQuat, delta * turnRate);
           }
         } else {
           // Arrived at gate
@@ -684,7 +714,7 @@ export const NPCTrader: FC<NPCTraderProps> = ({
 
           // Face station
           const targetQuat = new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), tmpDir);
-          ship.quaternion.slerp(targetQuat, delta * TURN_RATE * 0.5);
+          ship.quaternion.slerp(targetQuat, delta * turnRate * 0.5);
         } else {
           // Docked
           velocityRef.current.set(0, 0, 0);
@@ -837,7 +867,7 @@ export const NPCTrader: FC<NPCTraderProps> = ({
         if (undockSpeed > 5) {
           tmpDir.copy(velocityRef.current).normalize();
           const targetQuat = new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), tmpDir);
-          ship.quaternion.slerp(targetQuat, delta * TURN_RATE);
+          ship.quaternion.slerp(targetQuat, delta * turnRate);
         }
 
         // After some time, consider undocked
@@ -942,7 +972,7 @@ export const NPCTrader: FC<NPCTraderProps> = ({
           if (velocityRef.current.lengthSq() > 25) {
             tmpDir.copy(velocityRef.current).normalize();
             const targetQuat = new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), tmpDir);
-            ship.quaternion.slerp(targetQuat, delta * TURN_RATE * 2);
+            ship.quaternion.slerp(targetQuat, delta * turnRate * 2);
           }
           const enterRadius = Math.max(120, gateRadius * 0.6);
           if (dist < enterRadius) {
@@ -954,6 +984,20 @@ export const NPCTrader: FC<NPCTraderProps> = ({
         }
         break;
       }
+    }
+
+    // Periodic position reporting
+    // 1. Update local store frequently (10Hz) for smooth map UI
+    if (now - lastStoreUpdateTimeRef.current > 100) {
+      const pos: [number, number, number] = [ship.position.x, ship.position.y, ship.position.z];
+      updateFleetPosition(fleet.id, pos);
+      lastStoreUpdateTimeRef.current = now;
+    }
+
+    // 2. Report to backend less frequently (1Hz) to save bandwidth
+    if (now - lastPositionReportTimeRef.current > 1000) {
+      report('position-update');
+      lastPositionReportTimeRef.current = now;
     }
   });
 

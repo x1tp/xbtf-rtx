@@ -14,7 +14,6 @@ export function ModelGrid({ onSelect, currentModel, page, onPageChange }: ModelG
     const [models, setModels] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
     const [filterCategory, setFilterCategory] = useState<string>('');
-    const [updateTrigger, setUpdateTrigger] = useState(0); // Force re-render on persist update
 
     const pageSize = 12;
 
@@ -31,11 +30,7 @@ export function ModelGrid({ onSelect, currentModel, page, onPageChange }: ModelG
             });
     }, []);
 
-    useEffect(() => {
-        return persist.subscribe(() => {
-            setUpdateTrigger(prev => prev + 1);
-        });
-    }, []);
+
 
     if (loading) {
         return <div style={{ color: '#8ab6d6', padding: 20 }}>Loading models...</div>;
