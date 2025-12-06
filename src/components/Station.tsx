@@ -192,7 +192,13 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
         const clearBodies = () => {
             const w = getWorldSync();
             if (w && colliderBodiesRef.current.length > 0) {
-                colliderBodiesRef.current.forEach((b) => w.removeRigidBody(b));
+                colliderBodiesRef.current.forEach((b) => {
+                    try {
+                        if (w.bodies.contains(b.handle)) w.removeRigidBody(b);
+                    } catch (e) {
+                        console.warn('Station cleanup failed:', e);
+                    }
+                });
             }
             colliderBodiesRef.current = [];
             stationBodyRef.current = null;

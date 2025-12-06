@@ -11,9 +11,9 @@ export const PROFIT_SHARE_BLUEPRINT: SeizewellLayout = {
     { name: 'Teladianium Foundry (L)', modelPath: '/models/00435.obj', position: [60, -10, 220], scale: 32, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
   ],
   gates: [
-    { name: 'East Gate', modelPath: '/models/00088.obj', position: [1200, 0, 0], scale: 50, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, Math.PI / 2, 0] },
-    { name: 'West Gate', modelPath: '/models/00088.obj', position: [-1200, 0, 0], scale: 50, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, Math.PI / 2, 0] },
-    { name: 'South Gate', modelPath: '/models/00088.obj', position: [0, 0, -1200], scale: 50, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, Math.PI / 2, 0] },
+    { name: 'East Gate', modelPath: '/models/00088.obj', position: [3000, 0, 0], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, Math.PI / 2, 0], destinationSectorId: 'seizewell', gateType: 'E' },
+    { name: 'North Gate', modelPath: '/models/00088.obj', position: [0, 0, -3000], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, 0, 0], destinationSectorId: 'ceo_s_buckzoid', gateType: 'N' },
+    { name: 'South Gate', modelPath: '/models/00088.obj', position: [0, 0, 3000], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, 0, 0], destinationSectorId: 'spaceweed_drift', gateType: 'S' },
   ],
   ships: [],
 }

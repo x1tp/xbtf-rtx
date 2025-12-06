@@ -6,6 +6,7 @@ import { Ship } from './components/Ship';
 import { AIShip } from './components/AIShip';
 import { Planet } from './components/Planet';
 import { Station } from './components/Station';
+import { Gate } from './components/Gate';
 import { Sun } from './components/Sun';
 import { Dust } from './components/Dust';
 import { NavigationIndicator } from './components/NavigationIndicator';
@@ -43,12 +44,32 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
         () => layout ? layout.ships.map((s) => ({ ...s, placedPosition: place(s.position) })) : [],
         [layout]
     );
-    const initialShipPos: [number, number, number] = layout ? place(layout.playerStart || [0, 10, 450]) : [0, 10, 450];
+    const arrivalGate = useGameStore((s) => s.arrivalGate);
+    const initialShipPos = useMemo<[number, number, number]>(() => {
+        if (arrivalGate && layout) {
+            const gate = layout.gates.find(g => g.gateType === arrivalGate);
+            if (gate) {
+                const p = place(gate.position);
+                // Gate trigger radius is approx 5 * scale. We need to spawn safely outside.
+                // For scale 300, radius is 1500. Let's start at 2500 (scale * 8 + margin).
+                const safeDist = (gate.scale ?? 40) * 8 + 300;
+                // Offset towards center (0,0,0)
+                const toCenter = new THREE.Vector3(-p[0], 0, -p[2]).normalize();
+
+                // If the gate is at 0,0,0 (e.g. invalid config), fallback.
+                if (toCenter.lengthSq() < 0.001) toCenter.set(0, 0, 1);
+
+                return [p[0] + toCenter.x * safeDist, p[1], p[2] + toCenter.z * safeDist] as [number, number, number];
+            }
+        }
+        return layout ? place(layout.playerStart || [0, 10, 450]) : [0, 10, 450];
+    }, [layout, arrivalGate]);
+
     const [shipPos, setShipPos] = useState<[number, number, number]>(initialShipPos);
     const navData = useAiNavigation(layout, spacing);
     useEffect(() => {
-        setShipPos(layout ? place(layout.playerStart || [0, 10, 450]) : [0, 10, 450]);
-    }, [layout]);
+        setShipPos(initialShipPos);
+    }, [initialShipPos]);
     const sunPosition: [number, number, number] = layout ? layout.sun.position : cfg.sun.position;
     const StarfieldSky: React.FC<{ density?: number; brightness?: number; milkyWayStrength?: number; orientation?: [number, number, number]; radius?: number; fadeMin?: number; fadeMax?: number; viewFadeMin?: number; viewFadeMax?: number; texturePath?: string }> = ({ density = 0.15, brightness = 0.5, milkyWayStrength = 0.22, orientation = [0.0, 0.25, 0.97], radius = 2000000, fadeMin = 0.2, fadeMax = 0.95, viewFadeMin = 0.6, viewFadeMax = 0.85, texturePath }) => {
         const matRef = useRef<THREE.ShaderMaterial | null>(null);
@@ -320,32 +341,30 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
                             />
                         ))}
                         {layout.gates.map((g) => (
-                            <Station
+                            <Gate
                                 key={g.name}
                                 position={place(g.position)}
-                                showLights={false}
-                                rotate={false}
-                                scale={g.scale ?? 42}
                                 modelPath={g.modelPath}
-                                rotationSpeed={0}
-                                rotationAxis={g.rotationAxis ?? 'y'}
-                                rotation={g.rotation ?? [0, Math.PI / 2, 0]}
-                                collisions={g.collisions ?? false}
+                                rotation={g.rotation}
+                                destinationSectorId={g.destinationSectorId}
+                                gateType={g.gateType}
                                 objectName={g.name}
-                                navRadius={(g.scale ?? 42) * 1.1}
+                                scale={g.scale}
                             />
                         ))}
-                        {placedShips.map((s) => (
-                            <AIShip
-                                key={s.name}
-                                name={s.name}
-                                modelPath={s.modelPath}
-                                position={s.placedPosition}
-                                navGraph={navData.graph}
-                                obstacles={navData.obstacles}
-                                size={s.scale ?? 24}
-                            />
-                        ))}
+                        {
+                            placedShips.map((s) => (
+                                <AIShip
+                                    key={s.name}
+                                    name={s.name}
+                                    modelPath={s.modelPath}
+                                    position={s.placedPosition}
+                                    navGraph={navData.graph}
+                                    obstacles={navData.obstacles}
+                                    size={s.scale ?? 24}
+                                />
+                            ))
+                        }
                     </>
                 )
                 : (

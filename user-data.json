@@ -588,7 +588,15 @@
     "/models/00393.obj": "Pirate Ganymede",
     "/models/00394.obj": "Pirate Mule",
     "/models/00395.obj": "Pirate Vulture",
-    "/models/00396.obj": "Pirate Xenon Freighter"
+    "/models/00396.obj": "Pirate Xenon Freighter",
+    "/models/00001.obj": "Teladi Trading Station",
+    "/models/00011.obj": "Boron Bio Gas Factory / BoFu Chemical La",
+    "/models/00067.obj": "Boron Plankton Farm",
+    "/models/00182.obj": "Argon Farm",
+    "/models/00276.obj": "Paranid Farm",
+    "/models/00282.obj": "Teladi Farm",
+    "/models/00283.obj": " Teladi Sun Oil Refinery",
+    "/models/00430.obj": "Beta I.R.E. Laser Forge"
   },
   "plumes": {
     "ship:engineMarkers:/models/00140.obj": {
@@ -630,15 +638,37 @@
           "type": "blue_short"
         }
       ]
+    },
+    "ship:engineMarkers:/models/00000.obj": {
+      "positions": [
+        {
+          "x": 6.789754540242683,
+          "y": 0.4932009633672692,
+          "z": 13.947999954223633,
+          "type": "blue_short"
+        },
+        {
+          "x": -6.787460803937052,
+          "y": 0.6719559911889952,
+          "z": 13.947999954223636,
+          "type": "blue_short"
+        }
+      ]
     }
   },
   "cockpits": {
     "ship:cockpit:/models/00140.obj": {
       "position": null
+    },
+    "ship:cockpit:/models/00000.obj": {
+      "position": null
     }
   },
   "weapons": {
     "ship:weapons:/models/00140.obj": {
+      "positions": []
+    },
+    "ship:weapons:/models/00000.obj": {
       "positions": []
     }
   }

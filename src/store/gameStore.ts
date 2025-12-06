@@ -41,6 +41,7 @@ interface GameState {
   selectedTarget: NavTarget | null;
   selectedSectorId: string | null;
   currentSectorId: string | null;
+  arrivalGate: 'N' | 'S' | 'W' | 'E' | null | undefined;
   navIndicatorState: NavIndicatorState;
   navObjects: NavTarget[];
   toggleSectorMap: () => void;
@@ -49,6 +50,7 @@ interface GameState {
   setUniverseMapOpen: (open: boolean) => void;
   setSelectedSectorId: (id: string | null) => void;
   setCurrentSectorId: (id: string | null) => void;
+  setSectorTransition: (id: string, arrivalGate?: 'N' | 'S' | 'W' | 'E') => void;
   setSelectedTarget: (target: NavTarget | null) => void;
   setNavIndicatorState: (state: NavIndicatorState) => void;
   setNavObjects: (objects: NavTarget[]) => void;
@@ -92,6 +94,7 @@ export const useGameStore = create<GameState>((set) => ({
   selectedTarget: null,
   selectedSectorId: null,
   currentSectorId: 'seizewell',
+  arrivalGate: null,
   navIndicatorState: { screenX: 0, screenY: 0, distance: 0, isOnScreen: false, angle: 0 },
   navObjects: [],
   toggleSectorMap: () => set((state) => ({ sectorMapOpen: !state.sectorMapOpen })),
@@ -100,6 +103,7 @@ export const useGameStore = create<GameState>((set) => ({
   setUniverseMapOpen: (open) => set({ universeMapOpen: open }),
   setSelectedSectorId: (id) => set({ selectedSectorId: id }),
   setCurrentSectorId: (id) => set({ currentSectorId: id }),
+  setSectorTransition: (id, gate) => set({ currentSectorId: id, arrivalGate: gate }),
   setSelectedTarget: (target) => set({ selectedTarget: target }),
   setNavIndicatorState: (state) => set({ navIndicatorState: state }),
   setNavObjects: (objects) => set({ navObjects: objects }),

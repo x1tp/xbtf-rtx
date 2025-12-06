@@ -1,3 +1,10 @@
+import { UNIVERSE_SECTORS_XBTF } from './universe_xbtf'
+import type { SeizewellLayout, BlueprintObject } from './seizewell'
+import { TELADI_GAIN_BLUEPRINT } from './teladi_gain'
+import { PROFIT_SHARE_BLUEPRINT } from './profit_share'
+import { GREATER_PROFIT_BLUEPRINT } from './greater_profit'
+import { SEIZEWELL_BLUEPRINT } from './seizewell'
+
 export interface SectorConfig {
   sun: { position: [number, number, number]; size: number; color: string; intensity: number };
   planet: { position: [number, number, number]; size: number };
@@ -12,14 +19,6 @@ export const DEFAULT_SECTOR_CONFIG: SectorConfig = {
   station: { position: [50, 0, -120], scale: 40, modelPath: '/models/00001.obj', rotationSpeed: -0.05, rotationAxis: 'z' },
   asteroids: { count: 500, range: 400, center: [-250, 80, -900] }
 };
-import { UNIVERSE_SECTORS_XBTF } from './universe_xbtf'
-import type { SeizewellLayout } from './seizewell'
-import { TELADI_GAIN_BLUEPRINT } from './teladi_gain'
-import { PROFIT_SHARE_BLUEPRINT } from './profit_share'
-import { GREATER_PROFIT_BLUEPRINT } from './greater_profit'
-import { SEIZEWELL_BLUEPRINT } from './seizewell'
-
-
 
 const MANUAL_SECTOR_LAYOUTS: Record<string, SeizewellLayout> = {
   seizewell: SEIZEWELL_BLUEPRINT,
@@ -31,7 +30,7 @@ const MANUAL_SECTOR_LAYOUTS: Record<string, SeizewellLayout> = {
 export const getSectorLayoutById = (id: string): SeizewellLayout => {
   const sector = UNIVERSE_SECTORS_XBTF.find((s) => s.id === id) || UNIVERSE_SECTORS_XBTF[0]
 
-  const gates = (sector?.neighbors || []).map((nm) => {
+  const generatedGates = (sector?.neighbors || []).map((nm) => {
     const neighbor = UNIVERSE_SECTORS_XBTF.find((s) => s.name === nm)
     if (!neighbor) return null
 
@@ -41,37 +40,43 @@ export const getSectorLayoutById = (id: string): SeizewellLayout => {
     let name = 'Gate'
     let position: [number, number, number] = [0, 0, 0]
     let rotation: [number, number, number] = [0, 0, 0]
+    let gateType: 'N' | 'S' | 'W' | 'E' | undefined
 
     if (dx === 1) {
       name = 'East Gate'
-      position = [1000, 0, 0]
+      position = [5000, 0, 0]
       rotation = [0, Math.PI / 2, 0]
+      gateType = 'E'
     } else if (dx === -1) {
       name = 'West Gate'
-      position = [-1000, 0, 0]
-      rotation = [0, -Math.PI / 2, 0]
+      position = [-5000, 0, 0]
+      rotation = [0, Math.PI / 2, 0]
+      gateType = 'W'
     } else if (dy === 1) {
       name = 'South Gate'
-      position = [0, 0, 1000]
+      position = [0, 0, 5000]
       rotation = [0, 0, 0]
+      gateType = 'S'
     } else if (dy === -1) {
       name = 'North Gate'
-      position = [0, 0, -1000]
-      rotation = [0, Math.PI, 0]
+      position = [0, 0, -5000]
+      rotation = [0, 0, 0]
+      gateType = 'N'
     } else {
       // Fallback for non-adjacent jumps if any
       name = 'Gate'
       position = [2000, 0, 2000]
     }
 
-    return { name, position, rotation, modelPath: '/models/00088.obj' }
-  }).filter((g): g is { name: string; position: [number, number, number]; rotation: [number, number, number]; modelPath: string } => !!g)
+    return { name, position, rotation, modelPath: '/models/00088.obj', destinationSectorId: neighbor.id, gateType, scale: 300 }
+  }).filter((g) => !!g) as BlueprintObject[]
 
   const manual = MANUAL_SECTOR_LAYOUTS[id as keyof typeof MANUAL_SECTOR_LAYOUTS]
   if (manual) {
     return {
       ...manual,
-      gates
+      // If manual layout has gates, use them. Otherwise use generated gates.
+      gates: (manual.gates && manual.gates.length > 0) ? manual.gates : generatedGates
     }
   }
   const stations = [
@@ -81,7 +86,7 @@ export const getSectorLayoutById = (id: string): SeizewellLayout => {
   const planetPosition = [-4534400, -1700400, -19838000] as [number, number, number]
   const playerStart: [number, number, number] = [0, 50, 900]
   return {
-    gates,
+    gates: generatedGates,
     stations,
     ships: [],
     sun: { position: sunPosition, size: DEFAULT_SECTOR_CONFIG.sun.size, color: DEFAULT_SECTOR_CONFIG.sun.color, intensity: DEFAULT_SECTOR_CONFIG.sun.intensity },

@@ -1,6 +1,7 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
 import { useGameStore } from '../store/gameStore';
-import { Mesh, ShaderMaterial, Color, AdditiveBlending, CanvasTexture, SpriteMaterial, SRGBColorSpace, Vector3 } from 'three';
+import { Mesh, ShaderMaterial, Color, AdditiveBlending, CanvasTexture, SpriteMaterial, SRGBColorSpace, Vector3, DirectionalLight, Object3D } from 'three';
 
 interface SunProps {
     position?: [number, number, number];
@@ -24,6 +25,16 @@ export const Sun: React.FC<SunProps> = ({
     const meshRef = useRef<Mesh>(null);
     const sunAdapt = useGameStore((state) => state.sunAdapt);
     const sunIntensity = useGameStore((state) => state.sunIntensity);
+    const { camera, scene } = useThree();
+    const lightRef = useRef<DirectionalLight>(null);
+    const targetRef = useRef<Object3D>(new Object3D());
+
+    useEffect(() => {
+        if (targetRef.current) scene.add(targetRef.current);
+        return () => {
+            if (targetRef.current) scene.remove(targetRef.current);
+        };
+    }, [scene]);
 
     // Direction from origin toward the sun; used for lighting and flares
     const sunDir = useMemo(() => {
@@ -186,6 +197,20 @@ export const Sun: React.FC<SunProps> = ({
 
     const flareVisibility = sunIntensity; // Stronger when looking near the sun
 
+    useFrame(() => {
+        if (lightRef.current && targetRef.current) {
+            // Keep shadow camera focused on viewer for max resolution
+            const center = camera.position;
+            targetRef.current.position.copy(center);
+
+            // Offset light to maintain sun direction relative to player
+            const offset = sunDir.clone().multiplyScalar(5000);
+            lightRef.current.position.copy(center).add(offset);
+            lightRef.current.target = targetRef.current;
+            lightRef.current.updateMatrixWorld();
+        }
+    });
+
     return (
         <>
             <group position={position}>
@@ -214,6 +239,7 @@ export const Sun: React.FC<SunProps> = ({
 
             {/* Directional light, kept near the scene but aligned with the sun */}
             <directionalLight
+                ref={lightRef}
                 position={lightPosition.toArray() as [number, number, number]}
                 intensity={currentIntensity}
                 color={color}
@@ -221,13 +247,13 @@ export const Sun: React.FC<SunProps> = ({
                 shadow-mapSize-width={4096}
                 shadow-mapSize-height={4096}
                 shadow-camera-near={1}
-                shadow-camera-far={400000}
-                shadow-camera-left={-10000}
-                shadow-camera-right={10000}
-                shadow-camera-top={10000}
-                shadow-camera-bottom={-10000}
-                shadow-bias={-0.0005}
-                shadow-normalBias={0.02}
+                shadow-camera-far={10000}
+                shadow-camera-left={-4000}
+                shadow-camera-right={4000}
+                shadow-camera-top={4000}
+                shadow-camera-bottom={-4000}
+                shadow-bias={-0.001}
+                shadow-normalBias={0.04}
                 shadow-radius={2}
             />
         </>

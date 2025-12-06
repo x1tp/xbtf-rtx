@@ -12,9 +12,9 @@ export const TELADI_GAIN_BLUEPRINT: SeizewellLayout = {
     { name: 'Flower Farm (M)', modelPath: '/models/00403.obj', position: [120, -20, 420], scale: 26, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
   ],
   gates: [
-    { name: 'South Gate', modelPath: '/models/00088.obj', position: [0, 0, -1200], scale: 50, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, Math.PI / 2, 0] },
-    { name: 'East Gate', modelPath: '/models/00088.obj', position: [1200, 0, 0], scale: 50, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, Math.PI / 2, 0] },
-    { name: 'West Gate', modelPath: '/models/00088.obj', position: [-1200, 0, 0], scale: 50, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, Math.PI / 2, 0] },
+    { name: 'South Gate', modelPath: '/models/00088.obj', position: [0, 0, -1200], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, Math.PI / 2, 0] },
+    { name: 'East Gate', modelPath: '/models/00088.obj', position: [1200, 0, 0], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, Math.PI / 2, 0] },
+    { name: 'West Gate', modelPath: '/models/00088.obj', position: [-1200, 0, 0], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, Math.PI / 2, 0] },
   ],
   ships: [
     { name: 'Osprey (M6)', modelPath: '/models/00141.obj', position: [480, 10, 220], scale: 18, rotationAxis: 'y', rotationSpeed: 0, collisions: false },

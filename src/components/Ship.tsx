@@ -152,11 +152,11 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
             const b = new Box3().setFromObject(shipRef.current);
             const s = b.getSize(new Vector3());
             // Keep the collider modest but wide enough to cover the wings
-            const base = new Vector3(s.x * 0.5, s.y * 0.5, s.z * 0.5).multiplyScalar(0.55);
+            const base = new Vector3(s.x * 0.5, s.y * 0.5, s.z * 0.5).multiplyScalar(0.95);
             shipHalfExtentsRef.current.set(
-                Math.max(2.4, base.x),
-                Math.max(0.9, base.y),
-                Math.max(3.0, base.z)
+                Math.max(8.0, base.x),
+                Math.max(3.0, base.y),
+                Math.max(10.0, base.z)
             );
         }
         (async () => {
@@ -167,8 +167,9 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
             const rbDesc = RAPIER.RigidBodyDesc.kinematicVelocityBased().setCcdEnabled(true);
             const body = world.createRigidBody(rbDesc);
             const he = shipHalfExtentsRef.current;
-            const controller = world.createCharacterController(0.02);
+            const controller = world.createCharacterController(0.5);
             controller.setApplyImpulsesToDynamicBodies(true);
+            // controller.setUp({ x: 0, y: 0, z: 0 }); // Reverted to default for better wall blocking
             if (cancelled) {
                 world.removeRigidBody(body);
                 return;
@@ -184,7 +185,7 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
             }
             shipColliderRef.current = collider;
             characterControllerRef.current = controller;
-            console.log('Ship physics initialized. HalfExtents:', he, 'Hull:', !!hullColliderRef.current);
+            console.log('Ship physics initialized. HalfExtents:', he, 'Hull:', !!hullColliderRef.current, 'Offset: 0.5, FreeFlight: OFF, DefaultSize: LARGE');
         })();
 
         return () => {
@@ -434,12 +435,22 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
             if (result.x !== 0 || result.y !== 0 || result.z !== 0) {
                 const newPos = origin.clone().add(new Vector3(result.x, result.y, result.z));
                 ship.position.copy(newPos);
-                collided = (Math.abs(result.x - move.x) + Math.abs(result.y - move.y) + Math.abs(result.z - move.z)) > 1e-6;
+
+                // Check if we were obstructed (result differs from intended move)
+                collided = (Math.abs(result.x - move.x) + Math.abs(result.y - move.y) + Math.abs(result.z - move.z)) > 1e-4;
+
                 if (collided) {
-                    console.log('Ship collided!', result, move);
-                    const n = new Vector3(move.x - result.x, move.y - result.y, move.z - result.z).normalize();
-                    const vn = n.clone().multiplyScalar(velocity.dot(n));
-                    velocity.sub(vn).multiplyScalar(0.9);
+                    // Update local velocity to match the actual World Space movement
+                    // This prevents "pushing" - if we stopped, our velocity should become 0
+                    const actualMove = new Vector3(result.x, result.y, result.z);
+                    const actualVel = actualMove.divideScalar(delta); // World space velocity
+
+                    // Project back to local space
+                    velocity.x = actualVel.dot(right);
+                    velocity.y = actualVel.dot(up);
+                    velocity.z = actualVel.dot(forward);
+
+                    // console.log('Collision corrected velocity:', velocity);
                 }
             }
         }

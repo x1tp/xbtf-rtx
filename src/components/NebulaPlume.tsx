@@ -163,12 +163,6 @@ export const NebulaPlume: FC<NebulaPlumeProps> = ({
     const particles = particlesRef.current
     const sprites = spritesRef.current
     
-    // Count active particles
-    const activeCount = particles.filter(p => p.active).length
-    if (particles.length > 0 && Math.random() < 0.01) {
-      console.log(`Particles: ${activeCount}/${particles.length}, max: ${maxParticles}, rate: ${safeEmissionRate}, throttle: ${currentThrottle}`)
-    }
-    
     // Emit new particles
     if (currentThrottle > 0.1) {
       emitTimerRef.current += delta

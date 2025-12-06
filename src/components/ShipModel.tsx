@@ -1,11 +1,13 @@
 import type { FC } from 'react';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLoader, useFrame, useThree } from '@react-three/fiber';
+import { persist } from '../services/persist';
 import { OBJLoader, MTLLoader } from 'three-stdlib';
 import { NebulaPlume } from './NebulaPlume';
 import { AdditiveBlending, Box3, CanvasTexture, Color, Group, SpriteMaterial, Vector3, Texture, LinearMipmapLinearFilter, LinearFilter, SRGBColorSpace, LinearSRGBColorSpace, Mesh, RepeatWrapping, DoubleSide, Material, TextureLoader, MeshPhongMaterial } from 'three';
 import { useGameStore } from '../store/gameStore';
 import { getAllPresets } from '../config/plumes';
+import { getShipStats } from '../config/ships';
 
 
 interface ShipModelProps {
@@ -23,6 +25,25 @@ interface ShipModelProps {
 
 export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'ShipModel', modelPath, editorMode = false, disableTextures = false, markerOverrides, plumePositions, cockpitPosition, weaponPositions, throttle }) => {
     const objPath = modelPath || '/models/00000.obj';
+
+    const stats = useMemo(() => getShipStats(objPath), [objPath]);
+    const scaleFactor = useMemo(() => {
+        const map: Record<string, number> = {
+            'M1': 6.0,
+            'M2': 5.0,
+            'TL': 5.0,
+            'M6': 2.0,
+            'M3': 1.0,
+            'M4': 0.8,
+            'M5': 0.6,
+            'TS': 1.5,
+            'TP': 1.5,
+            'GO': 1.0,
+            'UNKNOWN': 1.0
+        };
+        return map[stats.class] || 1.0;
+    }, [stats.class]);
+
     const mtlPath = objPath.endsWith('.obj') ? objPath.replace('.obj', '.mtl') : '/models/00000.mtl';
     // Most converted BOD models need flipY disabled to display textures correctly
     const needsFlipYFix = true; // Apply to all models for consistency with Blender
@@ -218,6 +239,19 @@ export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'Shi
         };
         void run();
     }, [gl, materials, mtlPath, obj, disableTextures]);
+
+    // Load plumes from persist (user-data.json)
+    const [persistedPlumes, setPersistedPlumes] = useState<{ x: number; y: number; z: number; type?: string }[]>(() => persist.getPlumes(objPath));
+
+    useEffect(() => {
+        const update = () => {
+            setPersistedPlumes(persist.getPlumes(objPath));
+        };
+        // Initial fetch in case persist loaded after mount
+        update();
+        return persist.subscribe(update);
+    }, [objPath]);
+
     const initialMarkers = useMemo(() => {
         const rawInit = typeof window !== 'undefined' ? window.localStorage.getItem('ship:engineMarkers:' + objPath) : null;
         if (rawInit) {
@@ -231,7 +265,11 @@ export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'Shi
     const markers = useMemo(() => {
         if (plumePositions) return plumePositions;
         if (markerOverrides) return markerOverrides;
+        // Check persisted plumes first (server/admin tool)
+        if (persistedPlumes && persistedPlumes.length > 0) return persistedPlumes;
+        // Fallback to legacy localStorage
         if (initialMarkers.length > 0) return initialMarkers;
+
         const box = new Box3().setFromObject(obj);
         const size = box.getSize(new Vector3());
         const center = box.getCenter(new Vector3());
@@ -242,7 +280,7 @@ export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'Shi
             { x: center.x - spread, y, z: zBack, type: 'standard' },
             { x: center.x + spread, y, z: zBack, type: 'standard' }
         ];
-    }, [initialMarkers, markerOverrides, plumePositions, obj]);
+    }, [persistedPlumes, initialMarkers, markerOverrides, plumePositions, obj]);
     const glowTex = useMemo(() => {
         const c = document.createElement('canvas');
         c.width = 128; c.height = 128;
@@ -289,7 +327,7 @@ export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'Shi
 
 
     return (
-        <group position={[0, -0.3, 0.0]} name={name}>
+        <group position={[0, -0.3, 0.0]} name={name} scale={[scaleFactor, scaleFactor, scaleFactor]}>
             <primitive object={obj} />
             {markers.map((m, i) => {
                 const allPresets = getAllPresets();
