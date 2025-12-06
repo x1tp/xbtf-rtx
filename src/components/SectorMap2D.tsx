@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useGameStore } from '../store/gameStore';
+import { useGameStore, type GameState } from '../store/gameStore';
 import type { NavTarget } from '../store/gameStore';
+import type { NPCFleet } from '../types/simulation';
 import { UNIVERSE_SECTORS_XBTF } from '../config/universe_xbtf';
 import { getSectorLayoutById } from '../config/sector';
 
@@ -68,16 +69,17 @@ const getObjectIcon = (type: string, isSelected: boolean, isPlayer: boolean) => 
 type AxisView = 'xz' | 'xy' | 'yz';
 
 export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition = [0, 0, 0] }) => {
-    const sectorMapOpen = useGameStore((s) => s.sectorMapOpen);
-    const setSectorMapOpen = useGameStore((s) => s.setSectorMapOpen);
-    const setUniverseMapOpen = useGameStore((s) => s.setUniverseMapOpen);
-    const setCurrentSectorId = useGameStore((s) => s.setCurrentSectorId);
-    const currentSectorId = useGameStore((s) => s.currentSectorId);
-    const selectedSectorId = useGameStore((s) => s.selectedSectorId);
-    const setSelectedTarget = useGameStore((s) => s.setSelectedTarget);
-    const selectedTarget = useGameStore((s) => s.selectedTarget);
-    const storePosition = useGameStore((s) => s.position);
-    const storeObjects = useGameStore((s) => s.navObjects);
+    const sectorMapOpen = useGameStore((s: GameState) => s.sectorMapOpen);
+    const setSectorMapOpen = useGameStore((s: GameState) => s.setSectorMapOpen);
+    const setUniverseMapOpen = useGameStore((s: GameState) => s.setUniverseMapOpen);
+    const setCurrentSectorId = useGameStore((s: GameState) => s.setCurrentSectorId);
+    const currentSectorId = useGameStore((s: GameState) => s.currentSectorId);
+    const selectedSectorId = useGameStore((s: GameState) => s.selectedSectorId);
+    const setSelectedTarget = useGameStore((s: GameState) => s.setSelectedTarget);
+    const selectedTarget = useGameStore((s: GameState) => s.selectedTarget);
+    const storePosition = useGameStore((s: GameState) => s.position);
+    const storeObjects = useGameStore((s: GameState) => s.navObjects);
+    const fleets = useGameStore((s: GameState) => s.fleets);
 
     const [activeTab, setActiveTab] = useState<TabType>('all');
     const [zoom, setZoom] = useState(1);
@@ -92,9 +94,12 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
     // Compute objects to display:
     // 1. If props.objects provided, use them.
     // 2. If viewing a remote sector (selectedSectorId != currentSectorId), generate them.
-    // 3. Otherwise use storeObjects (live current sector objects).
+    // 3. Otherwise use storeObjects (live current sector objects) + NPC fleets.
     const objectsToRender = React.useMemo(() => {
         if (objects) return objects;
+
+        // Helper to get sector ID to filter fleets
+        const targetSectorId = selectedSectorId || currentSectorId;
 
         // If we are looking at a different sector than the one we are in
         if (selectedSectorId && selectedSectorId !== currentSectorId) {
@@ -114,11 +119,25 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
             layout.gates.forEach((g, i) => { list.push({ name: g.name, position: place(g.position), type: 'gate', targetSectorId: nb[i] }); });
             for (const s of layout.ships) list.push({ name: s.name, position: place(s.position), type: 'ship' });
 
+            // Add NPC fleets in this sector
+            const sectorFleets = fleets.filter((f: NPCFleet) => f.currentSectorId === targetSectorId && f.state !== 'in-transit');
+            for (const f of sectorFleets) {
+                list.push({ name: f.name, position: f.position, type: 'ship' });
+            }
+
             return list;
         }
 
-        return storeObjects;
-    }, [objects, selectedSectorId, currentSectorId, storeObjects]);
+        // Current sector: combine static objects with live fleet positions
+        const sectorFleets = fleets.filter((f: NPCFleet) => f.currentSectorId === targetSectorId && f.state !== 'in-transit');
+        const fleetObjects: SectorObject[] = sectorFleets.map((f: NPCFleet) => ({
+            name: f.name,
+            position: f.position,
+            type: 'ship' as const
+        }));
+
+        return [...storeObjects, ...fleetObjects];
+    }, [objects, selectedSectorId, currentSectorId, storeObjects, fleets]);
 
     const mapRef = useRef<SVGSVGElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);

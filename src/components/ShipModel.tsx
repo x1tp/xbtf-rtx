@@ -5,7 +5,7 @@ import { persist } from '../services/persist';
 import { OBJLoader, MTLLoader } from 'three-stdlib';
 import { NebulaPlume } from './NebulaPlume';
 import { AdditiveBlending, Box3, CanvasTexture, Color, Group, SpriteMaterial, Vector3, Texture, LinearMipmapLinearFilter, LinearFilter, SRGBColorSpace, LinearSRGBColorSpace, Mesh, RepeatWrapping, DoubleSide, Material, TextureLoader, MeshPhongMaterial } from 'three';
-import { useGameStore } from '../store/gameStore';
+import { useGameStore, type GameState } from '../store/gameStore';
 import { getAllPresets } from '../config/plumes';
 import { getShipStats } from '../config/ships';
 
@@ -52,12 +52,16 @@ export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'Shi
         loader.setResourcePath(rp);
         loader.setCrossOrigin('anonymous');
     });
-    const obj = useLoader(OBJLoader, objPath, (loader) => {
+    const loadedObj = useLoader(OBJLoader, objPath, (loader) => {
         if (!disableTextures) {
             materials.preload();
             loader.setMaterials(materials);
         }
     });
+    
+    // Clone the loaded object so each instance has its own copy
+    // This is necessary because useLoader caches by path, but Three.js objects can only have one parent
+    const obj = useMemo(() => loadedObj.clone(), [loadedObj]);
     useEffect(() => {
         obj.traverse((child) => {
             if (child instanceof Mesh) {
@@ -302,7 +306,7 @@ export const ShipModel: FC<ShipModelProps> = ({ enableLights = true, name = 'Shi
     const groupsRef = useRef<Record<number, Group | null>>({});
 
     // Use passed throttle or fallback to store (legacy/player)
-    const storeThrottle = useGameStore((state) => state.throttle);
+    const storeThrottle = useGameStore((state: GameState) => state.throttle);
     const currentThrottle = throttle !== undefined ? throttle : storeThrottle;
 
     useFrame(() => {

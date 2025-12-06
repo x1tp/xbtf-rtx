@@ -1,4 +1,4 @@
-import { Suspense, useRef, useState, useEffect } from 'react';
+import { Suspense, useRef, useState, useEffect, Fragment } from 'react';
 import { persist } from './services/persist';
 import { Canvas, useThree } from '@react-three/fiber';
 import { Scene } from './Scene';
@@ -29,6 +29,7 @@ import { EnginePlume } from './components/EnginePlume';
 import { UniverseMap } from './components/UniverseMap';
 import { EconomyTicker } from './components/EconomyTicker';
 import { getAllPresets } from './config/plumes';
+import { StationInfo } from './components/StationInfo';
 
 
 function OverExposureOverlay() {
@@ -165,6 +166,7 @@ function App() {
       <OverExposureOverlay />
       <SmartLoader />
       <HUD />
+      <StationInfo />
       <SectorMap2D />
       <UniverseMap />
       <OffScreenArrow />
@@ -728,32 +730,95 @@ function EconomyAdmin() {
   const recipes = useGameStore((s) => s.recipes)
   const stations = useGameStore((s) => s.stations)
   const sectorPrices = useGameStore((s) => s.sectorPrices)
+  const fleets = useGameStore((s) => s.fleets)
+  const tradeLog = useGameStore((s) => s.tradeLog)
   const initEconomy = useGameStore((s) => s.initEconomy)
   const tickEconomy = useGameStore((s) => s.tickEconomy)
   const timeScale = useGameStore((s) => s.timeScale)
   const setTimeScale = useGameStore((s) => s.setTimeScale)
   const syncEconomy = useGameStore((s) => s.syncEconomy)
   const [sectorFilter, setSectorFilter] = useState('all')
+  const [activeTab, setActiveTab] = useState<'economy' | 'fleets'>('economy')
   const sectorList = Array.from(new Set<string>([...stations.map((st) => st.sectorId), ...Object.keys(sectorPrices)])).sort()
   const wareMap = new Map<string, string>(wares.map((w) => [w.id, w.name]))
   const recipeMap = new Map<string, { id: string; productId: string; inputs: { wareId: string; amount: number }[]; cycleTimeSec: number; batchSize: number }>(recipes.map((r) => [r.id, r]))
   const visibleStations = stations.filter((st) => sectorFilter === 'all' || st.sectorId === sectorFilter)
+  const visibleFleets = fleets.filter((f) => sectorFilter === 'all' || f.currentSectorId === sectorFilter || f.destinationSectorId === sectorFilter)
   useEffect(() => { syncEconomy() }, [syncEconomy])
   useEffect(() => { const id = setInterval(() => syncEconomy(), 1000); return () => clearInterval(id) }, [syncEconomy])
+
+  const getStateColor = (state: string) => {
+    switch (state) {
+      case 'idle': return '#6090a0'
+      case 'loading': return '#44aaff'
+      case 'unloading': return '#ff9944'
+      case 'in-transit': return '#88cc44'
+      case 'docking': return '#aa88ff'
+      case 'undocking': return '#ff88aa'
+      default: return '#888888'
+    }
+  }
+
+  const getOwnerColor = (owner: string) => {
+    switch (owner) {
+      case 'argon': return '#6ad0ff'
+      case 'boron': return '#66ffa6'
+      case 'paranid': return '#ffcc66'
+      case 'split': return '#ff8888'
+      case 'teladi': return '#a6ff66'
+      case 'pirate': return '#ffaa66'
+      case 'xenon': return '#cccccc'
+      default: return '#888888'
+    }
+  }
+
+  const formatTime = (ms: number) => {
+    const s = Math.floor(ms / 1000)
+    const m = Math.floor(s / 60)
+    const sec = s % 60
+    return m > 0 ? `${m}m ${sec}s` : `${sec}s`
+  }
   return (
-    <div style={{ width: '100vw', height: '100vh', background: '#0b1016', color: '#c3e7ff', fontFamily: 'monospace' }}>
-      <div style={{ padding: 20, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, height: '100%', boxSizing: 'border-box' }}>
-        <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ fontSize: 18 }}>Economy Admin</span>
-            <span style={{ color: '#8ab6d6' }}>{wares.length} wares • {recipes.length} recipes • {stations.length} stations</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button onClick={() => initEconomy()} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Init</button>
-            <button onClick={() => tickEconomy(10)} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Tick +10s</button>
-            <button onClick={() => setTimeScale(timeScale === 1 ? 10 : 1)} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Time {timeScale.toFixed(1)}x</button>
-            <button onClick={() => { window.location.assign('/admin'); }} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Back</button>
-          </div>
+    <div style={{ width: '100vw', height: '100vh', background: '#0b1016', color: '#c3e7ff', fontFamily: 'monospace', display: 'flex', flexDirection: 'column' }}>
+      {/* Header */}
+      <div style={{ padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #184b6a', background: '#0a1520' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <span style={{ fontSize: 18, fontWeight: 'bold' }}>Economy Admin</span>
+          <span style={{ color: '#8ab6d6' }}>{wares.length} wares • {recipes.length} recipes • {stations.length} stations • {fleets.length} fleets</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button onClick={() => initEconomy()} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff', cursor: 'pointer' }}>Init</button>
+          <button onClick={() => tickEconomy(10)} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff', cursor: 'pointer' }}>Tick +10s</button>
+          <button onClick={() => setTimeScale(timeScale === 1 ? 10 : 1)} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff', cursor: 'pointer' }}>Time {timeScale.toFixed(1)}x</button>
+          <button onClick={() => { window.location.assign('/admin'); }} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff', cursor: 'pointer' }}>Back</button>
+        </div>
+      </div>
+
+      {/* Tabs and Filter */}
+      <div style={{ padding: '8px 20px', display: 'flex', alignItems: 'center', gap: 16, borderBottom: '1px solid #184b6a', background: '#0c1820' }}>
+        <div style={{ display: 'flex', gap: 4 }}>
+          <button 
+            onClick={() => setActiveTab('economy')} 
+            style={{ 
+              padding: '6px 16px', 
+              border: activeTab === 'economy' ? '1px solid #3fb6ff' : '1px solid #184b6a', 
+              background: activeTab === 'economy' ? '#1a3a50' : '#0f2230', 
+              color: activeTab === 'economy' ? '#fff' : '#8ab6d6', 
+              cursor: 'pointer',
+              borderRadius: '4px 4px 0 0'
+            }}
+          >Economy</button>
+          <button 
+            onClick={() => setActiveTab('fleets')} 
+            style={{ 
+              padding: '6px 16px', 
+              border: activeTab === 'fleets' ? '1px solid #3fb6ff' : '1px solid #184b6a', 
+              background: activeTab === 'fleets' ? '#1a3a50' : '#0f2230', 
+              color: activeTab === 'fleets' ? '#fff' : '#8ab6d6', 
+              cursor: 'pointer',
+              borderRadius: '4px 4px 0 0'
+            }}
+          >Fleets ({fleets.length})</button>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span>Sector</span>
@@ -762,6 +827,12 @@ function EconomyAdmin() {
             {sectorList.map((sid) => (<option key={sid} value={sid}>{sid}</option>))}
           </select>
         </div>
+      </div>
+
+      {/* Content */}
+      <div style={{ flex: 1, padding: 20, overflow: 'auto' }}>
+        {activeTab === 'economy' ? (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, height: '100%' }}>
         <div style={{ background: '#0f2230', border: '1px solid #184b6a', borderRadius: 6, padding: 12, overflow: 'auto' }}>
           <div style={{ marginBottom: 8, color: '#8ab6d6' }}>Sector Prices</div>
           {sectorFilter === 'all' ? (
@@ -829,10 +900,10 @@ function EconomyAdmin() {
                     ) : (
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 4 }}>
                         {inv.map(([wid, qty]) => (
-                          <>
+                          <Fragment key={wid}>
                             <div style={{ color: '#c3e7ff' }}>{wareMap.get(wid) || wid}</div>
                             <div style={{ color: '#ffaa44', textAlign: 'right' }}>{Math.round(qty)}</div>
-                          </>
+                          </Fragment>
                         ))}
                       </div>
                     )}
@@ -866,6 +937,184 @@ function EconomyAdmin() {
             ))}
           </div>
         </div>
+          </div>
+        ) : (
+          /* Fleets Tab */
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, height: '100%' }}>
+            {/* Active Fleets */}
+            <div style={{ background: '#0f2230', border: '1px solid #184b6a', borderRadius: 6, padding: 12, overflow: 'auto' }}>
+              <div style={{ marginBottom: 12, color: '#8ab6d6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Active Fleets ({visibleFleets.length})</span>
+                <div style={{ display: 'flex', gap: 8, fontSize: 11 }}>
+                  <span style={{ color: getStateColor('idle') }}>● idle</span>
+                  <span style={{ color: getStateColor('loading') }}>● loading</span>
+                  <span style={{ color: getStateColor('in-transit') }}>● transit</span>
+                  <span style={{ color: getStateColor('unloading') }}>● unloading</span>
+                </div>
+              </div>
+              {visibleFleets.length === 0 ? (
+                <div style={{ color: '#6090a0', padding: 20, textAlign: 'center' }}>
+                  No fleets active. Fleet simulation not yet initialized.
+                  <br /><br />
+                  <span style={{ fontSize: 11 }}>Fleets will appear here once the background simulation is running.</span>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {visibleFleets.map((f) => {
+                    const cargoEntries = Object.entries(f.cargo)
+                    const cargoTotal = cargoEntries.reduce((sum, [, qty]) => sum + qty, 0)
+                    const now = Date.now()
+                    const transitProgress = f.state === 'in-transit' && f.departureTime && f.arrivalTime
+                      ? (now - f.departureTime) / (f.arrivalTime - f.departureTime)
+                      : 0
+                    const eta = f.arrivalTime ? Math.max(0, f.arrivalTime - now) : 0
+
+                    return (
+                      <div key={f.id} style={{ border: '1px solid #184b6a', borderRadius: 6, padding: 10, background: '#0a1520' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ color: getOwnerColor(f.ownerType), fontWeight: 'bold' }}>{f.name}</span>
+                            <span style={{ color: '#6090a0', fontSize: 11 }}>{f.shipType}</span>
+                          </div>
+                          <span style={{ color: getStateColor(f.state), fontSize: 12, textTransform: 'uppercase' }}>{f.state}</span>
+                        </div>
+                        
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12, marginBottom: 8 }}>
+                          <div>
+                            <span style={{ color: '#6090a0' }}>Location: </span>
+                            <span style={{ color: '#c3e7ff' }}>{f.currentSectorId}</span>
+                          </div>
+                          {f.destinationSectorId && f.state === 'in-transit' && (
+                            <div>
+                              <span style={{ color: '#6090a0' }}>→ </span>
+                              <span style={{ color: '#88cc44' }}>{f.destinationSectorId}</span>
+                            </div>
+                          )}
+                          {f.targetStationId && (
+                            <div>
+                              <span style={{ color: '#6090a0' }}>Target: </span>
+                              <span style={{ color: '#44aaff' }}>{f.targetStationId}</span>
+                            </div>
+                          )}
+                          <div>
+                            <span style={{ color: '#6090a0' }}>Cargo: </span>
+                            <span style={{ color: cargoTotal > 0 ? '#ffaa44' : '#6090a0' }}>
+                              {cargoTotal > 0 ? `${cargoTotal} units` : 'empty'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Transit progress bar */}
+                        {f.state === 'in-transit' && (
+                          <div style={{ marginTop: 6 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
+                              <span style={{ color: '#6090a0' }}>Transit progress</span>
+                              <span style={{ color: '#88cc44' }}>ETA: {formatTime(eta)}</span>
+                            </div>
+                            <div style={{ height: 6, background: '#1a2a3a', borderRadius: 3, overflow: 'hidden' }}>
+                              <div style={{ 
+                                height: '100%', 
+                                width: `${Math.min(100, transitProgress * 100)}%`, 
+                                background: 'linear-gradient(90deg, #44aa44, #88cc44)',
+                                transition: 'width 0.5s ease'
+                              }} />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Cargo details */}
+                        {cargoEntries.length > 0 && (
+                          <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: '1fr auto', gap: 2, fontSize: 11 }}>
+                            {cargoEntries.map(([wareId, qty]) => (
+                              <Fragment key={wareId}>
+                                <span style={{ color: '#8ab6d6' }}>{wareMap.get(wareId) || wareId}</span>
+                                <span style={{ color: '#ffaa44', textAlign: 'right' }}>{qty}</span>
+                              </Fragment>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Current order info */}
+                        {f.currentOrder && (
+                          <div style={{ marginTop: 8, padding: 6, background: '#0f1a25', borderRadius: 4, fontSize: 11 }}>
+                            <div style={{ color: '#6090a0', marginBottom: 4 }}>Current Order:</div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 2 }}>
+                              <span>Buy {f.currentOrder.buyWareName}</span>
+                              <span style={{ color: '#ff6666' }}>-{f.currentOrder.buyPrice * f.currentOrder.buyQty}</span>
+                              <span>Sell @ {f.currentOrder.sellStationName}</span>
+                              <span style={{ color: '#66ff66' }}>+{f.currentOrder.sellPrice * f.currentOrder.sellQty}</span>
+                              <span style={{ color: '#8ab6d6' }}>Expected Profit</span>
+                              <span style={{ color: '#88cc44', fontWeight: 'bold' }}>{f.currentOrder.expectedProfit}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Fleet Summary & Trade Log */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Fleet Summary */}
+              <div style={{ background: '#0f2230', border: '1px solid #184b6a', borderRadius: 6, padding: 12 }}>
+                <div style={{ marginBottom: 8, color: '#8ab6d6' }}>Fleet Summary</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 6, fontSize: 12 }}>
+                  <span style={{ color: getStateColor('idle') }}>●</span>
+                  <span>Idle</span>
+                  <span style={{ color: '#c3e7ff' }}>{fleets.filter(f => f.state === 'idle').length}</span>
+                  
+                  <span style={{ color: getStateColor('loading') }}>●</span>
+                  <span>Loading</span>
+                  <span style={{ color: '#c3e7ff' }}>{fleets.filter(f => f.state === 'loading').length}</span>
+                  
+                  <span style={{ color: getStateColor('in-transit') }}>●</span>
+                  <span>In Transit</span>
+                  <span style={{ color: '#c3e7ff' }}>{fleets.filter(f => f.state === 'in-transit').length}</span>
+                  
+                  <span style={{ color: getStateColor('unloading') }}>●</span>
+                  <span>Unloading</span>
+                  <span style={{ color: '#c3e7ff' }}>{fleets.filter(f => f.state === 'unloading').length}</span>
+                </div>
+                <div style={{ borderTop: '1px solid #184b6a', marginTop: 12, paddingTop: 8 }}>
+                  <div style={{ marginBottom: 6, color: '#6090a0', fontSize: 11 }}>By Owner</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 4, fontSize: 11 }}>
+                    {Array.from(new Set(fleets.map(f => f.ownerType))).map(ownerType => (
+                      <Fragment key={ownerType}>
+                        <span style={{ color: getOwnerColor(ownerType) }}>●</span>
+                        <span style={{ textTransform: 'capitalize' }}>{ownerType}</span>
+                        <span style={{ color: '#c3e7ff' }}>{fleets.filter(f => f.ownerType === ownerType).length}</span>
+                      </Fragment>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Recent Trade Log */}
+              <div style={{ background: '#0f2230', border: '1px solid #184b6a', borderRadius: 6, padding: 12, flex: 1, overflow: 'auto' }}>
+                <div style={{ marginBottom: 8, color: '#8ab6d6' }}>Recent Trades</div>
+                {tradeLog.length === 0 ? (
+                  <div style={{ color: '#6090a0', fontSize: 12 }}>No trades recorded yet</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {tradeLog.slice(0, 20).map((t) => (
+                      <div key={t.id} style={{ fontSize: 11, padding: 6, background: '#0a1520', borderRadius: 4 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                          <span style={{ color: '#8ab6d6' }}>{t.fleetName}</span>
+                          <span style={{ color: '#88cc44' }}>+{t.profit}</span>
+                        </div>
+                        <div style={{ color: '#6090a0' }}>
+                          {t.quantity}x {t.wareName} • {t.buySectorId} → {t.sellSectorId}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -76,6 +76,12 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
             if (e.code === 'KeyU') {
                 useGameStore.getState().toggleUniverseMap();
             }
+            if (e.code === 'KeyI') {
+                const target = useGameStore.getState().selectedTarget;
+                if (target && target.type === 'station') {
+                    useGameStore.getState().toggleStationInfo();
+                }
+            }
             if (e.code === 'KeyJ') {
                 const current = useGameStore.getState().timeScale;
                 // Toggle between 1x and 10x

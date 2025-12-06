@@ -72,6 +72,7 @@ export const MODEL_MAP: Record<string, string> = {
     "/models/00141.obj": "Teladi Orca", // Note: User data says Teladi Orca, but Orca is Boron. Keeping as is for mapping.
     "/models/00142.obj": "Boron Piranha",
     "/models/00187.obj": "Teladi Albatross",
+    "/models/00188.obj": "Teladi Vulture",
     "/models/00189.obj": "Xenon Freighter",
     "/models/00192.obj": "Paranid Zeus",
     "/models/00262.obj": "Earth Carrier",

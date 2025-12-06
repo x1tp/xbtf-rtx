@@ -5,7 +5,7 @@ import { Group, MathUtils, Quaternion, Vector3 } from 'three';
 import { ShipModel } from './ShipModel';
 import { findPath } from '../ai/navigation';
 import type { NavGraph, NavObstacle } from '../ai/navigation';
-import { useGameStore } from '../store/gameStore';
+import { useGameStore, type GameState } from '../store/gameStore';
 import { getShipStats } from '../config/ships';
 
 interface AIShipProps {
@@ -28,7 +28,7 @@ export const AIShip: FC<AIShipProps> = ({ name, modelPath, position, navGraph, o
   const nextRepathAtRef = useRef(0);
   const lastNavSyncRef = useRef(0);
   const lastProgressSampleRef = useRef({ time: 0, pos: new Vector3(), stuckTime: 0 });
-  const timeScale = useGameStore((s) => s.timeScale);
+  const timeScale = useGameStore((s: GameState) => s.timeScale);
 
   const stats = useMemo(() => getShipStats(modelPath || name), [modelPath, name]);
 

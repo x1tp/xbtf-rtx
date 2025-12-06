@@ -3,7 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import * as POSTPROCESSING from 'postprocessing';
 import { SSGIEffect, TRAAEffect, MotionBlurEffect, VelocityDepthNormalPass, HBAOEffect } from 'realism-effects';
 import type { WebGLRenderer, Scene, PerspectiveCamera } from 'three';
-import { useGameStore } from '../store/gameStore';
+import { useGameStore, type GameState } from '../store/gameStore';
 
 export interface RealismEffectsProps {
     /** Enable Screen Space Global Illumination */
@@ -102,8 +102,8 @@ export const RealismEffects: React.FC<RealismEffectsProps> = ({
         velocityPass?: VelocityDepthNormalPass;
     }>({});
 
-    const sunIntensity = useGameStore((s) => s.sunIntensity);
-    const sunVisible = useGameStore((s) => s.sunVisible);
+    const sunIntensity = useGameStore((s: GameState) => s.sunIntensity);
+    const sunVisible = useGameStore((s: GameState) => s.sunVisible);
 
     // Merged SSGI options
     const mergedSsgiOptions = useMemo(() => ({
