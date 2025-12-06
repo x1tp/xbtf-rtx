@@ -834,6 +834,7 @@ function EconomyAdmin() {
   const stations = useGameStore((s) => s.stations)
   const sectorPrices = useGameStore((s) => s.sectorPrices)
   const fleets = useGameStore((s) => s.fleets)
+  const corporations = useGameStore((s) => s.corporations)
   const tradeLog = useGameStore((s) => s.tradeLog)
   const initEconomy = useGameStore((s) => s.initEconomy)
   const tickEconomy = useGameStore((s) => s.tickEconomy)
@@ -842,12 +843,25 @@ function EconomyAdmin() {
   const elapsedTimeSec = useGameStore((s) => s.elapsedTimeSec)
   const syncEconomy = useGameStore((s) => s.syncEconomy)
   const [sectorFilter, setSectorFilter] = useState('all')
-  const [activeTab, setActiveTab] = useState<'economy' | 'fleets'>('economy')
+  const [activeTab, setActiveTab] = useState<'economy' | 'fleets' | 'corporations'>('economy')
   const sectorList = Array.from(new Set<string>([...stations.map((st) => st.sectorId), ...Object.keys(sectorPrices)])).sort()
   const wareMap = new Map<string, string>(wares.map((w) => [w.id, w.name]))
+  const warePriceMap = new Map<string, number>(wares.map((w) => [w.id, w.basePrice]))
   const recipeMap = new Map<string, { id: string; productId: string; inputs: { wareId: string; amount: number }[]; cycleTimeSec: number; batchSize: number }>(recipes.map((r) => [r.id, r]))
   const visibleStations = stations.filter((st) => sectorFilter === 'all' || st.sectorId === sectorFilter)
   const visibleFleets = fleets.filter((f) => sectorFilter === 'all' || f.currentSectorId === sectorFilter || f.destinationSectorId === sectorFilter)
+  
+  // Calculate Total Economy Value
+  const totalStationValue = stations.reduce((sum, st) => {
+    return sum + Object.entries(st.inventory).reduce((s, [wid, qty]) => s + qty * (warePriceMap.get(wid) || 0), 0)
+  }, 0)
+  const totalFleetValue = fleets.reduce((sum, f) => {
+    const cargoVal = Object.entries(f.cargo).reduce((s, [wid, qty]) => s + qty * (warePriceMap.get(wid) || 0), 0)
+    return sum + f.credits + cargoVal
+  }, 0)
+  const totalCorpValue = corporations.reduce((sum, c) => sum + c.credits, 0)
+  const totalEconomyValue = totalStationValue + totalFleetValue + totalCorpValue
+
   useEffect(() => { syncEconomy() }, [syncEconomy])
   useEffect(() => { const id = setInterval(() => syncEconomy(), 1000); return () => clearInterval(id) }, [syncEconomy])
 
@@ -894,6 +908,9 @@ function EconomyAdmin() {
           <span style={{ fontSize: 18, fontWeight: 'bold' }}>Economy Admin</span>
           <span style={{ color: '#8ab6d6' }}>{wares.length} wares • {recipes.length} recipes • {stations.length} stations • {fleets.length} fleets</span>
           <span style={{ padding: '4px 10px', border: '1px solid #184b6a', borderRadius: 6, background: '#0f2230', color: '#c3e7ff' }}>Ingame time: {formatDuration(elapsedTimeSec)}</span>
+          <span style={{ padding: '4px 10px', border: '1px solid #88cc44', borderRadius: 6, background: '#0f2230', color: '#88cc44', fontWeight: 'bold' }}>
+            Total Value: {Math.floor(totalEconomyValue).toLocaleString()} Cr
+          </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button onClick={() => initEconomy()} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff', cursor: 'pointer' }}>Init</button>
@@ -928,6 +945,17 @@ function EconomyAdmin() {
               borderRadius: '4px 4px 0 0'
             }}
           >Fleets ({fleets.length})</button>
+          <button 
+            onClick={() => setActiveTab('corporations')} 
+            style={{ 
+              padding: '6px 16px', 
+              border: activeTab === 'corporations' ? '1px solid #3fb6ff' : '1px solid #184b6a', 
+              background: activeTab === 'corporations' ? '#1a3a50' : '#0f2230', 
+              color: activeTab === 'corporations' ? '#fff' : '#8ab6d6', 
+              cursor: 'pointer',
+              borderRadius: '4px 4px 0 0'
+            }}
+          >Corporations ({corporations.length})</button>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span>Sector</span>
@@ -1047,7 +1075,7 @@ function EconomyAdmin() {
           </div>
         </div>
           </div>
-        ) : (
+        ) : activeTab === 'fleets' ? (
           /* Fleets Tab */
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, height: '100%' }}>
             {/* Active Fleets */}
@@ -1222,6 +1250,48 @@ function EconomyAdmin() {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        ) : (
+          /* Corporations Tab */
+          <div style={{ background: '#0f2230', border: '1px solid #184b6a', borderRadius: 6, padding: 12, overflow: 'auto', height: '100%' }}>
+            <div style={{ marginBottom: 12, color: '#8ab6d6', fontSize: 16, fontWeight: 'bold' }}>Corporations</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
+              {corporations.map((corp) => (
+                <div key={corp.id} style={{ background: '#0a1520', border: '1px solid #184b6a', borderRadius: 6, padding: 16 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <span style={{ fontSize: 16, fontWeight: 'bold', color: getOwnerColor(corp.race) }}>{corp.name}</span>
+                    <span style={{ fontSize: 12, color: '#6090a0', textTransform: 'capitalize' }}>{corp.type}</span>
+                  </div>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 13 }}>
+                    <div>
+                      <div style={{ color: '#6090a0', marginBottom: 2 }}>Credits</div>
+                      <div style={{ color: '#c3e7ff', fontSize: 15 }}>{Math.floor(corp.credits).toLocaleString()} Cr</div>
+                    </div>
+                    <div>
+                      <div style={{ color: '#6090a0', marginBottom: 2 }}>Net Worth</div>
+                      <div style={{ color: '#88cc44', fontSize: 15 }}>{Math.floor(corp.netWorth).toLocaleString()} Cr</div>
+                    </div>
+                    <div>
+                      <div style={{ color: '#6090a0', marginBottom: 2 }}>Stations</div>
+                      <div style={{ color: '#c3e7ff' }}>{corp.stationIds.length}</div>
+                    </div>
+                    <div>
+                      <div style={{ color: '#6090a0', marginBottom: 2 }}>Fleets</div>
+                      <div style={{ color: '#c3e7ff' }}>{corp.fleetIds.length}</div>
+                    </div>
+                    <div>
+                      <div style={{ color: '#6090a0', marginBottom: 2 }}>Lifetime Profit</div>
+                      <div style={{ color: '#88cc44' }}>{Math.floor(corp.lifetimeProfit).toLocaleString()} Cr</div>
+                    </div>
+                    <div>
+                      <div style={{ color: '#6090a0', marginBottom: 2 }}>Trades Completed</div>
+                      <div style={{ color: '#c3e7ff' }}>{corp.lifetimeTrades}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}

@@ -596,7 +596,12 @@
     "/models/00276.obj": "Paranid Farm",
     "/models/00282.obj": "Teladi Farm",
     "/models/00283.obj": " Teladi Sun Oil Refinery",
-    "/models/00430.obj": "Beta I.R.E. Laser Forge"
+    "/models/00430.obj": "Beta I.R.E. Laser Forge",
+    "/models/00435.obj": "Crystal Fab",
+    "/models/00434.obj": "Crystal Fab",
+    "/models/00433.obj": "Crystal Fab",
+    "/models/00432.obj": "Crystal Fab",
+    "/models/00114.obj": "Silicon Mine"
   },
   "plumes": {
     "ship:engineMarkers:/models/00140.obj": {

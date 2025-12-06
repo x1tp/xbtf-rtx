@@ -3,6 +3,7 @@ import type { SeizewellLayout, BlueprintObject } from './seizewell'
 import { TELADI_GAIN_BLUEPRINT } from './teladi_gain'
 import { PROFIT_SHARE_BLUEPRINT } from './profit_share'
 import { GREATER_PROFIT_BLUEPRINT } from './greater_profit'
+import { COMPANY_PRIDE_BLUEPRINT } from './company_pride'
 import { SEIZEWELL_BLUEPRINT } from './seizewell'
 
 export interface SectorConfig {
@@ -25,6 +26,7 @@ const MANUAL_SECTOR_LAYOUTS: Record<string, SeizewellLayout> = {
   teladi_gain: TELADI_GAIN_BLUEPRINT,
   profit_share: PROFIT_SHARE_BLUEPRINT,
   greater_profit: GREATER_PROFIT_BLUEPRINT,
+  company_pride: COMPANY_PRIDE_BLUEPRINT,
 }
 
 export const getSectorLayoutById = (id: string): SeizewellLayout => {

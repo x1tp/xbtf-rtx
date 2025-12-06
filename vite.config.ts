@@ -84,7 +84,10 @@ function createUniverse() {
     'seizewell': ['teladi_gain'],
     'teladi_gain': ['seizewell', 'profit_share'],
     'profit_share': ['teladi_gain', 'greater_profit'],
-    'greater_profit': ['profit_share'],
+    'greater_profit': ['profit_share', 'blue_profit'],
+    'blue_profit': ['greater_profit', 'ceo_s_sprite'],
+    'ceo_s_sprite': ['blue_profit', 'company_pride'],
+    'company_pride': ['ceo_s_sprite'],
   }
   
   // Helper: Generate unique ID
@@ -114,18 +117,23 @@ function createUniverse() {
       { id: 'ore', name: 'Ore', category: 'primary', basePrice: 58, volume: 1 },
       { id: 'space_weed', name: 'Space Weed', category: 'food', basePrice: 420, volume: 1 },
       { id: 'space_fuel', name: 'Space Fuel', category: 'end', basePrice: 200, volume: 1 },
+      { id: 'silicon_wafers', name: 'Silicon Wafers', category: 'primary', basePrice: 504, volume: 18 },
       { id: 'ire_laser', name: 'IRE Laser', category: 'end', basePrice: 2980, volume: 5 },
     ]
     // Recipes for Teladi stations
     const recipes: Recipe[] = [
       // Solar Power Plants - produce energy from crystals
-      { id: 'spp_teladi', productId: 'energy_cells', inputs: [{ wareId: 'crystals', amount: 1 }], cycleTimeSec: 60, batchSize: 12, productStorageCap: 6000 },
+      { id: 'spp_teladi', productId: 'energy_cells', inputs: [{ wareId: 'crystals', amount: 1 }], cycleTimeSec: 60, batchSize: 120, productStorageCap: 6000 },
       // Sun Oil Refinery - produces oil from flowers + energy
       { id: 'sun_oil_refinery', productId: 'sun_oil', inputs: [{ wareId: 'sunrise_flowers', amount: 4 }, { wareId: 'energy_cells', amount: 8 }], cycleTimeSec: 90, batchSize: 6, productStorageCap: 2000 },
       // Flower Farm - produces sunrise flowers from energy
       { id: 'flower_farm', productId: 'sunrise_flowers', inputs: [{ wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 80, batchSize: 20, productStorageCap: 4000 },
       // Teladianium Foundry - produces teladianium from ore + energy
       { id: 'teladianium_foundry', productId: 'teladianium', inputs: [{ wareId: 'ore', amount: 6 }, { wareId: 'energy_cells', amount: 20 }], cycleTimeSec: 120, batchSize: 8, productStorageCap: 2000 },
+      // Crystal Fab - produces crystals from silicon + food + energy
+      { id: 'crystal_fab', productId: 'crystals', inputs: [{ wareId: 'silicon_wafers', amount: 4 }, { wareId: 'sun_oil', amount: 8 }, { wareId: 'energy_cells', amount: 80 }], cycleTimeSec: 120, batchSize: 4, productStorageCap: 1000 },
+      // Silicon Mine - produces silicon from energy
+      { id: 'silicon_mine', productId: 'silicon_wafers', inputs: [{ wareId: 'energy_cells', amount: 24 }], cycleTimeSec: 90, batchSize: 1, productStorageCap: 200 },
       // Bliss Place - produces space weed from energy + flowers
       { id: 'bliss_place', productId: 'space_weed', inputs: [{ wareId: 'sunrise_flowers', amount: 8 }, { wareId: 'energy_cells', amount: 15 }], cycleTimeSec: 150, batchSize: 10, productStorageCap: 1500 },
       // Dream Farm - produces space fuel from weed + energy
@@ -156,6 +164,10 @@ function createUniverse() {
       // === GREATER PROFIT ===
       { id: 'gp_dream', name: 'Dream Farm (M)', recipeId: 'dream_farm', sectorId: 'greater_profit', inventory: { space_fuel: 20, space_weed: 30, energy_cells: 100 }, reorderLevel: { space_weed: 20, energy_cells: 60 }, reserveLevel: { space_fuel: 40 } },
       { id: 'gp_bliss', name: 'Bliss Place (L)', recipeId: 'bliss_place', sectorId: 'greater_profit', inventory: { space_weed: 50, sunrise_flowers: 80, energy_cells: 150 }, reorderLevel: { sunrise_flowers: 50, energy_cells: 100 }, reserveLevel: { space_weed: 80 } },
+      { id: 'gp_crystal', name: 'Crystal Fab (M)', recipeId: 'crystal_fab', sectorId: 'greater_profit', inventory: { crystals: 20, silicon_wafers: 40, sun_oil: 60, energy_cells: 200 }, reorderLevel: { silicon_wafers: 20, sun_oil: 30, energy_cells: 100 }, reserveLevel: { crystals: 50 } },
+
+      // === COMPANY PRIDE ===
+      { id: 'cp_silicon', name: 'Silicon Mine (M)', recipeId: 'silicon_mine', sectorId: 'company_pride', inventory: { silicon_wafers: 10, energy_cells: 100 }, reorderLevel: { energy_cells: 50 }, reserveLevel: { silicon_wafers: 20 } },
     ]
     state.wares = wares
     state.recipes = recipes
@@ -165,7 +177,7 @@ function createUniverse() {
     // Initialize corporations
     const corporations: Corporation[] = [
       { id: 'teladi_company', name: 'Teladi Company', race: 'teladi', type: 'state', stationIds: ['ps_foundry'], fleetIds: [], credits: 5_000_000, netWorth: 50_000_000, aggressiveness: 0.4, expansionBudget: 500_000, riskTolerance: 0.3, lifetimeProfit: 0, lifetimeTrades: 0 },
-      { id: 'sunward_consortium', name: 'Sunward Consortium', race: 'teladi', type: 'guild', stationIds: ['sz_spp_b', 'ps_spp'], fleetIds: [], credits: 800_000, netWorth: 4_000_000, aggressiveness: 0.5, expansionBudget: 100_000, riskTolerance: 0.4, lifetimeProfit: 0, lifetimeTrades: 0 },
+      { id: 'sunward_consortium', name: 'Sunward Consortium', race: 'teladi', type: 'guild', stationIds: ['sz_spp_b', 'ps_spp', 'gp_crystal', 'cp_silicon'], fleetIds: [], credits: 800_000, netWorth: 4_000_000, aggressiveness: 0.5, expansionBudget: 100_000, riskTolerance: 0.4, lifetimeProfit: 0, lifetimeTrades: 0 },
       { id: 'family_zhikkt', name: "Family Zhi'kkt", race: 'teladi', type: 'family', stationIds: ['sz_spp_d', 'sz_flower_b', 'tg_flower'], fleetIds: [], credits: 300_000, netWorth: 1_500_000, aggressiveness: 0.6, expansionBudget: 50_000, riskTolerance: 0.5, lifetimeProfit: 0, lifetimeTrades: 0 },
       { id: 'family_tekra', name: "Family Tek'ra", race: 'teladi', type: 'family', stationIds: ['sz_oil', 'tg_oil'], fleetIds: [], credits: 400_000, netWorth: 2_000_000, aggressiveness: 0.55, expansionBudget: 60_000, riskTolerance: 0.45, lifetimeProfit: 0, lifetimeTrades: 0 },
       { id: 'crimson_commerce', name: 'Crimson Commerce Guild', race: 'teladi', type: 'guild', stationIds: ['sz_ire'], fleetIds: [], credits: 1_200_000, netWorth: 6_000_000, aggressiveness: 0.7, expansionBudget: 200_000, riskTolerance: 0.6, lifetimeProfit: 0, lifetimeTrades: 0 },
