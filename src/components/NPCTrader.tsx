@@ -173,50 +173,6 @@ export const NPCTrader: FC<NPCTraderProps> = ({
     }));
   }, [fleet.id]);
 
-  // Mirror local state to store for UI consistency
-  useEffect(() => {
-    const updates: Partial<NPCFleet> = {};
-    switch (localState) {
-      case 'idle':
-        updates.state = 'idle';
-        updates.destinationSectorId = undefined;
-        break;
-      case 'flying-to-station':
-        updates.state = 'idle';  // Flying within sector, not cross-sector transit
-        updates.targetStationId = currentCommand?.targetStationId;
-        break;
-      case 'flying-to-gate':
-      case 'entering-gate':
-        updates.state = 'in-transit';
-        updates.destinationSectorId = currentCommand?.targetSectorId;
-        break;
-      case 'docking':
-        updates.state = 'docking';
-        updates.targetStationId = currentCommand?.targetStationId || fleet.targetStationId;
-        break;
-      case 'docked':
-        updates.state = 'idle';
-        updates.targetStationId = currentCommand?.targetStationId || fleet.targetStationId;
-        break;
-      case 'loading':
-        updates.state = 'loading';
-        updates.targetStationId = currentCommand?.targetStationId || fleet.targetStationId;
-        break;
-      case 'unloading':
-        updates.state = 'unloading';
-        updates.targetStationId = currentCommand?.targetStationId || fleet.targetStationId;
-        break;
-      case 'undocking':
-        updates.state = 'undocking';
-        updates.targetStationId = currentCommand?.targetStationId || fleet.targetStationId;
-        break;
-    }
-    if (Object.keys(updates).length > 0) {
-      updates.stateStartTime = Date.now();
-      syncFleet(updates);
-    }
-  }, [localState, currentCommand, fleet.targetStationId, syncFleet]);
-
   const report = useCallback((type: ShipReportType, extra?: { stationId?: string; wareId?: string; amount?: number; sectorIdOverride?: string }) => {
     const ship = shipRef.current;
     if (!ship || !onReport) return;
@@ -270,7 +226,7 @@ export const NPCTrader: FC<NPCTraderProps> = ({
         positionUpdate.targetStationId = extra?.stationId;
         break;
       case 'undocked':
-        positionUpdate.state = 'undocking';
+        positionUpdate.state = 'idle';
         break;
       case 'arrived-at-gate':
         positionUpdate.state = 'in-transit';
@@ -338,6 +294,7 @@ export const NPCTrader: FC<NPCTraderProps> = ({
           if (currentCommand.targetSectorId && currentCommand.targetSectorId !== fleet.currentSectorId) {
             // Need to travel to gate
             setLocalState('flying-to-gate');
+            syncFleet({ state: 'in-transit', destinationSectorId: currentCommand.targetSectorId, stateStartTime: Date.now() });
             const gateData = getGateData(currentCommand.targetSectorId);
             buildPathTo(gateData?.pos || null);
           } else {
@@ -345,6 +302,8 @@ export const NPCTrader: FC<NPCTraderProps> = ({
             const stationPos = currentCommand.targetStationId ? stationPositions.get(currentCommand.targetStationId) : null;
             if (stationPos) {
               setLocalState('flying-to-station');
+              // Flying to station is considered 'idle' (busy in sector) or we could use 'in-transit' but usually 'idle' for local
+              syncFleet({ state: 'idle', targetStationId: currentCommand.targetStationId, stateStartTime: Date.now() });
               buildPathTo(new Vector3(stationPos[0], stationPos[1], stationPos[2]));
               dockAnchorRef.current = new Vector3(stationPos[0], stationPos[1], stationPos[2]);
               holdDockRef.current = false;
@@ -357,11 +316,14 @@ export const NPCTrader: FC<NPCTraderProps> = ({
           // If we are docked, check if it's the right station
           if (currentCommand.targetStationId && fleet.targetStationId === currentCommand.targetStationId) {
              // We are at the right station, start operation
-             setLocalState(currentCommand.type === 'trade-buy' ? 'loading' : 'unloading');
+             const nextState = currentCommand.type === 'trade-buy' ? 'loading' : 'unloading';
+             setLocalState(nextState);
+             syncFleet({ state: nextState, stateStartTime: Date.now() });
              actionTimerRef.current = 0;
           } else {
              // Wrong station, undock
              setLocalState('undocking');
+             syncFleet({ state: 'undocking', stateStartTime: Date.now() });
           }
         }
         break;
@@ -373,6 +335,7 @@ export const NPCTrader: FC<NPCTraderProps> = ({
             stationPositions.get(currentCommand.targetStationId) : null;
           if (stationPos) {
             setLocalState('flying-to-station');
+            syncFleet({ state: 'idle', targetStationId: currentCommand.targetStationId, stateStartTime: Date.now() });
             buildPathTo(new Vector3(stationPos[0], stationPos[1], stationPos[2]));
             dockAnchorRef.current = new Vector3(stationPos[0], stationPos[1], stationPos[2]);
             holdDockRef.current = false;
@@ -387,6 +350,7 @@ export const NPCTrader: FC<NPCTraderProps> = ({
       case 'goto-gate':
         if (localState === 'idle') {
           setLocalState('flying-to-gate');
+          syncFleet({ state: 'in-transit', destinationSectorId: currentCommand.targetSectorId, stateStartTime: Date.now() });
           const gateData = currentCommand.targetSectorId ? getGateData(currentCommand.targetSectorId) : null;
           buildPathTo(gateData?.pos || null);
         }
@@ -397,6 +361,7 @@ export const NPCTrader: FC<NPCTraderProps> = ({
           const stationPos = currentCommand.targetStationId ? stationPositions.get(currentCommand.targetStationId) : null;
           if (stationPos) {
             setLocalState('docking');
+            syncFleet({ state: 'docking', targetStationId: currentCommand.targetStationId, stateStartTime: Date.now() });
             dockAnchorRef.current = new Vector3(stationPos[0], stationPos[1], stationPos[2]);
           } else {
             console.warn(`[NPCTrader] ${fleet.name} dock command but station ${currentCommand.targetStationId} not found - skipping`);
@@ -408,6 +373,7 @@ export const NPCTrader: FC<NPCTraderProps> = ({
       case 'load-cargo':
         if (localState === 'docked') {
           setLocalState('loading');
+          syncFleet({ state: 'loading', stateStartTime: Date.now() });
           actionTimerRef.current = 0;
         }
         break;
@@ -415,6 +381,7 @@ export const NPCTrader: FC<NPCTraderProps> = ({
       case 'unload-cargo':
         if (localState === 'docked') {
           setLocalState('unloading');
+          syncFleet({ state: 'unloading', stateStartTime: Date.now() });
           actionTimerRef.current = 0;
         }
         break;
@@ -422,12 +389,14 @@ export const NPCTrader: FC<NPCTraderProps> = ({
       case 'undock':
         if (localState === 'docked') {
           setLocalState('undocking');
+          syncFleet({ state: 'undocking', stateStartTime: Date.now() });
         }
         break;
 
       case 'use-gate':
         if (localState === 'idle') {
           setLocalState('entering-gate');
+          syncFleet({ state: 'in-transit', destinationSectorId: currentCommand.targetSectorId, stateStartTime: Date.now() });
           const gateData = currentCommand.targetSectorId ? getGateData(currentCommand.targetSectorId) : null;
           buildPathTo(gateData?.pos || null);
         }
@@ -438,7 +407,7 @@ export const NPCTrader: FC<NPCTraderProps> = ({
         // Stay idle, just patrol/orbit
         break;
     }
-  }, [currentCommand, localState, stationPositions, buildPathTo, getGateData, fleet.currentSectorId, fleet.targetStationId]);
+  }, [currentCommand, localState, stationPositions, buildPathTo, getGateData, fleet.currentSectorId, fleet.targetStationId, syncFleet]);
 
   // Main simulation loop
   useFrame((_, rawDelta) => {
@@ -773,6 +742,7 @@ export const NPCTrader: FC<NPCTraderProps> = ({
           actionTimerRef.current = 0;
 
           if (currentCommand?.type === 'trade-buy') {
+             setLocalState('docked');
              advanceCommand(true);
           } else {
              // Check next command and transition directly to avoid React batching issues
@@ -811,6 +781,7 @@ export const NPCTrader: FC<NPCTraderProps> = ({
           actionTimerRef.current = 0;
 
           if (currentCommand?.type === 'trade-sell') {
+             setLocalState('docked');
              advanceCommand(true);
           } else {
              // Check next command and transition directly to avoid React batching issues
