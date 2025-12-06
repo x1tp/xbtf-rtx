@@ -12,7 +12,7 @@ export const TELADI_GAIN_BLUEPRINT: SeizewellLayout = {
     { name: 'Flower Farm (M)', modelPath: '/models/00282.obj', position: [120, -20, 420], scale: 26, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
   ],
   gates: [
-    { name: 'South Gate', modelPath: '/models/00088.obj', position: [0, 0, -1200], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, Math.PI / 2, 0] },
+    { name: 'South Gate', modelPath: '/models/00088.obj', position: [0, 0, -1200], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, Math.PI / 2, 0], destinationSectorId: 'seizewell', gateType: 'S' },
     { name: 'East Gate', modelPath: '/models/00088.obj', position: [1200, 0, 0], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, Math.PI / 2, 0] },
     { name: 'West Gate', modelPath: '/models/00088.obj', position: [-1200, 0, 0], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, Math.PI / 2, 0] },
   ],

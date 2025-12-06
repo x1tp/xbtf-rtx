@@ -54,6 +54,8 @@ export type ShipCommandType =
   | 'use-gate'        // Enter the gate to travel to another sector
   | 'patrol'          // Orbit/patrol current area
   | 'wait'            // Hold position
+  | 'trade-buy'       // Travel to station, dock, and buy ware
+  | 'trade-sell'      // Travel to station, dock, and sell ware
 
 export interface ShipCommand {
   id: string

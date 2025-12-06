@@ -1,4 +1,4 @@
-import { Suspense, useRef, useState, useEffect, Fragment } from 'react';
+import { Suspense, useRef, useState, useEffect, Fragment, useMemo, type FC } from 'react';
 import { persist } from './services/persist';
 import { Canvas, useThree } from '@react-three/fiber';
 import { Scene } from './Scene';
@@ -30,6 +30,95 @@ import { UniverseMap } from './components/UniverseMap';
 import { EconomyTicker } from './components/EconomyTicker';
 import { getAllPresets } from './config/plumes';
 import { StationInfo } from './components/StationInfo';
+import { NPCTrader } from './components/NPCTrader';
+import { buildNavGraph, buildNavNodesFromLayout } from './ai/navigation';
+import type { NavGraph } from './ai/navigation';
+import type { NPCFleet } from './types/simulation';
+
+const HiddenFleetSimulator: FC<{ excludeCurrentSector?: boolean }> = ({ excludeCurrentSector = false }) => {
+  const fleets = useGameStore((s) => s.fleets);
+  const economyStations = useGameStore((s) => s.stations);
+  const reportShipAction = useGameStore((s) => s.reportShipAction);
+  const currentSectorId = useGameStore((s) => s.currentSectorId);
+
+  const navDataBySector = useMemo(() => {
+    const map = new Map<string, {
+      stationPositions: Map<string, [number, number, number]>;
+      gatePositions: { position: [number, number, number]; destinationSectorId: string }[];
+      navGraph: NavGraph | null;
+    }>();
+    const spacing = 30;
+    const place = (p: [number, number, number]): [number, number, number] => [p[0] * spacing, p[1] * spacing, p[2] * spacing];
+    const sectorIds = new Set<string>();
+    fleets.forEach((f) => {
+      if (excludeCurrentSector && currentSectorId && f.currentSectorId === currentSectorId) return;
+      if (f.currentSectorId) sectorIds.add(f.currentSectorId);
+    });
+    sectorIds.forEach((sectorId) => {
+      const layout = getSectorLayoutById(sectorId || 'seizewell');
+      if (!layout) return;
+      const stationPositions = new Map<string, [number, number, number]>();
+      const layoutByName = new Map<string, [number, number, number]>();
+      for (const st of layout.stations) {
+        layoutByName.set(st.name, place(st.position));
+      }
+      for (const econStation of economyStations.filter((s) => s.sectorId === sectorId)) {
+        const layoutPos = layoutByName.get(econStation.name);
+        if (layoutPos) {
+          stationPositions.set(econStation.id, layoutPos);
+          stationPositions.set(econStation.name, layoutPos);
+        }
+      }
+      for (const st of layout.stations) {
+        if (!stationPositions.has(st.name)) {
+          stationPositions.set(st.name, place(st.position));
+        }
+      }
+      const gatePositions = layout.gates
+        .filter((g) => g.destinationSectorId)
+        .map((g) => ({
+          position: place(g.position) as [number, number, number],
+          destinationSectorId: g.destinationSectorId!,
+          radius: (g.scale ?? 40) * 5,
+        }));
+      const nodes = buildNavNodesFromLayout(layout, spacing);
+      const navGraph = buildNavGraph(nodes, []);
+      map.set(sectorId, { stationPositions, gatePositions, navGraph });
+    });
+    return map;
+  }, [fleets, economyStations]);
+
+  const filteredFleets = excludeCurrentSector && currentSectorId
+    ? fleets.filter((f) => f.currentSectorId !== currentSectorId)
+    : fleets;
+
+  if (filteredFleets.length === 0) return null;
+
+  return (
+    <Canvas
+      frameloop="always"
+      style={{ position: 'fixed', width: 1, height: 1, pointerEvents: 'none', opacity: 0, left: -10, top: -10 }}
+    >
+      <Suspense fallback={null}>
+        {filteredFleets.map((fleet: NPCFleet) => {
+          const nav = navDataBySector.get(fleet.currentSectorId || 'seizewell');
+          if (!nav) return null;
+          return (
+            <NPCTrader
+              key={`bg-${fleet.id}`}
+              fleet={fleet}
+              stationPositions={nav.stationPositions}
+              gatePositions={nav.gatePositions}
+              navGraph={nav.navGraph}
+              obstacles={[]}
+              onReport={reportShipAction}
+            />
+          );
+        })}
+      </Suspense>
+    </Canvas>
+  );
+};
 
 
 function OverExposureOverlay() {
@@ -107,25 +196,37 @@ function App() {
 
   if (path === '/admin') {
     return (
-      <AdminHome />
+      <>
+        <HiddenFleetSimulator />
+        <AdminHome />
+      </>
     );
   }
 
   if (path.startsWith('/admin/sector')) {
     return (
-      <PlanetEditor />
+      <>
+        <HiddenFleetSimulator />
+        <PlanetEditor />
+      </>
     );
   }
 
   if (path.startsWith('/admin/economy')) {
     return (
-      <EconomyAdmin />
+      <>
+        <HiddenFleetSimulator />
+        <EconomyAdmin />
+      </>
     );
   }
 
   if (path.startsWith('/admin/plume')) {
     return (
-      <PlumeEditor />
+      <>
+        <HiddenFleetSimulator />
+        <PlumeEditor />
+      </>
     );
   }
 
@@ -133,6 +234,7 @@ function App() {
     const modelFromPath = new URLSearchParams(window.location.search).get('model') || adminModel;
     return (
       <div style={{ width: '100vw', height: '100vh', background: '#0b1016' }}>
+        <HiddenFleetSimulator />
         <ShipEditorCanvas modelPath={modelFromPath} />
       </div>
     );
@@ -140,6 +242,7 @@ function App() {
 
   return (
     <div style={{ width: '100vw', height: '100vh', background: 'black' }}>
+      <HiddenFleetSimulator excludeCurrentSector />
       <Canvas
         shadows
         gl={{ logarithmicDepthBuffer: true, antialias: true }}
@@ -736,6 +839,7 @@ function EconomyAdmin() {
   const tickEconomy = useGameStore((s) => s.tickEconomy)
   const timeScale = useGameStore((s) => s.timeScale)
   const setTimeScale = useGameStore((s) => s.setTimeScale)
+  const elapsedTimeSec = useGameStore((s) => s.elapsedTimeSec)
   const syncEconomy = useGameStore((s) => s.syncEconomy)
   const [sectorFilter, setSectorFilter] = useState('all')
   const [activeTab, setActiveTab] = useState<'economy' | 'fleets'>('economy')
@@ -778,6 +882,15 @@ function EconomyAdmin() {
     const sec = s % 60
     return m > 0 ? `${m}m ${sec}s` : `${sec}s`
   }
+  const formatDuration = (seconds: number) => {
+    const totalSeconds = Math.max(0, Math.floor(seconds))
+    const hrs = Math.floor(totalSeconds / 3600)
+    const mins = Math.floor((totalSeconds % 3600) / 60)
+    const secs = totalSeconds % 60
+    if (hrs > 0) return `${hrs}h ${String(mins).padStart(2, '0')}m ${String(secs).padStart(2, '0')}s`
+    if (mins > 0) return `${mins}m ${String(secs).padStart(2, '0')}s`
+    return `${secs}s`
+  }
   return (
     <div style={{ width: '100vw', height: '100vh', background: '#0b1016', color: '#c3e7ff', fontFamily: 'monospace', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
@@ -785,6 +898,7 @@ function EconomyAdmin() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <span style={{ fontSize: 18, fontWeight: 'bold' }}>Economy Admin</span>
           <span style={{ color: '#8ab6d6' }}>{wares.length} wares • {recipes.length} recipes • {stations.length} stations • {fleets.length} fleets</span>
+          <span style={{ padding: '4px 10px', border: '1px solid #184b6a', borderRadius: 6, background: '#0f2230', color: '#c3e7ff' }}>Ingame time: {formatDuration(elapsedTimeSec)}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button onClick={() => initEconomy()} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff', cursor: 'pointer' }}>Init</button>

@@ -120,7 +120,7 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
             for (const s of layout.ships) list.push({ name: s.name, position: place(s.position), type: 'ship' });
 
             // Add NPC fleets in this sector
-            const sectorFleets = fleets.filter((f: NPCFleet) => f.currentSectorId === targetSectorId && f.state !== 'in-transit');
+            const sectorFleets = fleets.filter((f: NPCFleet) => f.currentSectorId === targetSectorId);
             for (const f of sectorFleets) {
                 list.push({ name: f.name, position: f.position, type: 'ship' });
             }
@@ -129,7 +129,7 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
         }
 
         // Current sector: combine static objects with live fleet positions
-        const sectorFleets = fleets.filter((f: NPCFleet) => f.currentSectorId === targetSectorId && f.state !== 'in-transit');
+        const sectorFleets = fleets.filter((f: NPCFleet) => f.currentSectorId === targetSectorId);
         const fleetObjects: SectorObject[] = sectorFleets.map((f: NPCFleet) => ({
             name: f.name,
             position: f.position,

@@ -14,7 +14,7 @@ type FleetBehavior = 'station-supply' | 'station-distribute' | 'corp-logistics' 
 type RaceType = 'argon' | 'boron' | 'paranid' | 'split' | 'teladi' | 'pirate' | 'xenon'
 
 // Ship command types for autonomous ships
-type ShipCommandType = 'goto-station' | 'dock' | 'load-cargo' | 'unload-cargo' | 'undock' | 'goto-gate' | 'use-gate' | 'patrol' | 'wait'
+type ShipCommandType = 'goto-station' | 'dock' | 'load-cargo' | 'unload-cargo' | 'undock' | 'goto-gate' | 'use-gate' | 'patrol' | 'wait' | 'trade-buy' | 'trade-sell'
 type ShipCommand = {
   id: string
   type: ShipCommandType
@@ -62,13 +62,13 @@ type TradeLogEntry = {
 }
 
 type UniverseState = {
-  wares: Ware[]; recipes: Recipe[]; stations: Station[]; sectorPrices: Record<string, Record<string, number>>; timeScale: number; acc: number
+  wares: Ware[]; recipes: Recipe[]; stations: Station[]; sectorPrices: Record<string, Record<string, number>>; timeScale: number; acc: number; elapsedTimeSec: number
   // Fleet simulation
   corporations: Corporation[]; fleets: NPCFleet[]; tradeLog: TradeLogEntry[]; lastTickTime: number
 }
 
 function createUniverse() {
-  const state: UniverseState = { wares: [], recipes: [], stations: [], sectorPrices: {}, timeScale: 1, acc: 0, corporations: [], fleets: [], tradeLog: [], lastTickTime: Date.now() }
+  const state: UniverseState = { wares: [], recipes: [], stations: [], sectorPrices: {}, timeScale: 1, acc: 0, elapsedTimeSec: 0, corporations: [], fleets: [], tradeLog: [], lastTickTime: Date.now() }
   
   // Fleet constants
   const FLEET_CONSTANTS = {
@@ -253,6 +253,8 @@ function createUniverse() {
     state.corporations = corporations
     state.fleets = fleets
     state.tradeLog = []
+    state.acc = 0
+    state.elapsedTimeSec = 0
     state.lastTickTime = Date.now()
   }
   const tick = (deltaSec: number) => {
@@ -431,208 +433,44 @@ function createUniverse() {
     
     // Process each fleet
     for (const fleet of state.fleets) {
-      const stateAge = (now - fleet.stateStartTime) * timeScaleMultiplier / 1000 // seconds in game time
-      
       // Autonomous mode: if fleet has commands queued, let frontend handle it
       // Backend only issues new commands when queue is empty
       const hasQueuedCommands = fleet.commandQueue.length > 0
       
-      switch (fleet.state) {
-        case 'idle': {
-          // Try to find a trade route when idle and no pending commands
-          if (!hasQueuedCommands && (stateAge > FLEET_CONSTANTS.IDLE_RETHINK_TIME || !fleet.currentOrder)) {
-            const order = findBestTradeRoute(fleet)
-            if (order) {
-              fleet.currentOrder = order
-              // Issue commands for the trade route
-              if (fleet.currentSectorId !== order.buySectorId) {
-                // Need to travel to buy station - issue gate travel commands
-                fleet.destinationSectorId = order.buySectorId
-                issueCommand(fleet.id, { type: 'goto-gate', targetSectorId: order.buySectorId })
-                issueCommand(fleet.id, { type: 'use-gate', targetSectorId: order.buySectorId })
-              } else {
-                // Already in sector - go to station, dock, load
-                issueCommand(fleet.id, { type: 'goto-station', targetStationId: order.buyStationId })
-                issueCommand(fleet.id, { type: 'dock', targetStationId: order.buyStationId })
-                issueCommand(fleet.id, { type: 'load-cargo', targetStationId: order.buyStationId, wareId: order.buyWareId, amount: order.buyQty })
-              }
-              fleet.stateStartTime = now
-            }
-          }
-          break
-        }
-        
-        case 'docking': {
-          // Backend fallback if no reports come in
-          if (!hasQueuedCommands && stateAge > FLEET_CONSTANTS.DOCK_TIME) {
-            const hasCargo = Object.values(fleet.cargo).reduce((a, b) => a + b, 0) > 0
-            fleet.state = hasCargo ? 'unloading' : 'loading'
-            fleet.stateStartTime = now
-          }
-          break
-        }
-        
-        case 'loading': {
-          // Load cargo from buy station
-          const order = fleet.currentOrder
-          if (!order) { fleet.state = 'idle'; fleet.stateStartTime = now; break }
-          
-          const station = getStation(order.buyStationId)
-          if (!station) { fleet.state = 'idle'; fleet.stateStartTime = now; break }
-          
-          const transferTime = (order.buyQty / 1000) * FLEET_CONSTANTS.TRANSFER_TIME_PER_1000
-          if (!hasQueuedCommands && stateAge > transferTime) {
-            // Transfer complete - take cargo from station
-            const available = station.inventory[order.buyWareId] || 0
-            const qty = Math.min(available, order.buyQty)
-            if (qty > 0) {
-              station.inventory[order.buyWareId] = (station.inventory[order.buyWareId] || 0) - qty
-              fleet.cargo[order.buyWareId] = (fleet.cargo[order.buyWareId] || 0) + qty
-              fleet.credits -= qty * order.buyPrice
-            }
-            
-            // Issue commands to travel to sell station
-            fleet.state = 'undocking'
-            fleet.stateStartTime = now
-            
-            issueCommand(fleet.id, { type: 'undock' })
-            if (fleet.currentSectorId !== order.sellSectorId) {
-              issueCommand(fleet.id, { type: 'goto-gate', targetSectorId: order.sellSectorId })
-              issueCommand(fleet.id, { type: 'use-gate', targetSectorId: order.sellSectorId })
-            }
-            issueCommand(fleet.id, { type: 'goto-station', targetStationId: order.sellStationId })
-            issueCommand(fleet.id, { type: 'dock', targetStationId: order.sellStationId })
-            issueCommand(fleet.id, { type: 'unload-cargo', targetStationId: order.sellStationId, wareId: order.sellWareId, amount: qty })
-          }
-          break
-        }
-        
-        case 'undocking': {
-          if (!hasQueuedCommands && stateAge > FLEET_CONSTANTS.DOCK_TIME) {
-            const order = fleet.currentOrder
-            if (!order) { fleet.state = 'idle'; fleet.stateStartTime = now; break }
-            
-            const hasCargo = Object.values(fleet.cargo).reduce((a, b) => a + b, 0) > 0
-            
-            if (hasCargo && fleet.currentSectorId !== order.sellSectorId) {
-              // Travel to sell sector
-              fleet.state = 'in-transit'
-              fleet.destinationSectorId = order.sellSectorId
-            } else if (hasCargo) {
-              // Already in sell sector, dock
-              fleet.state = 'docking'
-              fleet.targetStationId = order.sellStationId
-            } else {
-              // No cargo, order complete
-              fleet.currentOrder = undefined
-              fleet.state = 'idle'
-            }
-            fleet.stateStartTime = now
-          }
-          break
-        }
-        
-        case 'in-transit': {
-          // For autonomous ships, this is handled by frontend flying to gate
-          // Backend keeps this as a fallback / for off-screen simulation
-          if (!hasQueuedCommands && stateAge > FLEET_CONSTANTS.BASE_JUMP_TIME / fleet.speed) {
-            // Arrived!
-            fleet.currentSectorId = fleet.destinationSectorId || fleet.homeSectorId
-            fleet.position = randomPos()
-            fleet.destinationSectorId = undefined
-            
-            // Dock at target station
-            const order = fleet.currentOrder
-            if (order) {
-              const hasCargo = Object.values(fleet.cargo).reduce((a, b) => a + b, 0) > 0
-              fleet.targetStationId = hasCargo ? order.sellStationId : order.buyStationId
-              fleet.state = 'docking'
-              // Issue commands for the new sector
-              issueCommand(fleet.id, { type: 'goto-station', targetStationId: fleet.targetStationId })
-              issueCommand(fleet.id, { type: 'dock', targetStationId: fleet.targetStationId })
-            } else {
-              fleet.state = 'idle'
-            }
-            fleet.stateStartTime = now
-          }
-          break
-        }
-        
-        case 'unloading': {
-          // Unload cargo at sell station
-          const order = fleet.currentOrder
-          if (!order) { fleet.state = 'idle'; fleet.stateStartTime = now; break }
-          
-          const station = getStation(order.sellStationId)
-          if (!station) { fleet.state = 'idle'; fleet.stateStartTime = now; break }
-          
-          const cargoQty = fleet.cargo[order.sellWareId] || 0
-          const transferTime = (cargoQty / 1000) * FLEET_CONSTANTS.TRANSFER_TIME_PER_1000
-          
-          if (stateAge > transferTime) {
-            // Transfer complete - give cargo to station, get credits
-            if (cargoQty > 0) {
-              station.inventory[order.sellWareId] = (station.inventory[order.sellWareId] || 0) + cargoQty
-              const revenue = cargoQty * order.sellPrice
-              const cost = cargoQty * order.buyPrice
-              const profit = revenue - cost
-              
-              fleet.credits += revenue
-              fleet.totalProfit += profit
-              fleet.tripsCompleted++
-              fleet.cargo[order.sellWareId] = 0
-              
-              // Log the trade
-              state.tradeLog.unshift({
-                id: genId(),
-                timestamp: now,
-                fleetId: fleet.id,
-                fleetName: fleet.name,
-                wareId: order.sellWareId,
-                wareName: order.sellWareName,
-                quantity: cargoQty,
-                buyPrice: order.buyPrice,
-                sellPrice: order.sellPrice,
-                profit,
-                buySectorId: order.buySectorId,
-                sellSectorId: order.sellSectorId,
-                buyStationName: order.buyStationName,
-                sellStationName: order.sellStationName,
-              })
-              
-              // Keep trade log manageable
-              if (state.tradeLog.length > 100) state.tradeLog.length = 100
-              
-              // Pay profit share to owner
-              if (fleet.ownerId) {
-                const corp = state.corporations.find(c => c.id === fleet.ownerId)
-                if (corp) {
-                  const share = profit * (1 - fleet.profitShare)
-                  corp.credits += share
-                  corp.lifetimeProfit += share
-                  corp.lifetimeTrades++
-                }
-              }
-            }
-            
-            // Order complete
-            fleet.currentOrder = undefined
-            fleet.state = 'undocking'
-            fleet.stateStartTime = now
-          }
-          break
+      if (!hasQueuedCommands && !fleet.currentOrder) {
+        // Fleet is idle and needs work
+        const order = findBestTradeRoute(fleet)
+        if (order) {
+          fleet.currentOrder = order
+          // Issue high-level trade command
+          // The frontend will handle navigation, docking, and loading
+          issueCommand(fleet.id, { 
+            type: 'trade-buy', 
+            targetStationId: order.buyStationId,
+            targetSectorId: order.buySectorId,
+            wareId: order.buyWareId, 
+            amount: order.buyQty 
+          })
+          fleet.state = 'in-transit' // Generic busy state
+          fleet.stateStartTime = now
         }
       }
     }
     
     state.lastTickTime = now
   }
-  const loop = () => {
-    state.acc += 1 * Math.max(0.1, state.timeScale)
+  const advanceTime = (deltaSec: number) => {
+    if (deltaSec <= 0) return
+    state.acc += deltaSec
+    state.elapsedTimeSec += deltaSec
     if (state.acc >= 10) {
       tick(state.acc)
       state.acc = 0
     }
+  }
+  const loop = () => {
+    const delta = 1 * Math.max(0.1, state.timeScale)
+    advanceTime(delta)
   }
   const setTimeScale = (v: number) => { state.timeScale = v }
   
@@ -666,73 +504,124 @@ function createUniverse() {
     fleet.position = report.position
     fleet.currentSectorId = report.sectorId
     
-    // Remove completed command from queue
-    if (fleet.commandQueue.length > 0) {
-      fleet.commandQueue.shift()
-    }
-    
     console.log(`[Universe] Ship report: ${fleet.name} - ${report.type}`)
     
     // Handle specific report types
     switch (report.type) {
       case 'arrived-at-station':
-        fleet.targetStationId = report.stationId
         fleet.state = 'docking'
-        // Next: issue dock command if not already queued
-        if (fleet.commandQueue.length === 0) {
-          issueCommand(fleet.id, { type: 'dock', targetStationId: report.stationId })
-        }
         break
-        
+
       case 'docked':
-        fleet.state = 'docked' as FleetState // Use loading as docked equivalent
-        fleet.targetStationId = report.stationId
+        // We don't have a specific 'docked' state, but 'docking' implies being at the station
+        fleet.state = 'docking'
         break
-        
+
+      case 'undocked':
+        fleet.state = 'undocking'
+        break
+
+      case 'arrived-at-gate':
+        fleet.state = 'in-transit'
+        break
+
       case 'cargo-loaded':
-        if (report.wareId && report.amount) {
-          fleet.cargo[report.wareId] = (fleet.cargo[report.wareId] || 0) + report.amount
+        // Transaction: Buy from station
+        if (report.wareId && report.amount && report.stationId) {
+          const station = state.stations.find(s => s.id === report.stationId)
+          const order = fleet.currentOrder
+          
+          if (station && order) {
+            // Deduct from station, add to fleet
+            station.inventory[report.wareId] = (station.inventory[report.wareId] || 0) - report.amount
+            fleet.cargo[report.wareId] = (fleet.cargo[report.wareId] || 0) + report.amount
+            fleet.credits -= report.amount * order.buyPrice
+            
+            // Issue next command: Sell
+            // Remove the buy command from queue (it should be done)
+            fleet.commandQueue = [] 
+            
+            issueCommand(fleet.id, { 
+              type: 'trade-sell', 
+              targetStationId: order.sellStationId,
+              targetSectorId: order.sellSectorId,
+              wareId: order.sellWareId, 
+              amount: report.amount 
+            })
+            fleet.state = 'in-transit'
+          }
         }
-        fleet.state = 'loading'
         break
         
       case 'cargo-unloaded':
-        if (report.wareId && report.amount) {
+        // Transaction: Sell to station
+        if (report.wareId && report.amount && report.stationId) {
           const station = state.stations.find(s => s.id === report.stationId)
-          if (station) {
+          const order = fleet.currentOrder
+          
+          if (station && order) {
+            // Add to station, remove from fleet
             station.inventory[report.wareId] = (station.inventory[report.wareId] || 0) + report.amount
+            fleet.cargo[report.wareId] = Math.max(0, (fleet.cargo[report.wareId] || 0) - report.amount)
+            if (fleet.cargo[report.wareId] === 0) delete fleet.cargo[report.wareId]
+            
+            const revenue = report.amount * order.sellPrice
+            const cost = report.amount * order.buyPrice
+            const profit = revenue - cost
+            
+            fleet.credits += revenue
+            fleet.totalProfit += profit
+            fleet.tripsCompleted++
+            
+            // Log trade
+            state.tradeLog.unshift({
+              id: genId(),
+              timestamp: Date.now(),
+              fleetId: fleet.id,
+              fleetName: fleet.name,
+              wareId: report.wareId,
+              wareName: order.sellWareName,
+              quantity: report.amount,
+              buyPrice: order.buyPrice,
+              sellPrice: order.sellPrice,
+              profit,
+              buySectorId: order.buySectorId,
+              sellSectorId: order.sellSectorId,
+              buyStationName: order.buyStationName,
+              sellStationName: order.sellStationName,
+            })
+            if (state.tradeLog.length > 100) state.tradeLog.length = 100
+            
+            // Profit share
+            if (fleet.ownerId) {
+              const corp = state.corporations.find(c => c.id === fleet.ownerId)
+              if (corp) {
+                const share = profit * (1 - fleet.profitShare)
+                corp.credits += share
+                corp.lifetimeProfit += share
+                corp.lifetimeTrades++
+              }
+            }
+            
+            // Order complete
+            fleet.currentOrder = undefined
+            fleet.commandQueue = []
+            fleet.state = 'idle'
           }
-          fleet.cargo[report.wareId] = Math.max(0, (fleet.cargo[report.wareId] || 0) - report.amount)
-          if (fleet.cargo[report.wareId] === 0) delete fleet.cargo[report.wareId]
         }
-        fleet.state = 'unloading'
-        break
-        
-      case 'undocked':
-        fleet.state = 'idle'
-        fleet.targetStationId = undefined
-        break
-        
-      case 'arrived-at-gate':
-        // Ship is at the gate, next should use the gate
         break
         
       case 'entered-sector':
-        // Ship has entered new sector (stationId contains the destination sector)
         if (report.stationId) {
           fleet.currentSectorId = report.stationId
           fleet.destinationSectorId = undefined
-          fleet.state = 'idle'
+          fleet.state = 'in-transit'
         }
-        break
-        
-      case 'position-update':
-        // Just a position sync, already handled above
         break
     }
   }
   
-  return { state, init, tick, loop, setTimeScale, handleShipReport, issueCommand }
+  return { state, init, tick, loop, setTimeScale, handleShipReport, issueCommand, advanceTime }
 }
 
 function universePlugin() {
@@ -756,6 +645,7 @@ function universePlugin() {
             fleets: u.state.fleets,
             corporations: u.state.corporations,
             tradeLog: u.state.tradeLog.slice(0, 20), // Send last 20 trades
+            elapsedTimeSec: u.state.elapsedTimeSec,
           }))
           return
         }
@@ -783,7 +673,7 @@ function universePlugin() {
         if (req.method === 'POST' && url.startsWith('/__universe/tick')) {
           const full = new URL(url, 'http://localhost')
           const d = Number(full.searchParams.get('delta') || '0')
-          u.tick(d)
+          u.advanceTime(d)
           res.statusCode = 204
           res.end()
           return

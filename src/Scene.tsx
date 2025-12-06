@@ -108,7 +108,8 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
             .filter(g => g.destinationSectorId)
             .map(g => ({
                 position: place(g.position) as [number, number, number],
-                destinationSectorId: g.destinationSectorId!
+                destinationSectorId: g.destinationSectorId!,
+                radius: (g.scale ?? 40) * 5
             }));
     }, [layout]);
     
@@ -226,6 +227,8 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
                                     fleet={fleet}
                                     stationPositions={stationPositions}
                                     gatePositions={gatePositions}
+                                    navGraph={navData.graph}
+                                    obstacles={navData.obstacles}
                                     onReport={reportShipAction}
                                 />
                             ))}

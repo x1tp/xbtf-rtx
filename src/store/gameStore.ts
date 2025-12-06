@@ -46,6 +46,7 @@ export interface GameState {
   // Time / SETA
   timeScale: number;
   setTimeScale: (scale: number) => void;
+  elapsedTimeSec: number;
 
   // Navigation/Sector map
   sectorMapOpen: boolean;
@@ -116,6 +117,7 @@ export const useGameStore = create<GameState>((set) => ({
   sunIntensity: 0,
 
   timeScale: 1.0,
+  elapsedTimeSec: 0,
   setTimeScale: (scale) => {
     set({ timeScale: scale })
     fetch(`/__universe/time-scale?value=${encodeURIComponent(scale)}`, { method: 'POST' })
@@ -217,6 +219,7 @@ export const useGameStore = create<GameState>((set) => ({
         stations: data.stations || [], 
         sectorPrices: data.sectorPrices || {}, 
         timeScale: typeof data.timeScale === 'number' ? data.timeScale : 1,
+        elapsedTimeSec: typeof data.elapsedTimeSec === 'number' ? data.elapsedTimeSec : 0,
         corporations: data.corporations || [],
         fleets: data.fleets || [],
         activeEvents: data.activeEvents || [],
@@ -252,9 +255,9 @@ export const useGameStore = create<GameState>((set) => ({
     const state = useGameStore.getState()
     const { fleets, tradeLog } = state
     
-    // Get fleets in this sector
+    // Get fleets in this sector (include in-transit so they still render on the map)
     const sectorFleets = fleets.filter(f => 
-      f.currentSectorId === sectorId && f.state !== 'in-transit'
+      f.currentSectorId === sectorId
     )
     
     // Get fleets in transit to/from this sector
