@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
 import type { NavTarget } from '../store/gameStore';
 import { UNIVERSE_SECTORS_XBTF } from '../config/universe_xbtf';
+import { getSectorLayoutById } from '../config/sector';
 
 interface SectorObject {
     name: string;
@@ -72,6 +73,7 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
     const setUniverseMapOpen = useGameStore((s) => s.setUniverseMapOpen);
     const setCurrentSectorId = useGameStore((s) => s.setCurrentSectorId);
     const currentSectorId = useGameStore((s) => s.currentSectorId);
+    const selectedSectorId = useGameStore((s) => s.selectedSectorId);
     const setSelectedTarget = useGameStore((s) => s.setSelectedTarget);
     const selectedTarget = useGameStore((s) => s.selectedTarget);
     const storePosition = useGameStore((s) => s.position);
@@ -86,6 +88,37 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
     const [mapWidth, setMapWidth] = useState(800);
     const [mapHeight, setMapHeight] = useState(600);
     const [axisView, setAxisView] = useState<AxisView>('xz');
+
+    // Compute objects to display:
+    // 1. If props.objects provided, use them.
+    // 2. If viewing a remote sector (selectedSectorId != currentSectorId), generate them.
+    // 3. Otherwise use storeObjects (live current sector objects).
+    const objectsToRender = React.useMemo(() => {
+        if (objects) return objects;
+
+        // If we are looking at a different sector than the one we are in
+        if (selectedSectorId && selectedSectorId !== currentSectorId) {
+            const layout = getSectorLayoutById(selectedSectorId);
+            if (!layout) return [];
+
+            // Replicate App.tsx scaling logic
+            const spacing = 30;
+            const place = (p: [number, number, number]): [number, number, number] => [p[0] * spacing, p[1] * spacing, p[2] * spacing];
+
+            const sector = UNIVERSE_SECTORS_XBTF.find((s) => s.id === selectedSectorId);
+            const nbNames = (sector?.neighbors || []).slice(0, layout.gates.length);
+            const nb = nbNames.map((nm) => UNIVERSE_SECTORS_XBTF.find((x) => x.name === nm)?.id).filter((x): x is string => !!x);
+
+            const list: SectorObject[] = [];
+            for (const st of layout.stations) list.push({ name: st.name, position: place(st.position), type: 'station' });
+            layout.gates.forEach((g, i) => { list.push({ name: g.name, position: place(g.position), type: 'gate', targetSectorId: nb[i] }); });
+            for (const s of layout.ships) list.push({ name: s.name, position: place(s.position), type: 'ship' });
+
+            return list;
+        }
+
+        return storeObjects;
+    }, [objects, selectedSectorId, currentSectorId, storeObjects]);
 
     const mapRef = useRef<SVGSVGElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -151,7 +184,7 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
         }
     };
 
-    const objectsList = objects ?? storeObjects;
+    const objectsList = objectsToRender;
 
     // Calculate bounds for auto-scaling based on current view
     const allPositions = [...objectsList.map(o => o.position), currentPlayerPos];
@@ -459,6 +492,9 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
 
                             {/* Player position */}
                             {(() => {
+                                // Only show player if we are in the current sector
+                                if (selectedSectorId && selectedSectorId !== currentSectorId) return null;
+
                                 const playerPos = worldToMap(currentPlayerPos);
                                 return (
                                     <g transform={`translate(${playerPos.x}, ${playerPos.y})`}>
@@ -568,7 +604,7 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
                     }}
                 >
                     <span style={{ color: '#ff9944', fontSize: 14, fontWeight: 'bold' }}>
-                        {(() => { const s = UNIVERSE_SECTORS_XBTF.find((x) => x.id === (currentSectorId || 'seizewell')); return s ? s.name : (currentSectorId || 'seizewell'); })()}
+                        {(() => { const s = UNIVERSE_SECTORS_XBTF.find((x) => x.id === (selectedSectorId || currentSectorId || 'seizewell')); return s ? s.name : (selectedSectorId || currentSectorId || 'seizewell'); })()}
                     </span>
                     <span style={{ color: '#6090a0', fontSize: 10 }}>
                         &lt;&lt; Select a position &gt;&gt;
@@ -611,23 +647,25 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
                     }}
                 >
                     {/* Player entry */}
-                    <div
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            padding: '6px 8px',
-                            background: 'rgba(0, 100, 0, 0.3)',
-                            borderLeft: '3px solid #00ff00',
-                            marginBottom: 2,
-                        }}
-                    >
-                        <span style={{ color: '#00ff00', fontSize: 11, flex: 1 }}>
-                            ▶ Your Ship
-                        </span>
-                        <span style={{ color: '#00aa00', fontSize: 10 }}>
-                            HERE
-                        </span>
-                    </div>
+                    {(!selectedSectorId || selectedSectorId === currentSectorId) && (
+                        <div
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                padding: '6px 8px',
+                                background: 'rgba(0, 100, 0, 0.3)',
+                                borderLeft: '3px solid #00ff00',
+                                marginBottom: 2,
+                            }}
+                        >
+                            <span style={{ color: '#00ff00', fontSize: 11, flex: 1 }}>
+                                ▶ Your Ship
+                            </span>
+                            <span style={{ color: '#00aa00', fontSize: 10 }}>
+                                HERE
+                            </span>
+                        </div>
+                    )}
 
                     {filteredObjects.map((obj, i) => {
                         const isSelected = selectedTarget?.name === obj.name;
