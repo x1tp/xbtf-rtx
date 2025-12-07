@@ -111,7 +111,8 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
             .map(g => ({
                 position: place(g.position) as [number, number, number],
                 destinationSectorId: g.destinationSectorId!,
-                radius: (g.scale ?? 40) * 5
+                radius: (g.scale ?? 40) * 5,
+                gateType: g.gateType
             }));
     }, [layout]);
     

@@ -50,7 +50,7 @@ export const SEIZEWELL_BLUEPRINT: SeizewellLayout = {
     ],
     gates: [
         { name: 'West Gate', modelPath: '/models/00088.obj', position: [-3000, 0, 0], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, Math.PI / 2, 0], destinationSectorId: 'profit_share', gateType: 'W' },
-        { name: 'North Gate', modelPath: '/models/00088.obj', position: [0, 0, -3000], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, 0, 0], destinationSectorId: 'teladi_gain', gateType: 'N' },
+        { name: 'North Gate', modelPath: '/models/00088.obj', position: [0, 0, -3000], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, Math.PI, 0], destinationSectorId: 'teladi_gain', gateType: 'N' },
 
         { name: 'South Gate', modelPath: '/models/00088.obj', position: [0, 0, 3000], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, 0, 0], destinationSectorId: 'greater_profit', gateType: 'S' }
     ],

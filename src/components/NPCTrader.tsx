@@ -16,6 +16,7 @@ interface GateInfo {
   position: [number, number, number];
   destinationSectorId: string;
   radius?: number;
+  gateType?: string;
 }
 
 interface NPCTraderProps {
@@ -145,7 +146,7 @@ export const NPCTrader: FC<NPCTraderProps> = ({
   }, [stationPositions, fleet.id, fleet.shipType]);
 
   // Get gate data for a destination sector
-  const getGateData = useCallback((destSectorId: string): { pos: Vector3; radius: number } | null => {
+  const getGateData = useCallback((destSectorId: string): { pos: Vector3; radius: number; gateType?: string } | null => {
     let gate = gatePositions.find(g => g.destinationSectorId === destSectorId);
     
     // If not found, try pathfinding
@@ -158,8 +159,9 @@ export const NPCTrader: FC<NPCTraderProps> = ({
 
     if (gate) {
       const radius = typeof gate.radius === 'number' ? gate.radius : 300;
-      return { pos: new Vector3(gate.position[0], gate.position[1], gate.position[2]), radius };
+      return { pos: new Vector3(gate.position[0], gate.position[1], gate.position[2]), radius, gateType: gate.gateType };
     }
+    console.warn(`[NPCTrader] Cannot find gate to ${destSectorId} from ${fleet.currentSectorId}. Available gates: ${gatePositions.map(g => `${g.destinationSectorId}(${g.gateType})`).join(', ')}`);
     return null;
   }, [gatePositions, fleet.currentSectorId]);
 
@@ -280,13 +282,15 @@ export const NPCTrader: FC<NPCTraderProps> = ({
   }, []);
 
   // Teleport through gate and update store/report
-  const enterGate = useCallback((targetSectorId: string, gatePos: Vector3, shouldAdvance = true) => {
-    // Determine gate type based on position (approximate)
-    let exitGateType = 'N';
-    if (Math.abs(gatePos.x) > Math.abs(gatePos.z)) {
-      exitGateType = gatePos.x > 0 ? 'E' : 'W';
-    } else {
-      exitGateType = gatePos.z > 0 ? 'S' : 'N';
+  const enterGate = useCallback((targetSectorId: string, gatePos: Vector3, shouldAdvance = true, usedGateType?: string) => {
+    // Determine gate type based on position (approximate) if not provided
+    let exitGateType = usedGateType || 'N';
+    if (!usedGateType) {
+      if (Math.abs(gatePos.x) > Math.abs(gatePos.z)) {
+        exitGateType = gatePos.x > 0 ? 'E' : 'W';
+      } else {
+        exitGateType = gatePos.z > 0 ? 'S' : 'N';
+      }
     }
     
     // Determine expected entry gate type in the new sector
@@ -331,11 +335,23 @@ export const NPCTrader: FC<NPCTraderProps> = ({
     }));
     setLocalState('gone'); // despawn from current sector
     if (shouldAdvance) {
-      advanceCommand();
+      advanceCommand(true);
     } else {
       setLocalState('idle');
     }
   }, [advanceCommand, fleet.id, report]);
+
+  // Reset state when sector changes (arrived in new sector)
+  const prevSectorIdRef = useRef(fleet.currentSectorId);
+  useEffect(() => {
+    if (fleet.currentSectorId !== prevSectorIdRef.current) {
+       prevSectorIdRef.current = fleet.currentSectorId;
+       // Only reset to idle if we were gone (in transit)
+       if (localState === 'gone') {
+         setLocalState('idle');
+       }
+    }
+  }, [fleet.currentSectorId, localState]);
 
   // Process current command to determine what to do
   useEffect(() => {
@@ -737,7 +753,7 @@ export const NPCTrader: FC<NPCTraderProps> = ({
             const actualTarget = nextHop || finalDest;
             const isFinalDest = actualTarget === finalDest;
             
-            enterGate(actualTarget, gatePos, isFinalDest);
+            enterGate(actualTarget, gatePos, isFinalDest, gateData.gateType);
           }
         }
         break;
@@ -1115,7 +1131,7 @@ export const NPCTrader: FC<NPCTraderProps> = ({
             // Advance if we reached final dest AND it's not a trade command (which needs to dock)
             const shouldAdvance = isFinalDest && !isTrade;
 
-            enterGate(actualTarget, gatePos, shouldAdvance);
+            enterGate(actualTarget, gatePos, shouldAdvance, gateData.gateType);
           }
         }
         break;

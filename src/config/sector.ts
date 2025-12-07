@@ -67,7 +67,16 @@ export const getSectorLayoutById = (id: string): SeizewellLayout => {
     } else {
       // Fallback for non-adjacent jumps if any
       name = 'Gate'
-      position = [2000, 0, 2000]
+      // Determine approximate cardinal direction for gate type
+      if (Math.abs(dx) > Math.abs(dy)) {
+        gateType = dx > 0 ? 'E' : 'W';
+        position = dx > 0 ? [5000, 0, 0] : [-5000, 0, 0];
+        rotation = [0, Math.PI / 2, 0];
+      } else {
+        gateType = dy > 0 ? 'S' : 'N';
+        position = dy > 0 ? [0, 0, 5000] : [0, 0, -5000];
+        rotation = [0, 0, 0];
+      }
     }
 
     return { name, position, rotation, modelPath: '/models/00088.obj', destinationSectorId: neighbor.id, gateType, scale: 300 }

@@ -75,12 +75,13 @@ const HiddenFleetSimulator: FC<{ excludeCurrentSector?: boolean }> = ({ excludeC
         }
       }
       const gatePositions = layout.gates
-        .filter((g) => g.destinationSectorId)
-        .map((g) => ({
-          position: place(g.position) as [number, number, number],
-          destinationSectorId: g.destinationSectorId!,
-          radius: (g.scale ?? 40) * 5,
-        }));
+            .filter((g) => g.destinationSectorId)
+            .map((g) => ({
+              position: place(g.position) as [number, number, number],
+              destinationSectorId: g.destinationSectorId!,
+              radius: (g.scale ?? 40) * 5,
+              gateType: g.gateType,
+            }));
       const nodes = buildNavNodesFromLayout(layout, spacing);
       const navGraph = buildNavGraph(nodes, []);
       map.set(sectorId, { stationPositions, gatePositions, navGraph });

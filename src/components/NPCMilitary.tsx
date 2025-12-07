@@ -16,6 +16,7 @@ interface GateInfo {
   position: [number, number, number];
   destinationSectorId: string;
   radius?: number;
+  gateType?: string;
 }
 
 interface NPCMilitaryProps {
@@ -105,7 +106,7 @@ export const NPCMilitary: FC<NPCMilitaryProps> = ({
   }, [fleet.position]);
 
   // Get gate data for a destination sector
-  const getGateData = useCallback((destSectorId: string): { pos: Vector3; radius: number } | null => {
+  const getGateData = useCallback((destSectorId: string): { pos: Vector3; radius: number; gateType?: string } | null => {
     let gate = gatePositions.find(g => g.destinationSectorId === destSectorId);
     
     // If not found, try pathfinding
@@ -118,8 +119,9 @@ export const NPCMilitary: FC<NPCMilitaryProps> = ({
 
     if (gate) {
       const radius = typeof gate.radius === 'number' ? gate.radius : 300;
-      return { pos: new Vector3(gate.position[0], gate.position[1], gate.position[2]), radius };
+      return { pos: new Vector3(gate.position[0], gate.position[1], gate.position[2]), radius, gateType: gate.gateType };
     }
+    console.warn(`[NPCMilitary] Cannot find gate to ${destSectorId} from ${fleet.currentSectorId}`);
     return null;
   }, [gatePositions, fleet.currentSectorId]);
 
@@ -219,12 +221,14 @@ export const NPCMilitary: FC<NPCMilitaryProps> = ({
     }
   }, []);
 
-  const enterGate = useCallback((targetSectorId: string, gatePos: Vector3, shouldAdvance = true) => {
-    let exitGateType = 'N';
-    if (Math.abs(gatePos.x) > Math.abs(gatePos.z)) {
-      exitGateType = gatePos.x > 0 ? 'E' : 'W';
-    } else {
-      exitGateType = gatePos.z > 0 ? 'S' : 'N';
+  const enterGate = useCallback((targetSectorId: string, gatePos: Vector3, shouldAdvance = true, usedGateType?: string) => {
+    let exitGateType = usedGateType || 'N';
+    if (!usedGateType) {
+      if (Math.abs(gatePos.x) > Math.abs(gatePos.z)) {
+        exitGateType = gatePos.x > 0 ? 'E' : 'W';
+      } else {
+        exitGateType = gatePos.z > 0 ? 'S' : 'N';
+      }
     }
     
     const entryGateTypeMap: Record<string, string> = { 'E': 'W', 'W': 'E', 'N': 'S', 'S': 'N' };
@@ -265,11 +269,23 @@ export const NPCMilitary: FC<NPCMilitaryProps> = ({
     }));
     setLocalState('gone');
     if (shouldAdvance) {
-      advanceCommand();
+      advanceCommand(true);
     } else {
       setLocalState('idle');
     }
   }, [advanceCommand, fleet.id, report]);
+
+  // Reset state when sector changes (arrived in new sector)
+  const prevSectorIdRef = useRef(fleet.currentSectorId);
+  useEffect(() => {
+    if (fleet.currentSectorId !== prevSectorIdRef.current) {
+       prevSectorIdRef.current = fleet.currentSectorId;
+       // Only reset to idle if we were gone (in transit)
+       if (localState === 'gone') {
+         setLocalState('idle');
+       }
+    }
+  }, [fleet.currentSectorId, localState]);
 
   // Process current command
   useEffect(() => {
@@ -512,7 +528,7 @@ export const NPCMilitary: FC<NPCMilitaryProps> = ({
                       const actualTarget = nextHop || finalDest;
                       const isFinalDest = actualTarget === finalDest;
                       
-                      enterGate(actualTarget, gateData.pos, isFinalDest); // Advance if reached final dest
+                      enterGate(actualTarget, gateData.pos, isFinalDest, gateData.gateType); // Advance if reached final dest
                   }
               }
           }

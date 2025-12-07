@@ -12,9 +12,9 @@ export const TELADI_GAIN_BLUEPRINT: SeizewellLayout = {
     { name: 'Flower Farm (M)', modelPath: '/models/00282.obj', position: [120, -20, 420], scale: 26, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
   ],
   gates: [
-    { name: 'South Gate', modelPath: '/models/00088.obj', position: [0, 0, -1200], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, Math.PI / 2, 0], destinationSectorId: 'seizewell', gateType: 'S' },
-    { name: 'East Gate', modelPath: '/models/00088.obj', position: [1200, 0, 0], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, Math.PI / 2, 0] },
-    { name: 'West Gate', modelPath: '/models/00088.obj', position: [-1200, 0, 0], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, Math.PI / 2, 0] },
+    { name: 'South Gate', modelPath: '/models/00088.obj', position: [0, 0, 5000], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, 0, 0], destinationSectorId: 'seizewell', gateType: 'S' },
+    { name: 'East Gate', modelPath: '/models/00088.obj', position: [5000, 0, 0], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, Math.PI / 2, 0], destinationSectorId: 'family_whi', gateType: 'E' },
+    { name: 'West Gate', modelPath: '/models/00088.obj', position: [-5000, 0, 0], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, Math.PI / 2, 0], destinationSectorId: 'ceo_s_buckzoid', gateType: 'W' },
   ],
   ships: [
     // Ships migrated to persistent NPC fleet system
