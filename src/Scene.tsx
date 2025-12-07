@@ -7,6 +7,8 @@ import type { NPCFleet } from './types/simulation';
 import { Ship } from './components/Ship';
 import { AIShip } from './components/AIShip';
 import { NPCTrader } from './components/NPCTrader';
+import { NPCMilitary } from './components/NPCMilitary';
+import { NPCBuilder } from './components/NPCBuilder';
 import { Planet } from './components/Planet';
 import { Station } from './components/Station';
 import { Gate } from './components/Gate';
@@ -221,17 +223,28 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
                         }
                         {/* NPC Trader Fleets */}
                         <Suspense fallback={null}>
-                            {sectorFleets.map((fleet: NPCFleet) => (
-                                <NPCTrader
-                                    key={fleet.id}
-                                    fleet={fleet}
-                                    stationPositions={stationPositions}
-                                    gatePositions={gatePositions}
-                                    navGraph={navData.graph}
-                                    obstacles={navData.obstacles}
-                                    onReport={reportShipAction}
-                                />
-                            ))}
+                            {sectorFleets.map((fleet: NPCFleet) => {
+                                let Component = NPCTrader;
+                                if (fleet.behavior === 'patrol') {
+                                    // @ts-ignore
+                                    Component = NPCMilitary;
+                                } else if (fleet.behavior === 'construction') {
+                                    // @ts-ignore
+                                    Component = NPCBuilder;
+                                }
+
+                                return (
+                                    <Component
+                                        key={fleet.id}
+                                        fleet={fleet}
+                                        stationPositions={stationPositions}
+                                        gatePositions={gatePositions}
+                                        navGraph={navData.graph}
+                                        obstacles={navData.obstacles}
+                                        onReport={reportShipAction}
+                                    />
+                                );
+                            })}
                         </Suspense>
                     </>
                 )

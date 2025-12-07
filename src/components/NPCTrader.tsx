@@ -7,6 +7,8 @@ import { useGameStore, type GameState } from '../store/gameStore';
 import type { NPCFleet, ShipReportType } from '../types/simulation';
 import type { NavGraph, NavObstacle } from '../ai/navigation';
 import { findPath } from '../ai/navigation';
+import { findNextHop } from '../ai/universePathfinding';
+import { getSectorLayoutById } from '../config/sector';
 
 import { updateFleetPosition } from '../store/fleetPositions';
 
@@ -84,7 +86,7 @@ export const NPCTrader: FC<NPCTraderProps> = ({
   const timeScale = useGameStore((s: GameState) => s.timeScale);
 
   // Local autonomous state
-  const [localState, setLocalState] = useState<'idle' | 'flying-to-station' | 'flying-to-gate' | 'docking' | 'docked' | 'loading' | 'unloading' | 'undocking' | 'entering-gate' | 'gone'>('idle');
+  const [localState, setLocalState] = useState<'idle' | 'flying-to-station' | 'flying-to-gate' | 'docking' | 'docked' | 'loading' | 'unloading' | 'undocking' | 'entering-gate' | 'patrolling' | 'gone'>('idle');
   const [currentCommandIndex, setCurrentCommandIndex] = useState(0);
   const actionTimerRef = useRef(0);
   const lastReportRef = useRef<string>('');
@@ -144,13 +146,22 @@ export const NPCTrader: FC<NPCTraderProps> = ({
 
   // Get gate data for a destination sector
   const getGateData = useCallback((destSectorId: string): { pos: Vector3; radius: number } | null => {
-    const gate = gatePositions.find(g => g.destinationSectorId === destSectorId);
+    let gate = gatePositions.find(g => g.destinationSectorId === destSectorId);
+    
+    // If not found, try pathfinding
+    if (!gate && destSectorId !== fleet.currentSectorId) {
+       const nextHop = findNextHop(fleet.currentSectorId, destSectorId);
+       if (nextHop) {
+         gate = gatePositions.find(g => g.destinationSectorId === nextHop);
+       }
+    }
+
     if (gate) {
       const radius = typeof gate.radius === 'number' ? gate.radius : 300;
       return { pos: new Vector3(gate.position[0], gate.position[1], gate.position[2]), radius };
     }
     return null;
-  }, [gatePositions]);
+  }, [gatePositions, fleet.currentSectorId]);
 
   // Build or refresh a nav path toward a target
   const buildPathTo = useCallback((target: Vector3 | null) => {
@@ -271,15 +282,43 @@ export const NPCTrader: FC<NPCTraderProps> = ({
   // Teleport through gate and update store/report
   const enterGate = useCallback((targetSectorId: string, gatePos: Vector3, shouldAdvance = true) => {
     // Determine gate type based on position (approximate)
-    let gateType = 'N';
+    let exitGateType = 'N';
     if (Math.abs(gatePos.x) > Math.abs(gatePos.z)) {
-      gateType = gatePos.x > 0 ? 'E' : 'W';
+      exitGateType = gatePos.x > 0 ? 'E' : 'W';
     } else {
-      gateType = gatePos.z > 0 ? 'S' : 'N';
+      exitGateType = gatePos.z > 0 ? 'S' : 'N';
     }
     
-    report('entered-sector', { stationId: targetSectorId, sectorIdOverride: targetSectorId, gateType });
-    const destPos: [number, number, number] = [gatePos.x, gatePos.y, gatePos.z];
+    // Determine expected entry gate type in the new sector
+    // E -> W, W -> E, N -> S, S -> N
+    const entryGateTypeMap: Record<string, string> = { 'E': 'W', 'W': 'E', 'N': 'S', 'S': 'N' };
+    const expectedEntryGateType = entryGateTypeMap[exitGateType] || 'N';
+
+    // Calculate spawn position in new sector
+    const targetLayout = getSectorLayoutById(targetSectorId);
+    // Find matching gate (fallback to first gate if not found)
+    const matchingGate = targetLayout.gates.find(g => g.gateType === expectedEntryGateType) || targetLayout.gates[0];
+    
+    let destPos: [number, number, number] = [0, 0, 0];
+    if (matchingGate) {
+        const scale = 30; // Scene scaling factor
+        const gx = matchingGate.position[0] * scale;
+        const gy = matchingGate.position[1] * scale;
+        const gz = matchingGate.position[2] * scale;
+        
+        const offset = 400;
+        let offX = 0, offZ = 0;
+        
+        if (expectedEntryGateType === 'W') offX = offset;
+        else if (expectedEntryGateType === 'E') offX = -offset;
+        else if (expectedEntryGateType === 'N') offZ = offset;
+        else if (expectedEntryGateType === 'S') offZ = -offset;
+        
+        destPos = [gx + offX, gy, gz + offZ];
+    }
+
+    report('entered-sector', { stationId: targetSectorId, sectorIdOverride: targetSectorId, gateType: exitGateType });
+    
     useGameStore.setState((state: GameState) => ({
       fleets: state.fleets.map((f) => f.id === fleet.id ? {
         ...f,
@@ -352,18 +391,27 @@ export const NPCTrader: FC<NPCTraderProps> = ({
       case 'goto-station':
         if (localState === 'idle') {
           // Check if station is in current sector or need gate travel
-          const stationPos = currentCommand.targetStationId ?
-            stationPositions.get(currentCommand.targetStationId) : null;
-          if (stationPos) {
-            setLocalState('flying-to-station');
-            syncFleet({ state: 'idle', targetStationId: currentCommand.targetStationId, stateStartTime: Date.now() });
-            buildPathTo(new Vector3(stationPos[0], stationPos[1], stationPos[2]));
-            dockAnchorRef.current = new Vector3(stationPos[0], stationPos[1], stationPos[2]);
-            holdDockRef.current = false;
+          const targetSector = currentCommand.targetSectorId;
+          const needsTravel = targetSector && targetSector !== fleet.currentSectorId;
+          
+          if (needsTravel) {
+             setLocalState('flying-to-gate');
+             syncFleet({ state: 'in-transit', destinationSectorId: targetSector, stateStartTime: Date.now() });
+             const gateData = getGateData(targetSector);
+             buildPathTo(gateData?.pos || null);
           } else {
-            // Station not in current sector - skip command to prevent getting stuck
-            console.warn(`[NPCTrader] ${fleet.name} cannot goto station ${currentCommand.targetStationId} - not in sector, skipping`);
-            advanceCommand();
+             const stationPos = currentCommand.targetStationId ?
+               stationPositions.get(currentCommand.targetStationId) : null;
+             if (stationPos) {
+               setLocalState('flying-to-station');
+               syncFleet({ state: 'idle', targetStationId: currentCommand.targetStationId, stateStartTime: Date.now() });
+               buildPathTo(new Vector3(stationPos[0], stationPos[1], stationPos[2]));
+               dockAnchorRef.current = new Vector3(stationPos[0], stationPos[1], stationPos[2]);
+               holdDockRef.current = false;
+             } else {
+               console.warn(`[NPCTrader] ${fleet.name} cannot goto station ${currentCommand.targetStationId} - skipping`);
+               advanceCommand();
+             }
           }
         }
         break;
@@ -424,8 +472,22 @@ export const NPCTrader: FC<NPCTraderProps> = ({
         break;
 
       case 'patrol':
+        if (localState === 'idle') {
+          setLocalState('patrolling');
+          syncFleet({ state: 'idle', stateStartTime: Date.now() });
+          // Pick a random patrol point
+          const range = 8000;
+          const patrolPoint = new Vector3(
+            (Math.random() - 0.5) * range,
+            (Math.random() - 0.5) * range * 0.2,
+            (Math.random() - 0.5) * range
+          );
+          buildPathTo(patrolPoint);
+        }
+        break;
+      
       case 'wait':
-        // Stay idle, just patrol/orbit
+        // Stay idle
         break;
     }
   }, [currentCommand, localState, stationPositions, buildPathTo, getGateData, fleet.currentSectorId, fleet.targetStationId, syncFleet]);
@@ -451,7 +513,7 @@ export const NPCTrader: FC<NPCTraderProps> = ({
 
     // Simple stuck detection -> trigger a repath
     const lp = lastProgressSampleRef.current;
-    const movingStates = localState === 'flying-to-station' || localState === 'flying-to-gate' || localState === 'entering-gate';
+    const movingStates = localState === 'flying-to-station' || localState === 'flying-to-gate' || localState === 'entering-gate' || localState === 'patrolling';
     if (!movingStates) {
       lp.time = 0;
       lp.stuckTime = 0;
@@ -474,6 +536,8 @@ export const NPCTrader: FC<NPCTraderProps> = ({
               buildPathTo(getStationPosition(currentCommand.targetStationId));
             } else if ((currentCommand?.type === 'goto-gate' || currentCommand?.type === 'use-gate') && currentCommand.targetSectorId) {
               buildPathTo(getGateData(currentCommand.targetSectorId)?.pos || null);
+            } else if (localState === 'patrolling') {
+              nextRepathAtRef.current = 0;
             }
             lp.stuckTime = 0;
           }
@@ -668,7 +732,12 @@ export const NPCTrader: FC<NPCTraderProps> = ({
             advanceCommand();
           } else {
             // No explicit use-gate command; auto-enter
-            enterGate(currentCommand.targetSectorId, gatePos);
+            const finalDest = currentCommand.targetSectorId;
+            const nextHop = findNextHop(fleet.currentSectorId, finalDest);
+            const actualTarget = nextHop || finalDest;
+            const isFinalDest = actualTarget === finalDest;
+            
+            enterGate(actualTarget, gatePos, isFinalDest);
           }
         }
         break;
@@ -924,6 +993,65 @@ export const NPCTrader: FC<NPCTraderProps> = ({
         break;
       }
 
+      case 'patrolling': {
+        // Patrol logic: fly to random points
+        if (performance.now() > nextRepathAtRef.current || pathRef.current.length === 0) {
+          const range = 8000;
+          const patrolPoint = new Vector3(
+            (Math.random() - 0.5) * range,
+            (Math.random() - 0.5) * range * 0.2,
+            (Math.random() - 0.5) * range
+          );
+          buildPathTo(patrolPoint);
+        }
+        
+        const target = getCurrentWaypoint(pathRef.current[pathRef.current.length - 1]);
+        if (!target) {
+            nextRepathAtRef.current = 0;
+            break;
+        }
+
+        const dist = ship.position.distanceTo(target);
+        
+        tmpDir.copy(target).sub(ship.position).normalize();
+        
+        // Avoidance
+        const avoidance = new Vector3();
+        for (const o of obstacles) {
+            const offset = ship.position.clone().sub(o.center);
+            const d = offset.length();
+            if (d < o.radius + 160 && d > 1e-3) {
+                const strength = (o.radius + 160 - d) / (o.radius + 160);
+                avoidance.add(offset.normalize().multiplyScalar(strength));
+            }
+        }
+        if (avoidance.lengthSq() > 0) {
+            tmpDir.add(avoidance.multiplyScalar(1.5)).normalize();
+        }
+
+        tmpVec.copy(tmpDir).multiplyScalar(shipMaxSpeed * 0.8);
+
+        const velDiff = tmpVec.clone().sub(velocityRef.current);
+        const accelMag = Math.min(shipAccel * delta, velDiff.length());
+        if (accelMag > 0.01) {
+            velDiff.normalize().multiplyScalar(accelMag);
+            velocityRef.current.add(velDiff);
+        }
+
+        ship.position.add(velocityRef.current.clone().multiplyScalar(delta));
+
+        if (velocityRef.current.lengthSq() > 5) {
+            tmpDir.copy(velocityRef.current).normalize();
+            const targetQuat = new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), tmpDir);
+            ship.quaternion.slerp(targetQuat, delta * turnRate);
+        }
+
+        if (pathRef.current.length <= 1 && dist < 100) {
+             nextRepathAtRef.current = 0; 
+        }
+        break;
+      }
+
       case 'entering-gate': {
         if (!currentCommand?.targetSectorId) break;
 
@@ -977,9 +1105,17 @@ export const NPCTrader: FC<NPCTraderProps> = ({
           const enterRadius = Math.max(120, gateRadius * 0.6);
           if (dist < enterRadius) {
             // Entered the gate - move to destination sector and keep simulating
-            const targetSectorId = currentCommand.targetSectorId;
+            const finalDest = currentCommand.targetSectorId;
+            const nextHop = findNextHop(fleet.currentSectorId, finalDest);
+            const actualTarget = nextHop || finalDest;
+            const isFinalDest = actualTarget === finalDest;
+            
             const isTrade = currentCommand.type === 'trade-buy' || currentCommand.type === 'trade-sell';
-            enterGate(targetSectorId, gatePos, !isTrade);
+            
+            // Advance if we reached final dest AND it's not a trade command (which needs to dock)
+            const shouldAdvance = isFinalDest && !isTrade;
+
+            enterGate(actualTarget, gatePos, shouldAdvance);
           }
         }
         break;
