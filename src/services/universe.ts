@@ -7,8 +7,10 @@ import {
   type NPCFleet,
   type ShipReport,
   type ShipCommand,
+  type SectorEvent, // Ensure this is imported
 } from '../types/simulation'
 import type { Station } from '../store/gameStore'
+import { CorporationAI } from './CorporationAI'
 
 type WareCategory = 'primary' | 'food' | 'intermediate' | 'end'
 
@@ -100,22 +102,22 @@ const DEFAULT_RECIPES: Recipe[] = [
 ]
 
 const DEFAULT_STATIONS: Station[] = [
-  { id: 'sz_spp_b', name: 'Solar Power Plant Beta', recipeId: 'spp_cycle', sectorId: 'seizewell', inventory: {}, reorderLevel: {}, reserveLevel: {} },
-  { id: 'sz_spp_d', name: 'Solar Power Plant Delta', recipeId: 'spp_cycle', sectorId: 'seizewell', inventory: {}, reorderLevel: {}, reserveLevel: {} },
-  { id: 'sz_mine', name: 'Seizewell Ore Mine', recipeId: 'mine_ore', sectorId: 'seizewell', inventory: {}, reorderLevel: {}, reserveLevel: {} },
-  { id: 'sz_oil', name: 'Sun Oil Refinery (beta)', recipeId: 'oil_refinery', sectorId: 'seizewell', inventory: {}, reorderLevel: {}, reserveLevel: {} },
-  { id: 'sz_ire', name: 'Beta I.R.E. Laser Forge (alpha)', recipeId: 'ire_forge', sectorId: 'seizewell', inventory: {}, reorderLevel: {}, reserveLevel: {} },
-  { id: 'sz_flower_b', name: 'Flower Farm (beta)', recipeId: 'flower_farm', sectorId: 'seizewell', inventory: {}, reorderLevel: {}, reserveLevel: {} },
-  { id: 'sz_flower_g', name: 'Flower Farm (gamma)', recipeId: 'flower_farm', sectorId: 'seizewell', inventory: {}, reorderLevel: {}, reserveLevel: {} },
-  { id: 'sz_flower_d', name: 'Flower Farm (delta)', recipeId: 'flower_farm', sectorId: 'seizewell', inventory: {}, reorderLevel: {}, reserveLevel: {} },
-  { id: 'tg_spp', name: 'Teladi Gain SPP', recipeId: 'spp_cycle', sectorId: 'teladi_gain', inventory: {}, reorderLevel: {}, reserveLevel: {} },
-  { id: 'tg_oil', name: 'Teladi Gain Sun Oil', recipeId: 'oil_refinery', sectorId: 'teladi_gain', inventory: {}, reorderLevel: {}, reserveLevel: {} },
-  { id: 'tg_flower', name: 'Teladi Gain Flower Farm', recipeId: 'flower_farm', sectorId: 'teladi_gain', inventory: {}, reorderLevel: {}, reserveLevel: {} },
-  { id: 'ps_spp', name: 'Profit Share SPP', recipeId: 'spp_cycle', sectorId: 'profit_share', inventory: {}, reorderLevel: {}, reserveLevel: {} },
-  { id: 'ps_foundry', name: 'Profit Share Teladianium Foundry', recipeId: 'teladianium_foundry', sectorId: 'profit_share', inventory: {}, reorderLevel: {}, reserveLevel: {} },
-  { id: 'ps_silicon', name: 'Profit Share Silicon Mine', recipeId: 'mine_silicon', sectorId: 'profit_share', inventory: {}, reorderLevel: {}, reserveLevel: {} },
-  { id: 'gp_dream', name: 'Greater Profit Dream Farm', recipeId: 'spaceweed_cycle', sectorId: 'greater_profit', inventory: {}, reorderLevel: {}, reserveLevel: {} },
-  { id: 'gp_bliss', name: 'Greater Profit Bliss Place', recipeId: 'spaceweed_cycle', sectorId: 'greater_profit', inventory: {}, reorderLevel: {}, reserveLevel: {} },
+  { id: 'sz_spp_b', name: 'Solar Power Plant Beta', recipeId: 'spp_cycle', sectorId: 'seizewell', position: [2000, 0, 2000], modelPath: '/models/00285.obj', inventory: {}, reorderLevel: {}, reserveLevel: {} },
+  { id: 'sz_spp_d', name: 'Solar Power Plant Delta', recipeId: 'spp_cycle', sectorId: 'seizewell', position: [-2000, 100, -2000], modelPath: '/models/00285.obj', inventory: {}, reorderLevel: {}, reserveLevel: {} },
+  { id: 'sz_mine', name: 'Seizewell Ore Mine', recipeId: 'mine_ore', sectorId: 'seizewell', position: [0, -500, 5000], modelPath: '/models/00114.obj', inventory: {}, reorderLevel: {}, reserveLevel: {} },
+  { id: 'sz_oil', name: 'Sun Oil Refinery (beta)', recipeId: 'oil_refinery', sectorId: 'seizewell', position: [3000, 0, -1000], modelPath: '/models/00283.obj', inventory: {}, reorderLevel: {}, reserveLevel: {} },
+  { id: 'sz_ire', name: 'Beta I.R.E. Laser Forge (alpha)', recipeId: 'ire_forge', sectorId: 'seizewell', position: [-1500, 200, 3000], modelPath: '/models/00430.obj', inventory: {}, reorderLevel: {}, reserveLevel: {} },
+  { id: 'sz_flower_b', name: 'Flower Farm (beta)', recipeId: 'flower_farm', sectorId: 'seizewell', position: [2500, -200, 2500], modelPath: '/models/00282.obj', inventory: {}, reorderLevel: {}, reserveLevel: {} },
+  { id: 'sz_flower_g', name: 'Flower Farm (gamma)', recipeId: 'flower_farm', sectorId: 'seizewell', position: [-2500, 200, -2500], modelPath: '/models/00282.obj', inventory: {}, reorderLevel: {}, reserveLevel: {} },
+  { id: 'sz_flower_d', name: 'Flower Farm (delta)', recipeId: 'flower_farm', sectorId: 'seizewell', position: [1000, 0, 4000], modelPath: '/models/00282.obj', inventory: {}, reorderLevel: {}, reserveLevel: {} },
+  { id: 'tg_spp', name: 'Teladi Gain SPP', recipeId: 'spp_cycle', sectorId: 'teladi_gain', position: [0, 0, 0], modelPath: '/models/00285.obj', inventory: {}, reorderLevel: {}, reserveLevel: {} },
+  { id: 'tg_oil', name: 'Teladi Gain Sun Oil', recipeId: 'oil_refinery', sectorId: 'teladi_gain', position: [2000, 0, 2000], modelPath: '/models/00283.obj', inventory: {}, reorderLevel: {}, reserveLevel: {} },
+  { id: 'tg_flower', name: 'Teladi Gain Flower Farm', recipeId: 'flower_farm', sectorId: 'teladi_gain', position: [-2000, 0, -2000], modelPath: '/models/00282.obj', inventory: {}, reorderLevel: {}, reserveLevel: {} },
+  { id: 'ps_spp', name: 'Profit Share SPP', recipeId: 'spp_cycle', sectorId: 'profit_share', position: [0, 0, 0], modelPath: '/models/00285.obj', inventory: {}, reorderLevel: {}, reserveLevel: {} },
+  { id: 'ps_foundry', name: 'Profit Share Teladianium Foundry', recipeId: 'teladianium_foundry', sectorId: 'profit_share', position: [3000, 100, 0], modelPath: '/models/00283.obj', inventory: {}, reorderLevel: {}, reserveLevel: {} },
+  { id: 'ps_silicon', name: 'Profit Share Silicon Mine', recipeId: 'mine_silicon', sectorId: 'profit_share', position: [-3000, -200, 0], modelPath: '/models/00114.obj', inventory: {}, reorderLevel: {}, reserveLevel: {} },
+  { id: 'gp_dream', name: 'Greater Profit Dream Farm', recipeId: 'spaceweed_cycle', sectorId: 'greater_profit', position: [2000, 0, 0], modelPath: '/models/00282.obj', inventory: {}, reorderLevel: {}, reserveLevel: {} },
+  { id: 'gp_bliss', name: 'Greater Profit Bliss Place', recipeId: 'spaceweed_cycle', sectorId: 'greater_profit', position: [-2000, 0, 0], modelPath: '/models/00282.obj', inventory: {}, reorderLevel: {}, reserveLevel: {} },
 ]
 
 const DEFAULT_SECTOR_PRICES: Record<string, Record<string, number>> = {
@@ -291,6 +293,25 @@ export class UniverseService {
     if (!Number.isFinite(deltaSec) || deltaSec <= 0) return
     this.state.elapsedTimeSec += deltaSec
     productionStep(this.state.stations, this.state.recipes, deltaSec)
+
+    // AI Processing
+    this.state.corporations.forEach(corp => {
+      const newFleets = CorporationAI.processTurn(
+        corp,
+        this.state.stations,
+        this.state.wares,
+        this.state.recipes,
+        this.state.activeEvents as SectorEvent[],
+        this.state.fleets
+      )
+
+      if (newFleets.length > 0) {
+        this.state.fleets.push(...newFleets)
+        // Also register with corp
+        corp.fleetIds.push(...newFleets.map(f => f.id))
+      }
+    })
+
     this.assignTrades()
   }
 

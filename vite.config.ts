@@ -2,6 +2,8 @@ import { defineConfig } from 'vite'
 import type { ViteDevServer } from 'vite'
 import type { IncomingMessage, ServerResponse } from 'http'
 import react from '@vitejs/plugin-react'
+import fs from 'node:fs'
+import path from 'node:path'
 
 type Ware = { id: string; name: string; category: 'primary' | 'food' | 'intermediate' | 'end'; basePrice: number; volume: number }
 type Recipe = { id: string; productId: string; inputs: { wareId: string; amount: number }[]; cycleTimeSec: number; batchSize: number; productStorageCap: number }
@@ -517,10 +519,45 @@ function createUniverse() {
     
     state.lastTickTime = now
   }
+
+  // Saving logic
+  const saveGame = () => {
+    try {
+      const saveDir = path.resolve(process.cwd(), 'saves')
+      if (!fs.existsSync(saveDir)) {
+        fs.mkdirSync(saveDir)
+      }
+      
+      const hour = Math.floor(state.elapsedTimeSec / 3600)
+      const slot = (hour % 10) + 1
+      const filename = path.join(saveDir, `autosave_${slot}.json`)
+      
+      // We don't want to save the entire state if it contains massive logs or unnecessary data
+      // but strictly speaking, we should save everything to restore it.
+      // state.tradeLog is capped at 100 entries, so it's fine.
+      const saveData = JSON.stringify(state, null, 2)
+      fs.writeFileSync(filename, saveData)
+      console.log(`[Universe] Auto-saved to ${filename} (Hour ${hour})`)
+    } catch (e) {
+      console.error('[Universe] Failed to save game:', e)
+    }
+  }
+
   const advanceTime = (deltaSec: number) => {
     if (deltaSec <= 0) return
+    
+    const lastHour = Math.floor(state.elapsedTimeSec / 3600)
+    
     state.acc += deltaSec
     state.elapsedTimeSec += deltaSec
+    
+    const currentHour = Math.floor(state.elapsedTimeSec / 3600)
+    
+    // Auto-save every in-game hour (3600 seconds)
+    if (currentHour > lastHour && currentHour > 0) {
+      saveGame()
+    }
+
     if (state.acc >= 10) {
       tick(state.acc)
       state.acc = 0

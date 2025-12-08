@@ -22,6 +22,9 @@ export interface Station {
   name: string;
   recipeId: string;
   sectorId: string;
+  position: [number, number, number];
+  modelPath: string;
+  ownerId?: string; // Optional for now as legacy stations might not have it
   inventory: Record<string, number>;
   reorderLevel: Record<string, number>;
   reserveLevel: Record<string, number>;
@@ -94,7 +97,7 @@ export interface GameState {
   syncFleets: () => Promise<void>;
   getSectorView: (sectorId: string) => SectorViewData | null;
   getCorporation: (id: string) => Corporation | undefined;
-  
+
   // Ship autonomy - reports from frontend ships to backend
   reportShipAction: (fleetId: string, type: string, data: {
     sectorId: string;
@@ -218,20 +221,20 @@ export const useGameStore = create<GameState>((set, get) => ({
         const backendFleets = data.fleets || [];
         const currentSectorId = state.currentSectorId;
         const mergedFleets = backendFleets.map((bFleet: NPCFleet) => {
-            if (currentSectorId && bFleet.currentSectorId === currentSectorId) {
-                const localFleet = state.fleets.find(f => f.id === bFleet.id);
-                if (localFleet) {
-                    return { ...bFleet, position: localFleet.position };
-                }
+          if (currentSectorId && bFleet.currentSectorId === currentSectorId) {
+            const localFleet = state.fleets.find(f => f.id === bFleet.id);
+            if (localFleet) {
+              return { ...bFleet, position: localFleet.position };
             }
-            return bFleet;
+          }
+          return bFleet;
         });
 
-        return { 
-          wares: data.wares || [], 
-          recipes: data.recipes || [], 
-          stations: data.stations || [], 
-          sectorPrices: data.sectorPrices || {}, 
+        return {
+          wares: data.wares || [],
+          recipes: data.recipes || [],
+          stations: data.stations || [],
+          sectorPrices: data.sectorPrices || {},
           timeScale: typeof data.timeScale === 'number' ? data.timeScale : 1,
           elapsedTimeSec: typeof data.elapsedTimeSec === 'number' ? data.elapsedTimeSec : 0,
           corporations: data.corporations || [],
@@ -250,7 +253,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   fleets: [],
   activeEvents: [],
   tradeLog: [],
-  
+
   syncFleets: async () => {
     try {
       const res = await fetch('/__universe/fleets')
@@ -259,28 +262,28 @@ export const useGameStore = create<GameState>((set, get) => ({
         // Check if selected target is a ship that has left the sector
         let selectedTarget = state.selectedTarget;
         if (selectedTarget && selectedTarget.type === 'ship') {
-           // Find the ship in the new data
-           const ship = (data.fleets || []).find((f: NPCFleet) => f.name === selectedTarget?.name);
-           // If ship not found, or ship is no longer in current sector, clear target
-           if (!ship || (ship.currentSectorId !== state.currentSectorId && state.currentSectorId)) {
-              selectedTarget = null;
-           }
+          // Find the ship in the new data
+          const ship = (data.fleets || []).find((f: NPCFleet) => f.name === selectedTarget?.name);
+          // If ship not found, or ship is no longer in current sector, clear target
+          if (!ship || (ship.currentSectorId !== state.currentSectorId && state.currentSectorId)) {
+            selectedTarget = null;
+          }
         }
 
         // Merge fleets to preserve local positions for current sector
         const backendFleets = data.fleets || [];
         const currentSectorId = state.currentSectorId;
         const mergedFleets = backendFleets.map((bFleet: NPCFleet) => {
-            if (currentSectorId && bFleet.currentSectorId === currentSectorId) {
-                const localFleet = state.fleets.find(f => f.id === bFleet.id);
-                if (localFleet) {
-                    return { ...bFleet, position: localFleet.position };
-                }
+          if (currentSectorId && bFleet.currentSectorId === currentSectorId) {
+            const localFleet = state.fleets.find(f => f.id === bFleet.id);
+            if (localFleet) {
+              return { ...bFleet, position: localFleet.position };
             }
-            return bFleet;
+          }
+          return bFleet;
         });
 
-        return { 
+        return {
           corporations: data.corporations || [],
           fleets: mergedFleets,
           activeEvents: data.activeEvents || [],
@@ -296,18 +299,18 @@ export const useGameStore = create<GameState>((set, get) => ({
   getSectorView: (sectorId: string): SectorViewData | null => {
     const state = useGameStore.getState()
     const { fleets, tradeLog } = state
-    
+
     // Get fleets in this sector (include in-transit so they still render on the map)
-    const sectorFleets = fleets.filter(f => 
+    const sectorFleets = fleets.filter(f =>
       f.currentSectorId === sectorId
     )
-    
+
     // Get fleets in transit to/from this sector
-    const inTransit = fleets.filter(f => 
-      f.state === 'in-transit' && 
+    const inTransit = fleets.filter(f =>
+      f.state === 'in-transit' &&
       (f.currentSectorId === sectorId || f.destinationSectorId === sectorId)
     )
-    
+
     // Calculate stats
     const stats = {
       totalFleets: sectorFleets.length,
@@ -317,12 +320,12 @@ export const useGameStore = create<GameState>((set, get) => ({
       incomingFleets: inTransit.filter(f => f.destinationSectorId === sectorId).length,
       outgoingFleets: inTransit.filter(f => f.currentSectorId === sectorId).length,
     }
-    
+
     // Recent trades in this sector
     const recentTrades = tradeLog
       .filter(t => t.buySectorId === sectorId || t.sellSectorId === sectorId)
       .slice(0, 10)
-    
+
     return {
       sectorId,
       sectorName: sectorId, // TODO: lookup proper name
@@ -362,7 +365,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   getCorporation: (id: string) => {
     return get().corporations.find(c => c.id === id)
   },
-  
+
   // Report ship actions to backend for autonomous ships
   reportShipAction: async (fleetId: string, type: string, data: {
     sectorId: string;

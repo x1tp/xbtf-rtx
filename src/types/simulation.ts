@@ -18,23 +18,41 @@ export interface Corporation {
   name: string
   race: RaceType
   type: OwnershipType
-  
+
   // Assets
   stationIds: string[]
   fleetIds: string[]
-  
+
   // Finances
   credits: number
   netWorth: number
-  
+
   // Behavior tuning
   aggressiveness: number      // 0-1, how competitive in pricing
   expansionBudget: number     // Credits reserved for growth
   riskTolerance: number       // 0-1, willingness to trade in danger zones
-  
+
   // Stats
   lifetimeProfit: number
   lifetimeTrades: number
+
+  // AI State (The Brain)
+  aiState: CorporationAIState
+}
+
+export interface CorporationAIState {
+  lastExpansionCheck: number
+  currentGoal: 'stabilize' | 'expand' | 'war'
+  pendingConstructions: PendingConstruction[]
+}
+
+export interface PendingConstruction {
+  id: string
+  stationType: string      // Recipe ID or specific station type
+  targetSectorId: string
+  builderShipId?: string   // TL ship assigned
+  status: 'planning' | 'hiring-tl' | 'in-transit' | 'building'
+  createdAt: number
 }
 
 // ============================================================================
@@ -44,7 +62,7 @@ export interface Corporation {
 export type FleetState = 'idle' | 'loading' | 'in-transit' | 'unloading' | 'docking' | 'undocking'
 
 // Ship autonomy: Backend issues commands, frontend ships execute them
-export type ShipCommandType = 
+export type ShipCommandType =
   | 'goto-station'    // Fly to a station (may require gate travel)
   | 'dock'            // Dock at current target station
   | 'load-cargo'      // Load specified cargo at docked station
@@ -115,14 +133,14 @@ export interface NPCFleet {
   // Backend only sets commands, frontend executes and reports back
   state: FleetState             // Current state (reported by frontend)
   stateStartTime: number        // When current state began
-  
+
   // Command queue (set by backend, executed by frontend)
   commandQueue: ShipCommand[]   // Commands to execute in order
   currentCommand?: ShipCommand  // Currently executing command
-  
+
   // Transit info (for cross-sector travel)
   destinationSectorId?: string
-  
+
   // Trading
   cargo: Record<string, number> // wareId -> amount
   credits: number               // Ship's own credits (for freelancers)
@@ -143,7 +161,7 @@ export interface TradeOrder {
   buyWareName: string
   buyQty: number
   buyPrice: number
-  
+
   sellStationId: string
   sellStationName: string
   sellSectorId: string
@@ -151,7 +169,7 @@ export interface TradeOrder {
   sellWareName: string
   sellQty: number
   sellPrice: number
-  
+
   expectedProfit: number
   createdAt: number
 }
@@ -160,7 +178,7 @@ export interface TradeOrder {
 // Event Types
 // ============================================================================
 
-export type SectorEventType = 
+export type SectorEventType =
   | 'shortage'          // Ware shortage, prices spike
   | 'surplus'           // Ware surplus, prices drop
   | 'pirate_raid'       // Pirates attacking traders
@@ -232,13 +250,13 @@ export interface SectorViewTransit {
 export interface SectorViewData {
   sectorId: string
   sectorName: string
-  
+
   // Fleets present in sector
   fleets: SectorViewFleet[]
-  
+
   // Fleets in transit to/from this sector
   fleetsInTransit: SectorViewTransit[]
-  
+
   // Summary stats
   stats: {
     totalFleets: number
@@ -248,7 +266,7 @@ export interface SectorViewData {
     incomingFleets: number
     outgoingFleets: number
   }
-  
+
   // Recent activity
   recentTrades: TradeLogEntry[]
 }
@@ -303,6 +321,7 @@ export const TELADI_CORPORATIONS: Corporation[] = [
     riskTolerance: 0.3,
     lifetimeProfit: 0,
     lifetimeTrades: 0,
+    aiState: { lastExpansionCheck: 0, currentGoal: 'expand', pendingConstructions: [] },
   },
   {
     id: 'sunward_consortium',
@@ -318,6 +337,7 @@ export const TELADI_CORPORATIONS: Corporation[] = [
     riskTolerance: 0.4,
     lifetimeProfit: 0,
     lifetimeTrades: 0,
+    aiState: { lastExpansionCheck: 0, currentGoal: 'stabilize', pendingConstructions: [] },
   },
   {
     id: 'family_zhikkt',
@@ -333,6 +353,7 @@ export const TELADI_CORPORATIONS: Corporation[] = [
     riskTolerance: 0.5,
     lifetimeProfit: 0,
     lifetimeTrades: 0,
+    aiState: { lastExpansionCheck: 0, currentGoal: 'expand', pendingConstructions: [] },
   },
   {
     id: 'family_tekra',
@@ -348,6 +369,7 @@ export const TELADI_CORPORATIONS: Corporation[] = [
     riskTolerance: 0.45,
     lifetimeProfit: 0,
     lifetimeTrades: 0,
+    aiState: { lastExpansionCheck: 0, currentGoal: 'expand', pendingConstructions: [] },
   },
   {
     id: 'crimson_commerce',
@@ -363,6 +385,7 @@ export const TELADI_CORPORATIONS: Corporation[] = [
     riskTolerance: 0.6,
     lifetimeProfit: 0,
     lifetimeTrades: 0,
+    aiState: { lastExpansionCheck: 0, currentGoal: 'war', pendingConstructions: [] },
   },
   {
     id: 'profit_guild',
@@ -378,6 +401,7 @@ export const TELADI_CORPORATIONS: Corporation[] = [
     riskTolerance: 0.55,
     lifetimeProfit: 0,
     lifetimeTrades: 0,
+    aiState: { lastExpansionCheck: 0, currentGoal: 'expand', pendingConstructions: [] },
   },
 ]
 
@@ -391,16 +415,16 @@ export const STATION_OWNERSHIP: Record<string, string> = {
   'sz_flower_g': 'independent',  // Small independent
   'sz_flower_d': 'independent',
   'sz_ire': 'crimson_commerce',
-  
+
   // Teladi Gain
   'tg_bliss': 'profit_guild',
   'tg_oil': 'family_tekra',
   'tg_flower': 'family_zhikkt',
-  
+
   // Profit Share
   'ps_spp': 'sunward_consortium',
   'ps_foundry': 'teladi_company',  // Heavy industry = company
-  
+
   // Greater Profit
   'gp_dream': 'profit_guild',
   'gp_bliss': 'profit_guild',
@@ -429,25 +453,25 @@ export const INITIAL_FLEETS: FleetSpawnConfig[] = [
   { ownerId: 'teladi_company', ownerType: 'state', behavior: 'corp-logistics', shipType: 'Vulture', modelPath: '/models/00188.obj', capacity: 2800, speed: 1.0, autonomy: 0.3, profitShare: 0.1, homeSectorId: 'seizewell' },
   { ownerId: 'teladi_company', ownerType: 'state', behavior: 'corp-logistics', shipType: 'Vulture', modelPath: '/models/00188.obj', capacity: 2800, speed: 1.0, autonomy: 0.3, profitShare: 0.1, homeSectorId: 'profit_share' },
   { ownerId: 'teladi_company', ownerType: 'state', behavior: 'freelance', shipType: 'Albatross', modelPath: '/models/00187.obj', capacity: 8000, speed: 0.7, autonomy: 0.8, profitShare: 0.2, homeSectorId: 'seizewell' },
-  
+
   // Sunward Consortium - station supply for solar plants
   { ownerId: 'sunward_consortium', ownerType: 'guild', behavior: 'station-supply', homeStationId: 'sz_spp_b', shipType: 'Vulture', modelPath: '/models/00188.obj', capacity: 2800, speed: 1.0, autonomy: 0.2, profitShare: 0.15, homeSectorId: 'seizewell' },
   { ownerId: 'sunward_consortium', ownerType: 'guild', behavior: 'station-distribute', homeStationId: 'ps_spp', shipType: 'Vulture', modelPath: '/models/00188.obj', capacity: 2800, speed: 1.0, autonomy: 0.3, profitShare: 0.15, homeSectorId: 'profit_share' },
-  
+
   // Family Zhi'kkt - family business
   { ownerId: 'family_zhikkt', ownerType: 'family', behavior: 'station-distribute', homeStationId: 'sz_spp_d', shipType: 'Vulture', modelPath: '/models/00188.obj', capacity: 2800, speed: 1.0, autonomy: 0.4, profitShare: 0.25, homeSectorId: 'seizewell' },
-  
+
   // Family Tek'ra - oil business
   { ownerId: 'family_tekra', ownerType: 'family', behavior: 'station-supply', homeStationId: 'sz_oil', shipType: 'Vulture', modelPath: '/models/00188.obj', capacity: 2800, speed: 1.0, autonomy: 0.3, profitShare: 0.2, homeSectorId: 'seizewell' },
-  
+
   // Crimson Commerce - weapon traders
   { ownerId: 'crimson_commerce', ownerType: 'guild', behavior: 'station-supply', homeStationId: 'sz_ire', shipType: 'Vulture', modelPath: '/models/00188.obj', capacity: 2800, speed: 1.0, autonomy: 0.2, profitShare: 0.1, homeSectorId: 'seizewell' },
   { ownerId: 'crimson_commerce', ownerType: 'guild', behavior: 'freelance', shipType: 'Vulture', modelPath: '/models/00188.obj', capacity: 2800, speed: 1.1, autonomy: 0.9, profitShare: 0.3, homeSectorId: 'seizewell' },
-  
+
   // Profit Guild - recreational goods
   { ownerId: 'profit_guild', ownerType: 'guild', behavior: 'guild-assigned', shipType: 'Vulture', modelPath: '/models/00188.obj', capacity: 2800, speed: 1.0, autonomy: 0.5, profitShare: 0.2, homeSectorId: 'teladi_gain' },
   { ownerId: 'profit_guild', ownerType: 'guild', behavior: 'station-supply', homeStationId: 'gp_dream', shipType: 'Vulture', modelPath: '/models/00188.obj', capacity: 2800, speed: 1.0, autonomy: 0.3, profitShare: 0.15, homeSectorId: 'greater_profit' },
-  
+
   // Independent traders - pure profit seekers
   { ownerId: null, ownerType: 'independent', behavior: 'freelance', shipType: 'Vulture', modelPath: '/models/00188.obj', capacity: 2800, speed: 1.05, autonomy: 1.0, profitShare: 1.0, homeSectorId: 'seizewell' },
   { ownerId: null, ownerType: 'independent', behavior: 'freelance', shipType: 'Vulture', modelPath: '/models/00188.obj', capacity: 2800, speed: 0.95, autonomy: 1.0, profitShare: 1.0, homeSectorId: 'profit_share' },
@@ -461,22 +485,22 @@ export const INITIAL_FLEETS: FleetSpawnConfig[] = [
 export const FLEET_CONSTANTS = {
   /** Base time in seconds to travel between adjacent sectors */
   BASE_JUMP_TIME: 120,
-  
+
   /** Time in seconds to dock at a station */
   DOCK_TIME: 30,
-  
+
   /** Time in seconds to load/unload cargo per 1000 units */
   TRANSFER_TIME_PER_1000: 60,
-  
+
   /** Minimum profit margin to consider a trade route */
   MIN_PROFIT_MARGIN: 50,
-  
+
   /** Maximum jump distance for trade routes */
   MAX_ROUTE_JUMPS: 4,
-  
+
   /** How often to re-evaluate trade routes when idle */
   IDLE_RETHINK_TIME: 30,
-  
+
   /** Fleet position update interval for remote viewing (ms) */
   POSITION_UPDATE_INTERVAL: 500,
 }
