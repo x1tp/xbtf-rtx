@@ -233,7 +233,7 @@ export const NPCBuilder: FC<NPCBuilderProps> = ({
         const gy = matchingGate.position[1] * scale;
         const gz = matchingGate.position[2] * scale;
         
-        const offset = 600; // Larger offset for builders
+        const offset = 2000; // Larger offset for builders
         let offX = 0, offZ = 0;
         
         if (expectedEntryGateType === 'W') offX = offset;
@@ -244,7 +244,7 @@ export const NPCBuilder: FC<NPCBuilderProps> = ({
         destPos = [gx + offX, gy, gz + offZ];
     }
 
-    report('entered-sector', { stationId: targetSectorId, sectorIdOverride: targetSectorId, gateType: exitGateType });
+    report('entered-sector', { stationId: targetSectorId, sectorIdOverride: targetSectorId, gateType: exitGateType, position: destPos });
     
     useGameStore.setState((state: GameState) => ({
       fleets: state.fleets.map((f) => f.id === fleet.id ? {
@@ -269,10 +269,14 @@ export const NPCBuilder: FC<NPCBuilderProps> = ({
   useEffect(() => {
     if (fleet.currentSectorId !== prevSectorIdRef.current) {
        prevSectorIdRef.current = fleet.currentSectorId;
+       initializedRef.current = false;
        // Only reset to idle if we were gone (in transit)
        if (localState === 'gone') {
          setLocalState('idle');
        }
+       // Reset docking state to prevent teleportation to previous dock location
+       holdDockRef.current = false;
+       dockAnchorRef.current = null;
     }
   }, [fleet.currentSectorId, localState]);
 

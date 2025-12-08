@@ -31,8 +31,10 @@ import { EconomyTicker } from './components/EconomyTicker';
 import { getAllPresets } from './config/plumes';
 import { StationInfo } from './components/StationInfo';
 import { NPCTrader } from './components/NPCTrader';
+import { NPCMilitary } from './components/NPCMilitary';
+import { NPCBuilder } from './components/NPCBuilder';
 import { buildNavGraph, buildNavNodesFromLayout } from './ai/navigation';
-import type { NavGraph } from './ai/navigation';
+import type { NavGraph, NavObstacle } from './ai/navigation';
 import type { NPCFleet } from './types/simulation';
 
 const HiddenFleetSimulator: FC<{ excludeCurrentSector?: boolean }> = ({ excludeCurrentSector = false }) => {
@@ -46,6 +48,7 @@ const HiddenFleetSimulator: FC<{ excludeCurrentSector?: boolean }> = ({ excludeC
       stationPositions: Map<string, [number, number, number]>;
       gatePositions: { position: [number, number, number]; destinationSectorId: string }[];
       navGraph: NavGraph | null;
+      obstacles: NavObstacle[];
     }>();
     const spacing = 30;
     const place = (p: [number, number, number]): [number, number, number] => [p[0] * spacing, p[1] * spacing, p[2] * spacing];
@@ -59,8 +62,17 @@ const HiddenFleetSimulator: FC<{ excludeCurrentSector?: boolean }> = ({ excludeC
       if (!layout) return;
       const stationPositions = new Map<string, [number, number, number]>();
       const layoutByName = new Map<string, [number, number, number]>();
+      const obstacles: NavObstacle[] = [];
+
       for (const st of layout.stations) {
-        layoutByName.set(st.name, place(st.position));
+        const pos = place(st.position);
+        layoutByName.set(st.name, pos);
+        obstacles.push({
+          id: `station-${st.name}`,
+          center: new Vector3(pos[0], pos[1], pos[2]),
+          radius: (st.scale ?? 24) * 5,
+          label: st.name
+        });
       }
       for (const econStation of economyStations.filter((s) => s.sectorId === sectorId)) {
         const layoutPos = layoutByName.get(econStation.name);
@@ -76,18 +88,40 @@ const HiddenFleetSimulator: FC<{ excludeCurrentSector?: boolean }> = ({ excludeC
       }
       const gatePositions = layout.gates
             .filter((g) => g.destinationSectorId)
-            .map((g) => ({
-              position: place(g.position) as [number, number, number],
-              destinationSectorId: g.destinationSectorId!,
-              radius: (g.scale ?? 40) * 5,
-              gateType: g.gateType,
-            }));
+            .map((g) => {
+              const pos = place(g.position) as [number, number, number];
+              obstacles.push({
+                id: `gate-${g.name}`,
+                center: new Vector3(pos[0], pos[1], pos[2]),
+                radius: (g.scale ?? 40) * 6,
+                label: g.name
+              });
+              return {
+                position: pos,
+                destinationSectorId: g.destinationSectorId!,
+                radius: (g.scale ?? 40) * 5,
+                gateType: g.gateType,
+              };
+            });
+            
+      // Add planet obstacle if present
+      if (layout.planet) {
+         // Planet is usually huge and far away, but let's add it just in case ships fly through it
+         // Use a conservative radius
+         obstacles.push({
+             id: 'planet',
+             center: new Vector3(layout.planet.position[0] * spacing, layout.planet.position[1] * spacing, layout.planet.position[2] * spacing),
+             radius: layout.planet.size * 0.8, // Reduced radius to be safe against phantom collisions
+             label: 'planet'
+         });
+      }
+
       const nodes = buildNavNodesFromLayout(layout, spacing);
-      const navGraph = buildNavGraph(nodes, []);
-      map.set(sectorId, { stationPositions, gatePositions, navGraph });
+      const navGraph = buildNavGraph(nodes, obstacles);
+      map.set(sectorId, { stationPositions, gatePositions, navGraph, obstacles });
     });
     return map;
-  }, [fleets, economyStations]);
+  }, [fleets, economyStations, excludeCurrentSector, currentSectorId]);
 
   const filteredFleets = excludeCurrentSector && currentSectorId
     ? fleets.filter((f) => f.currentSectorId !== currentSectorId)
@@ -104,14 +138,19 @@ const HiddenFleetSimulator: FC<{ excludeCurrentSector?: boolean }> = ({ excludeC
         {filteredFleets.map((fleet: NPCFleet) => {
           const nav = navDataBySector.get(fleet.currentSectorId || 'seizewell');
           if (!nav) return null;
+          
+          let Component: any = NPCTrader;
+          if (fleet.behavior === 'patrol') Component = NPCMilitary;
+          if (fleet.behavior === 'construction') Component = NPCBuilder;
+
           return (
-            <NPCTrader
+            <Component
               key={`bg-${fleet.id}`}
               fleet={fleet}
               stationPositions={nav.stationPositions}
               gatePositions={nav.gatePositions}
               navGraph={nav.navGraph}
-              obstacles={[]}
+              obstacles={nav.obstacles}
               onReport={reportShipAction}
             />
           );

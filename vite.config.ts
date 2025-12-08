@@ -590,34 +590,38 @@ function createUniverse() {
         if (report.stationId) {
           fleet.currentSectorId = report.stationId
           fleet.destinationSectorId = undefined
-          fleet.state = 'in-transit'
+          fleet.state = 'idle'
           
-          // Calculate spawn position based on arrival gate
-          // If we left via North gate, we arrive at South gate of new sector
-          // Standard gate positions: N: [0,0,-3000], S: [0,0,3000], W: [-3000,0,0], E: [3000,0,0]
-          // We spawn slightly offset from the gate to avoid collision
-          
-          let spawnPos: [number, number, number] = [0, 0, 0]
-          const offset = 400 // Distance from gate center
-          
-          if (report.gateType === 'N') {
-             // Arrive at South Gate
-             spawnPos = [0, 0, 3000 - offset]
-          } else if (report.gateType === 'S') {
-             // Arrive at North Gate
-             spawnPos = [0, 0, -3000 + offset]
-          } else if (report.gateType === 'W') {
-             // Arrive at East Gate
-             spawnPos = [3000 - offset, 0, 0]
-          } else if (report.gateType === 'E') {
-             // Arrive at West Gate
-             spawnPos = [-3000 + offset, 0, 0]
+          // Use the position provided in the report (calculated by frontend with correct scale)
+          if (report.position) {
+             fleet.position = report.position
           } else {
-             // Fallback to random edge position if gate type unknown
-             spawnPos = randomPos()
+            // Fallback: Calculate spawn position based on arrival gate
+            // Standard gate positions in frontend are scaled by 30 (5000 * 30 = 150000)
+            // N: [0,0,-150000], S: [0,0,150000], W: [-150000,0,0], E: [150000,0,0]
+            
+            let spawnPos: [number, number, number] = [0, 0, 0]
+            const offset = 2000 // Distance from gate center
+            const GATE_DIST = 150000
+            
+            if (report.gateType === 'N') {
+               // Arrive at South Gate
+               spawnPos = [0, 0, GATE_DIST - offset]
+            } else if (report.gateType === 'S') {
+               // Arrive at North Gate
+               spawnPos = [0, 0, -GATE_DIST + offset]
+            } else if (report.gateType === 'W') {
+               // Arrive at East Gate
+               spawnPos = [GATE_DIST - offset, 0, 0]
+            } else if (report.gateType === 'E') {
+               // Arrive at West Gate
+               spawnPos = [-GATE_DIST + offset, 0, 0]
+            } else {
+               spawnPos = randomPos()
+            }
+            
+            fleet.position = spawnPos
           }
-          
-          fleet.position = spawnPos
         }
         break
 
