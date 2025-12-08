@@ -287,6 +287,8 @@ function App() {
     return (
       <>
         <HiddenFleetSimulator />
+        {/* Ensure construction TLs keep simulating even when only the economy admin is open */}
+        <HiddenFleetSimulator behaviors={['construction']} />
         <EconomyAdmin />
       </>
     );

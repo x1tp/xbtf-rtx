@@ -541,6 +541,19 @@ export const NPCTrader: FC<NPCTraderProps> = ({
 
     const delta = rawDelta * timeScale;
 
+    // Safety net: if ship drifts absurdly far, snap back to sector center and force a repath
+    const OUT_OF_BOUNDS = 200000;
+    if (Math.abs(ship.position.x) > OUT_OF_BOUNDS || Math.abs(ship.position.z) > OUT_OF_BOUNDS) {
+      ship.position.set(0, 0, 0);
+      velocityRef.current.set(0, 0, 0);
+      pathRef.current = [];
+      pathIndexRef.current = 0;
+      nextRepathAtRef.current = 0;
+      setLocalState('idle');
+      report('position-update', { position: [0, 0, 0] });
+      return;
+    }
+
     // Adjust physics based on ship class
     let physicsMult = 1.0;
     if (fleet.shipType === 'Phoenix' || fleet.shipType === 'Albatross') physicsMult = 0.15;

@@ -384,6 +384,28 @@ export const NPCBuilder: FC<NPCBuilderProps> = ({
 
     const delta = rawDelta * timeScale;
 
+    // Safety net: if ship drifts absurdly far, snap back to sector center and repath
+    const OUT_OF_BOUNDS = 200000;
+    if (Math.abs(ship.position.x) > OUT_OF_BOUNDS || Math.abs(ship.position.z) > OUT_OF_BOUNDS) {
+      ship.position.set(0, 0, 0);
+      velocityRef.current.set(0, 0, 0);
+      pathRef.current = [];
+      pathIndexRef.current = 0;
+      nextRepathAtRef.current = 0;
+      setLocalState('idle');
+      report('position-update', { position: [0, 0, 0] });
+      return;
+    }
+
+    // If we have a destination sector but no commands (e.g., queue cleared), push a goto/use gate
+    if (fleet.destinationSectorId && (!fleet.commandQueue || fleet.commandQueue.length === 0) && localState === 'idle') {
+      const targetSector = fleet.destinationSectorId;
+      setLocalState('flying-to-gate');
+      syncFleet({ state: 'in-transit', destinationSectorId: targetSector, stateStartTime: Date.now() });
+      const gateData = getGateData(targetSector);
+      buildPathTo(gateData?.pos || null);
+    }
+
     const shipAccel = BASE_ACCELERATION;
     const shipMaxSpeed = MAX_SPEED;
     const turnRate = BASE_TURN_RATE;
@@ -477,8 +499,9 @@ export const NPCBuilder: FC<NPCBuilderProps> = ({
 
           if (localState === 'entering-gate' || localState === 'flying-to-gate') {
             const gateData = currentCommand?.targetSectorId ? getGateData(currentCommand.targetSectorId) : null;
-            if (gateData && dist < 300) {
-              const enterRadius = Math.max(150, gateData.radius * 0.8);
+            if (gateData) {
+              // Be generous on entry radius for large TLs
+              const enterRadius = Math.max(500, gateData.radius * 1.2);
               if (dist < enterRadius) {
                 const finalDest = currentCommand?.targetSectorId || fleet.currentSectorId;
                 const nextHop = findNextHop(fleet.currentSectorId, finalDest);
@@ -496,7 +519,8 @@ export const NPCBuilder: FC<NPCBuilderProps> = ({
 
     const now = performance.now();
     if (localState === 'flying-to-station' || localState === 'flying-to-gate' || localState === 'entering-gate') {
-      if (now - lastProgressSampleRef.current.time > 1000) {
+    const now = performance.now();
+    if (now - lastProgressSampleRef.current.time > 1000) {
         const moved = ship.position.distanceTo(lastProgressSampleRef.current.pos);
         if (moved < 2) {
           lastProgressSampleRef.current.stuckTime += 1;
