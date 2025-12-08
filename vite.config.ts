@@ -36,17 +36,63 @@ type RaceType = 'argon' | 'boron' | 'paranid' | 'split' | 'teladi' | 'pirate' | 
 // AI Constants
 const STATION_BLUEPRINTS: Record<string, { id: string; name: string; cost: number; modelPath: string }> = {
   'spp_cycle': { id: 'teladi_spp', name: 'Teladi Solar Power Plant', cost: 846104, modelPath: '/models/00285.obj' },
+  'spp_argon': { id: 'argon_spp', name: 'Argon Solar Power Plant', cost: 846104, modelPath: '/models/00184.obj' },
+  'spp_split': { id: 'split_spp', name: 'Split Solar Power Plant', cost: 846104, modelPath: '/models/00275.obj' },
+  'spp_paranid': { id: 'paranid_spp', name: 'Paranid Solar Power Plant', cost: 846104, modelPath: '/models/00279.obj' },
+  'spp_boron': { id: 'boron_spp', name: 'Boron Solar Power Plant', cost: 846104, modelPath: '/models/00281.obj' },
   'mine_ore': { id: 'ore_mine', name: 'Ore Mine', cost: 588256, modelPath: '/models/00114.obj' },
   'mine_silicon': { id: 'silicon_mine', name: 'Silicon Mine', cost: 1118256, modelPath: '/models/00114.obj' },
   'flower_farm': { id: 'teladi_flower_farm', name: 'Flower Farm', cost: 461104, modelPath: '/models/00282.obj' },
   'oil_refinery': { id: 'teladi_oil_refinery', name: 'Sun Oil Refinery', cost: 1661104, modelPath: '/models/00283.obj' },
   'teladianium_foundry': { id: 'teladianium_foundry', name: 'Teladianium Foundry', cost: 661104, modelPath: '/models/00283.obj' },
   'ire_forge': { id: 'ire_forge', name: 'Beta I.R.E. Forge', cost: 2861104, modelPath: '/models/00430.obj' },
-  'spaceweed_cycle': { id: 'dream_farm', name: 'Dream Farm', cost: 1200000, modelPath: '/models/00282.obj' }
+  'hept_forge': { id: 'hept_forge', name: 'HEPT Laser Forge', cost: 3200000, modelPath: '/models/00440.obj' },
+  'pac_forge': { id: 'pac_forge', name: 'PAC Laser Forge', cost: 2000000, modelPath: '/models/00442.obj' },
+  'spaceweed_cycle': { id: 'dream_farm', name: 'Dream Farm', cost: 1200000, modelPath: '/models/00282.obj' },
+  'plankton_farm': { id: 'plankton_farm', name: 'Plankton Farm', cost: 350000, modelPath: '/models/00067.obj' },
+  'bogas_plant': { id: 'bogas_plant', name: 'BoGas Factory', cost: 420000, modelPath: '/models/00011.obj' },
+  'bofu_lab': { id: 'bofu_lab', name: 'BoFu Chemical Lab', cost: 520000, modelPath: '/models/00011.obj' },
+  'argon_farm': { id: 'argon_farm', name: 'Argon Farm', cost: 400000, modelPath: '/models/00182.obj' },
+  'cahoona_bakery': { id: 'cahoona_bakery', name: 'Cahoona Bakery', cost: 600000, modelPath: '/models/00183.obj' },
+  'scruffin_farm': { id: 'scruffin_farm', name: 'Scruffin Farm', cost: 380000, modelPath: '/models/00272.obj' },
+  'rastar_refinery': { id: 'rastar_refinery', name: 'Rastar Refinery', cost: 520000, modelPath: '/models/00273.obj' },
+  'quantum_tube_fab': { id: 'quantum_tube_fab', name: 'Quantum Tube Fab', cost: 900000, modelPath: '/models/00420.obj' },
+  'chip_plant': { id: 'chip_plant', name: 'Chip Plant', cost: 1100000, modelPath: '/models/00278.obj' },
+  'computer_plant': { id: 'computer_plant', name: 'Computer Plant', cost: 1000000, modelPath: '/models/00431.obj' },
+  'teladi_quantum_tube_fab': { id: 'teladi_quantum_tube_fab', name: 'Teladi Quantum Tube Fab', cost: 900000, modelPath: '/models/00420.obj' },
+  'argon_quantum_tube_fab': { id: 'argon_quantum_tube_fab', name: 'Argon Quantum Tube Fab', cost: 900000, modelPath: '/models/00232.obj' },
+  'split_quantum_tube_fab': { id: 'split_quantum_tube_fab', name: 'Split Quantum Tube Fab', cost: 900000, modelPath: '/models/00237.obj' },
+  'boron_bio_gas': { id: 'bogas_plant', name: 'BoGas Factory', cost: 420000, modelPath: '/models/00011.obj' },
+  'boron_bofu': { id: 'bofu_lab', name: 'BoFu Chemical Lab', cost: 520000, modelPath: '/models/00011.obj' },
+  'paranid_farm': { id: 'paranid_farm', name: 'Paranid Farm', cost: 400000, modelPath: '/models/00276.obj' },
+  'paranid_quantum_tube_fab': { id: 'paranid_quantum_tube_fab', name: 'Paranid Quantum Tube Fab', cost: 900000, modelPath: '/models/00213.obj' },
+  'boron_chip_plant': { id: 'boron_chip_plant', name: 'Boron Chip Plant', cost: 1100000, modelPath: '/models/00280.obj' },
+  'equipment_dock': { id: 'equipment_dock', name: 'Equipment Dock', cost: 1500000, modelPath: '/models/00448.obj' },
+  'trading_station': { id: 'trading_station', name: 'Trading Station', cost: 1200000, modelPath: '/models/00001.obj' },
+  'shipyard': { id: 'shipyard', name: 'Shipyard', cost: 5000000, modelPath: '/models/00444.obj' },
+  'pirate_station': { id: 'pirate_station', name: 'Pirate Station', cost: 1800000, modelPath: '/models/00397.obj' },
+  'xenon_power': { id: 'xenon_power', name: 'Xenon Power Plant', cost: 900000, modelPath: '/models/00323.obj' }
+}
+
+// Ship Catalog for purchasing
+const SHIP_CATALOG = {
+  vulture: { id: 'vulture', name: 'Vulture', cost: 85000, capacity: 2800, speed: 1.0, modelPath: '/models/00007.obj' },
+  albatross: { id: 'albatross', name: 'Albatross', cost: 450000, capacity: 8000, speed: 0.7, modelPath: '/models/00187.obj' },
+}
+
+// Dynamic Economy Settings
+const ECONOMY_SETTINGS = {
+  CORP_MIN_CREDITS_TO_BUY_SHIP: 200000,  // Must have this after purchase
+  TRADER_SPAWN_INTERVAL: 300000,          // 5 min between new sole traders
+  TRADER_SPAWN_CHANCE: 0.3,               // 30% chance per interval
+  TRADER_STARTING_CREDITS: 30000,
+  TRADER_PROMOTION_THRESHOLD: 500000,     // Credits needed to found corp
+  STATION_FOUNDING_COST: 800000,
+  MAX_INDEPENDENT_TRADERS: 10,
 }
 
 // Ship command types for autonomous ships
-type ShipCommandType = 'goto-station' | 'dock' | 'load-cargo' | 'unload-cargo' | 'undock' | 'goto-gate' | 'use-gate' | 'patrol' | 'wait' | 'trade-buy' | 'trade-sell'
+type ShipCommandType = 'goto-station' | 'dock' | 'load-cargo' | 'unload-cargo' | 'undock' | 'goto-gate' | 'use-gate' | 'patrol' | 'wait' | 'trade-buy' | 'trade-sell' | 'move-to-sector'
 type ShipCommand = {
   id: string
   type: ShipCommandType
@@ -98,6 +144,8 @@ type UniverseState = {
   wares: Ware[]; recipes: Recipe[]; stations: Station[]; sectorPrices: Record<string, Record<string, number>>; timeScale: number; acc: number; elapsedTimeSec: number
   // Fleet simulation
   corporations: Corporation[]; fleets: NPCFleet[]; tradeLog: TradeLogEntry[]; lastTickTime: number
+  // Dynamic economy
+  lastTraderSpawnCheck?: number
 }
 
 function createUniverse() {
@@ -247,6 +295,20 @@ function createUniverse() {
       { id: 'space_fuel', name: 'Space Fuel', category: 'end', basePrice: 200, volume: 1 },
       { id: 'silicon_wafers', name: 'Silicon Wafers', category: 'primary', basePrice: 504, volume: 18 },
       { id: 'ire_laser', name: 'IRE Laser', category: 'end', basePrice: 2980, volume: 5 },
+      { id: 'plankton', name: 'Plankton', category: 'food', basePrice: 40, volume: 1 },
+      { id: 'bogas', name: 'BoGas', category: 'food', basePrice: 50, volume: 1 },
+      { id: 'bofu', name: 'BoFu', category: 'food', basePrice: 90, volume: 1 },
+      { id: 'wheat', name: 'Wheat', category: 'food', basePrice: 60, volume: 1 },
+      { id: 'cahoonas', name: 'Meatsteak Cahoonas', category: 'food', basePrice: 110, volume: 1 },
+      { id: 'scruffin_fruit', name: 'Scruffin Fruit', category: 'food', basePrice: 60, volume: 1 },
+      { id: 'rastar_oil', name: 'Rastar Oil', category: 'food', basePrice: 140, volume: 1 },
+      { id: 'quantum_tubes', name: 'Quantum Tubes', category: 'intermediate', basePrice: 1800, volume: 2 },
+      { id: 'microchips', name: 'Microchips', category: 'intermediate', basePrice: 1684, volume: 1 },
+      { id: 'computer_components', name: 'Computer Components', category: 'intermediate', basePrice: 1200, volume: 1 },
+      { id: 'hept_laser', name: 'HEPT Laser', category: 'end', basePrice: 120000, volume: 8 },
+      { id: 'pac_laser', name: 'PAC Laser', category: 'end', basePrice: 40000, volume: 6 },
+      { id: 'ship_parts', name: 'Ship Parts', category: 'end', basePrice: 800, volume: 4 },
+      { id: 'trade_goods', name: 'Trade Goods', category: 'end', basePrice: 200, volume: 1 },
     ]
     // Recipes for Teladi stations
     const recipes: Recipe[] = [
@@ -258,6 +320,8 @@ function createUniverse() {
       { id: 'flower_farm', productId: 'sunrise_flowers', inputs: [{ wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 80, batchSize: 20, productStorageCap: 4000 },
       // Teladianium Foundry - produces teladianium from ore + energy
       { id: 'teladianium_foundry', productId: 'teladianium', inputs: [{ wareId: 'ore', amount: 6 }, { wareId: 'energy_cells', amount: 20 }], cycleTimeSec: 120, batchSize: 8, productStorageCap: 2000 },
+      // Ore Mine - produces ore from energy
+      { id: 'ore_mine', productId: 'ore', inputs: [{ wareId: 'energy_cells', amount: 20 }], cycleTimeSec: 90, batchSize: 8, productStorageCap: 1200 },
       // Crystal Fab - produces crystals from silicon + food + energy
       { id: 'crystal_fab', productId: 'crystals', inputs: [{ wareId: 'silicon_wafers', amount: 4 }, { wareId: 'sun_oil', amount: 8 }, { wareId: 'energy_cells', amount: 80 }], cycleTimeSec: 120, batchSize: 4, productStorageCap: 1000 },
       // Silicon Mine - produces silicon from energy
@@ -268,6 +332,34 @@ function createUniverse() {
       { id: 'dream_farm', productId: 'space_fuel', inputs: [{ wareId: 'space_weed', amount: 4 }, { wareId: 'energy_cells', amount: 12 }], cycleTimeSec: 100, batchSize: 8, productStorageCap: 2000 },
       // IRE Laser Forge - produces lasers from teladianium + energy
       { id: 'ire_forge', productId: 'ire_laser', inputs: [{ wareId: 'teladianium', amount: 2 }, { wareId: 'energy_cells', amount: 40 }], cycleTimeSec: 180, batchSize: 1, productStorageCap: 50 },
+      // HEPT Laser Forge
+      { id: 'hept_forge', productId: 'hept_laser', inputs: [{ wareId: 'teladianium', amount: 6 }, { wareId: 'energy_cells', amount: 120 }], cycleTimeSec: 200, batchSize: 1, productStorageCap: 20 },
+      // PAC Laser Forge
+      { id: 'pac_forge', productId: 'pac_laser', inputs: [{ wareId: 'ore', amount: 6 }, { wareId: 'energy_cells', amount: 80 }], cycleTimeSec: 180, batchSize: 1, productStorageCap: 20 },
+      // Plankton Farm (Boron)
+      { id: 'plankton_farm', productId: 'plankton', inputs: [{ wareId: 'energy_cells', amount: 8 }], cycleTimeSec: 80, batchSize: 40, productStorageCap: 800 },
+      // BoGas Plant (Boron)
+      { id: 'bogas_plant', productId: 'bogas', inputs: [{ wareId: 'plankton', amount: 20 }, { wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 90, batchSize: 30, productStorageCap: 600 },
+      // BoFu Lab (Boron)
+      { id: 'bofu_lab', productId: 'bofu', inputs: [{ wareId: 'bogas', amount: 20 }, { wareId: 'energy_cells', amount: 12 }], cycleTimeSec: 100, batchSize: 30, productStorageCap: 600 },
+      // Argon Farm (wheat)
+      { id: 'argon_farm', productId: 'wheat', inputs: [{ wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 80, batchSize: 30, productStorageCap: 800 },
+      // Cahoona Bakery
+      { id: 'cahoona_bakery', productId: 'cahoonas', inputs: [{ wareId: 'wheat', amount: 20 }, { wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 90, batchSize: 30, productStorageCap: 600 },
+      // Scruffin Farm (Split)
+      { id: 'scruffin_farm', productId: 'scruffin_fruit', inputs: [{ wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 80, batchSize: 30, productStorageCap: 800 },
+      // Rastar Refinery (Split)
+      { id: 'rastar_refinery', productId: 'rastar_oil', inputs: [{ wareId: 'scruffin_fruit', amount: 20 }, { wareId: 'energy_cells', amount: 15 }], cycleTimeSec: 100, batchSize: 30, productStorageCap: 600 },
+      // Quantum Tube Fab
+      { id: 'quantum_tube_fab', productId: 'quantum_tubes', inputs: [{ wareId: 'silicon_wafers', amount: 4 }, { wareId: 'teladianium', amount: 2 }, { wareId: 'energy_cells', amount: 40 }], cycleTimeSec: 140, batchSize: 4, productStorageCap: 400 },
+      // Chip Plant
+      { id: 'chip_plant', productId: 'microchips', inputs: [{ wareId: 'silicon_wafers', amount: 4 }, { wareId: 'quantum_tubes', amount: 1 }, { wareId: 'energy_cells', amount: 30 }], cycleTimeSec: 160, batchSize: 2, productStorageCap: 200 },
+      // Computer Plant
+      { id: 'computer_plant', productId: 'computer_components', inputs: [{ wareId: 'microchips', amount: 2 }, { wareId: 'silicon_wafers', amount: 2 }, { wareId: 'energy_cells', amount: 30 }], cycleTimeSec: 150, batchSize: 4, productStorageCap: 400 },
+      // Logistics hubs (trading station / equipment dock)
+      { id: 'logistics_hub', productId: 'trade_goods', inputs: [], cycleTimeSec: 120, batchSize: 5, productStorageCap: 500 },
+      // Shipyard (produces ship parts to justify inputs)
+      { id: 'shipyard', productId: 'ship_parts', inputs: [{ wareId: 'teladianium', amount: 20 }, { wareId: 'ore', amount: 20 }, { wareId: 'energy_cells', amount: 100 }], cycleTimeSec: 240, batchSize: 10, productStorageCap: 500 },
     ]
     // Stations matching the 4 Teladi sectors
     const stations: Station[] = [
@@ -436,6 +528,23 @@ function createUniverse() {
           job.builderShipId = tl.id
           job.status = 'in-transit'
           console.log(`[CorpAI] ${corp.name} hired TL ${tl.name} for ${job.stationType}`)
+
+          // Start the TL moving toward the build sector right away (first hop)
+          const path = findSectorPath(spawnSector, job.targetSectorId)
+          if (path && path.length > 0) {
+            const nextSector = path[0]
+            tl.commandQueue = []
+            issueCommand(tl.id, { type: 'goto-gate', targetSectorId: nextSector })
+            issueCommand(tl.id, { type: 'use-gate', targetSectorId: nextSector })
+            tl.state = 'in-transit'
+            tl.destinationSectorId = job.targetSectorId
+            tl.stateStartTime = now
+          } else if (path && path.length === 0) {
+            // Already in target sector (unlikely on spawn)
+            tl.destinationSectorId = job.targetSectorId
+          } else {
+            console.warn(`[CorpAI] TL ${tl.name} cannot find path from ${spawnSector} to ${job.targetSectorId}`)
+          }
         }
         else if (job.status === 'in-transit') {
           // Check if TL is there
@@ -454,29 +563,32 @@ function createUniverse() {
             tl.commandQueue = []
             tl.state = 'idle'
           } else {
+            const path = findSectorPath(tl.currentSectorId, job.targetSectorId)
+            if (!path) {
+              console.warn(`[CorpAI] TL ${tl.name} cannot find path from ${tl.currentSectorId} to ${job.targetSectorId}`)
+              continue
+            }
+
             // Debug why it's not matching
             if (Math.random() < 0.05) console.log(`[CorpAI] TL ${tl.name} at ${tl.currentSectorId}, target ${job.targetSectorId}`)
-            // If TL is idle, recalculate path and issue new commands
-            // (clear stale commands from previous sector that may reference non-existent gates)
-            if (tl.state === 'idle') {
-              // Clear any stale commands from previous hop
-              tl.commandQueue = []
 
-              // Use BFS pathfinding for multi-hop navigation
-              const path = findSectorPath(tl.currentSectorId, job.targetSectorId)
-              if (path && path.length > 0) {
-                console.log(`[CorpAI] TL ${tl.name} path: ${tl.currentSectorId} → ${path.join(' → ')}`)
-                // Issue commands for ONLY the next hop (recalculate after each sector)
-                const nextSector = path[0]
-                issueCommand(tl.id, { type: 'goto-gate', targetSectorId: nextSector })
-                issueCommand(tl.id, { type: 'use-gate', targetSectorId: nextSector })
-                tl.state = 'in-transit'
-              } else if (path && path.length === 0) {
-                // Already at destination (shouldn't happen due to check above, but be safe)
-                console.log(`[CorpAI] TL ${tl.name} already at ${job.targetSectorId}`)
-              } else {
-                console.warn(`[CorpAI] TL ${tl.name} cannot find path from ${tl.currentSectorId} to ${job.targetSectorId}`)
-              }
+            // Issue the next hop explicitly (goto-gate + use-gate) to mirror trader behavior
+            const nextSector = path[0]
+            const head = tl.commandQueue[0]
+            const needsNewOrder =
+              tl.commandQueue.length === 0 ||
+              head.targetSectorId !== nextSector ||
+              (head.type !== 'goto-gate' && head.type !== 'move-to-sector')
+
+            if (needsNewOrder) {
+              tl.commandQueue = []
+              issueCommand(tl.id, { type: 'goto-gate', targetSectorId: nextSector })
+              issueCommand(tl.id, { type: 'use-gate', targetSectorId: nextSector })
+              tl.state = 'in-transit'
+              tl.destinationSectorId = job.targetSectorId
+              tl.stateStartTime = now
+              const pathStr = [tl.currentSectorId, ...path].join(' -> ')
+              console.log(`[CorpAI] TL ${tl.name} path: ${pathStr}`)
             }
           }
         }
@@ -487,7 +599,30 @@ function createUniverse() {
             const station: Station = {
               id: `station_${corp.id}_${genId()}`,
               name: blueprint.name,
-              recipeId: job.stationType === 'spp_cycle' ? 'spp_teladi' : job.stationType, // Map to recipe
+              // Map stationType to actual recipe id (some differ from blueprint key)
+              recipeId: (() => {
+                if (job.stationType === 'spp_cycle') return 'spp_teladi'
+                if (job.stationType === 'spp_argon' || job.stationType === 'spp_split' || job.stationType === 'spp_paranid' || job.stationType === 'spp_boron') return 'spp_teladi'
+                if (job.stationType === 'mine_silicon') return 'silicon_mine'
+                if (job.stationType === 'mine_ore') return 'ore_mine'
+                if (job.stationType === 'hept_forge') return 'hept_forge'
+                if (job.stationType === 'pac_forge') return 'pac_forge'
+                if (job.stationType === 'plankton_farm') return 'plankton_farm'
+                if (job.stationType === 'bogas_plant') return 'bogas_plant'
+                if (job.stationType === 'bofu_lab') return 'bofu_lab'
+                if (job.stationType === 'argon_farm') return 'argon_farm'
+                if (job.stationType === 'cahoona_bakery') return 'cahoona_bakery'
+                if (job.stationType === 'scruffin_farm') return 'scruffin_farm'
+                if (job.stationType === 'rastar_refinery') return 'rastar_refinery'
+                if (job.stationType === 'quantum_tube_fab' || job.stationType === 'teladi_quantum_tube_fab' || job.stationType === 'argon_quantum_tube_fab' || job.stationType === 'split_quantum_tube_fab' || job.stationType === 'paranid_quantum_tube_fab') return 'quantum_tube_fab'
+                if (job.stationType === 'chip_plant' || job.stationType === 'boron_chip_plant') return 'chip_plant'
+                if (job.stationType === 'computer_plant') return 'computer_plant'
+                if (job.stationType === 'equipment_dock') return 'logistics_hub'
+                if (job.stationType === 'trading_station') return 'logistics_hub'
+                if (job.stationType === 'shipyard') return 'shipyard'
+                if (job.stationType === 'xenon_power') return 'spp_teladi'
+                return job.stationType
+              })(),
               sectorId: job.targetSectorId,
               position: randomPos(),
               modelPath: blueprint.modelPath,
@@ -548,7 +683,149 @@ function createUniverse() {
           }
         }
       }
+
+      // ============ Ship Purchasing Logic ============
+      const corpFleets = state.fleets.filter(f => f.ownerId === corp.id && f.behavior !== 'construction')
+      const corpStations = state.stations.filter(s => s.ownerId === corp.id)
+
+      // Rule: 1 trader per 2 stations, minimum 1
+      const desiredFleetSize = Math.max(1, Math.floor(corpStations.length / 2))
+
+      if (corpFleets.length < desiredFleetSize && corp.credits > SHIP_CATALOG.vulture.cost + ECONOMY_SETTINGS.CORP_MIN_CREDITS_TO_BUY_SHIP) {
+        // Purchase new trader
+        const shipyard = 'seizewell' // Teladi shipyard
+        const newFleet: NPCFleet = {
+          id: `fleet_${genId()}`,
+          name: `${corp.name.split(' ')[0]} Trader ${genId().substring(0, 4)}`,
+          shipType: 'Vulture',
+          modelPath: SHIP_CATALOG.vulture.modelPath,
+          race: corp.race,
+          capacity: SHIP_CATALOG.vulture.capacity,
+          speed: SHIP_CATALOG.vulture.speed,
+          homeSectorId: shipyard,
+          ownerId: corp.id,
+          ownerType: corp.type,
+          behavior: 'corp-logistics',
+          autonomy: 0.5,
+          profitShare: 0.15,
+          currentSectorId: shipyard,
+          position: randomPos(),
+          state: 'idle',
+          stateStartTime: now,
+          cargo: {},
+          credits: 10000,
+          commandQueue: [],
+          totalProfit: 0,
+          tripsCompleted: 0
+        }
+
+        state.fleets.push(newFleet)
+        corp.fleetIds.push(newFleet.id)
+        corp.credits -= SHIP_CATALOG.vulture.cost
+
+        console.log(`[CorpAI] ${corp.name} purchased new trader: ${newFleet.name}`)
+      }
     })
+  }
+
+  // ============ Sole Trader Spawning ============
+  const spawnSoleTraders = () => {
+    const now = Date.now()
+
+    // Initialize spawn timer if missing
+    if (!state.lastTraderSpawnCheck) state.lastTraderSpawnCheck = now
+
+    if (now - state.lastTraderSpawnCheck > ECONOMY_SETTINGS.TRADER_SPAWN_INTERVAL) {
+      state.lastTraderSpawnCheck = now
+
+      // Cap total independents
+      const independentCount = state.fleets.filter(f => f.ownerType === 'independent').length
+      if (independentCount < ECONOMY_SETTINGS.MAX_INDEPENDENT_TRADERS && Math.random() < ECONOMY_SETTINGS.TRADER_SPAWN_CHANCE) {
+        const spawnSectors = ['seizewell', 'profit_share', 'teladi_gain', 'greater_profit']
+        const spawnSector = spawnSectors[Math.floor(Math.random() * spawnSectors.length)]
+
+        const newTrader: NPCFleet = {
+          id: `fleet_${genId()}`,
+          name: `Independent ${genId().substring(0, 4)}`,
+          shipType: 'Vulture',
+          modelPath: SHIP_CATALOG.vulture.modelPath,
+          race: 'teladi',
+          capacity: SHIP_CATALOG.vulture.capacity,
+          speed: 0.9 + Math.random() * 0.2, // Slight variation
+          homeSectorId: spawnSector,
+          ownerId: null,
+          ownerType: 'independent',
+          behavior: 'freelance',
+          autonomy: 1.0,
+          profitShare: 1.0,
+          currentSectorId: spawnSector,
+          position: randomPos(),
+          state: 'idle',
+          stateStartTime: now,
+          cargo: {},
+          credits: ECONOMY_SETTINGS.TRADER_STARTING_CREDITS,
+          commandQueue: [],
+          totalProfit: 0,
+          tripsCompleted: 0
+        }
+
+        state.fleets.push(newTrader)
+        console.log(`[Economy] 🚀 New sole trader entered market: ${newTrader.name} in ${spawnSector}`)
+      }
+    }
+  }
+
+  // ============ Trader → Corporation Promotion ============
+  const runTraderPromotion = () => {
+    const now = Date.now()
+    const promotionCandidates = state.fleets.filter(
+      f => f.ownerType === 'independent' && f.credits >= ECONOMY_SETTINGS.TRADER_PROMOTION_THRESHOLD
+    )
+
+    for (const trader of promotionCandidates) {
+      // Check if they have enough for station + buffer
+      if (trader.credits < ECONOMY_SETTINGS.STATION_FOUNDING_COST + 100000) continue
+
+      // Found a new corporation!
+      const newCorpId = `corp_${genId()}`
+      const traderShortName = trader.name.replace('Independent ', '')
+      const newCorp: Corporation = {
+        id: newCorpId,
+        name: `${traderShortName} Trading Co.`,
+        race: trader.race,
+        type: 'family', // Small family business
+        stationIds: [],
+        fleetIds: [trader.id],
+        credits: trader.credits - ECONOMY_SETTINGS.STATION_FOUNDING_COST,
+        netWorth: trader.credits,
+        aggressiveness: 0.3 + Math.random() * 0.3,
+        expansionBudget: 50000,
+        riskTolerance: 0.5,
+        lifetimeProfit: trader.totalProfit,
+        lifetimeTrades: trader.tripsCompleted,
+        aiState: { lastExpansionCheck: now, currentGoal: 'expand', pendingConstructions: [] }
+      }
+
+      // Transfer trader to corp
+      trader.ownerId = newCorpId
+      trader.ownerType = 'family'
+      trader.behavior = 'corp-logistics'
+      trader.credits = 10000 // Reset personal funds
+
+      // Start building first station
+      const sectorKeys = Object.keys(SECTOR_GRAPH)
+      const targetSector = sectorKeys[Math.floor(Math.random() * sectorKeys.length)]
+      newCorp.aiState!.pendingConstructions.push({
+        id: genId(),
+        stationType: 'spp_cycle', // Start with basic solar power
+        targetSectorId: targetSector,
+        status: 'planning',
+        createdAt: now
+      })
+
+      state.corporations.push(newCorp)
+      console.log(`[Economy] 🎉 ${trader.name} founded ${newCorp.name}! Building first station in ${targetSector}`)
+    }
   }
 
   const tick = (deltaSec: number) => {
@@ -597,6 +874,8 @@ function createUniverse() {
 
     // Run AI
     runCorporationAI()
+    spawnSoleTraders()
+    runTraderPromotion()
 
     // ============ Fleet Tick Logic ============
     const now = Date.now()
@@ -732,6 +1011,66 @@ function createUniverse() {
       // Autonomous mode: if fleet has commands queued, let frontend handle it
       // Backend only issues new commands when queue is empty
       const hasQueuedCommands = fleet.commandQueue.length > 0
+
+      // Nudge ships that look stuck mid-order (e.g., forever undocking with cargo loaded)
+      if (hasQueuedCommands) {
+        const cmd = fleet.commandQueue[0]
+        const isTradeCmd = cmd.type === 'trade-buy' || cmd.type === 'trade-sell'
+        const stuckTooLong = now - (fleet.stateStartTime || now) > 15000 // 15 seconds of no progress
+
+        if (isTradeCmd && stuckTooLong && (fleet.state === 'undocking' || fleet.state === 'docking' || fleet.state === 'idle')) {
+          // Force the ship back into transit toward its target sector
+          fleet.state = 'in-transit'
+          fleet.destinationSectorId = cmd.targetSectorId
+          fleet.stateStartTime = now
+        }
+
+        // Hard rescue: if a sell command has been running for a long time, settle the trade to unblock the economy
+        if (cmd.type === 'trade-sell' && now - (fleet.stateStartTime || now) > 120000) { // 2 minutes
+          const station = state.stations.find(s => s.id === cmd.targetStationId)
+          const wareId = cmd.wareId
+          const amount = Math.min(cmd.amount || 0, wareId ? (fleet.cargo[wareId] || 0) : 0)
+          if (station && wareId && amount > 0) {
+            // Transfer cargo
+            fleet.cargo[wareId] = Math.max(0, (fleet.cargo[wareId] || 0) - amount)
+            station.inventory[wareId] = (station.inventory[wareId] || 0) + amount
+
+            // Credit revenue
+            const sellPrice = state.sectorPrices[station.sectorId]?.[wareId] || state.wares.find(w => w.id === wareId)?.basePrice || 0
+            const revenue = amount * sellPrice
+            fleet.credits += revenue
+
+            // Log trade for visibility
+            state.tradeLog.unshift({
+              id: genId(),
+              timestamp: now,
+              fleetId: fleet.id,
+              fleetName: fleet.name,
+              wareId,
+              wareName: state.wares.find(w => w.id === wareId)?.name || wareId,
+              quantity: amount,
+              buyPrice: 0,
+              sellPrice,
+              profit: revenue,
+              buySectorId: fleet.currentSectorId,
+              sellSectorId: station.sectorId,
+              buyStationName: fleet.targetStationId || 'unknown',
+              sellStationName: station.name,
+            })
+            if (state.tradeLog.length > 100) state.tradeLog.length = 100
+          }
+
+          // Clear command and reset
+          fleet.commandQueue = []
+          fleet.currentOrder = undefined
+          fleet.state = 'idle'
+          fleet.stateStartTime = now
+          continue
+        }
+
+        // Let the frontend continue executing the queued commands
+        continue
+      }
 
       if (!hasQueuedCommands && !fleet.currentOrder) {
         // Fleet is idle and needs work
@@ -971,7 +1310,9 @@ function createUniverse() {
         break
 
       case 'undocked':
-        fleet.state = 'undocking'
+        // Consider undocking complete on report; keep ship free to move immediately
+        fleet.state = 'idle'
+        fleet.stateStartTime = report.timestamp || Date.now()
         break
 
       case 'queue-complete':

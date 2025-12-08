@@ -35,9 +35,9 @@ import { NPCMilitary } from './components/NPCMilitary';
 import { NPCBuilder } from './components/NPCBuilder';
 import { buildNavGraph, buildNavNodesFromLayout } from './ai/navigation';
 import type { NavGraph, NavObstacle } from './ai/navigation';
-import type { NPCFleet } from './types/simulation';
+import type { NPCFleet, FleetBehavior } from './types/simulation';
 
-const HiddenFleetSimulator: FC<{ excludeCurrentSector?: boolean }> = ({ excludeCurrentSector = false }) => {
+const HiddenFleetSimulator: FC<{ excludeCurrentSector?: boolean; behaviors?: FleetBehavior[] }> = ({ excludeCurrentSector = false, behaviors }) => {
   const fleets = useGameStore((s) => s.fleets);
   const economyStations = useGameStore((s) => s.stations);
   const reportShipAction = useGameStore((s) => s.reportShipAction);
@@ -123,9 +123,11 @@ const HiddenFleetSimulator: FC<{ excludeCurrentSector?: boolean }> = ({ excludeC
     return map;
   }, [fleets, economyStations, excludeCurrentSector, currentSectorId]);
 
-  const filteredFleets = excludeCurrentSector && currentSectorId
-    ? fleets.filter((f) => f.currentSectorId !== currentSectorId)
-    : fleets;
+  const filteredFleets = fleets.filter((f) => {
+    if (excludeCurrentSector && currentSectorId && f.currentSectorId === currentSectorId) return false;
+    if (behaviors && behaviors.length > 0 && !behaviors.includes(f.behavior)) return false;
+    return true;
+  });
 
   if (filteredFleets.length === 0) return null;
 
@@ -312,6 +314,8 @@ function App() {
   return (
     <div style={{ width: '100vw', height: '100vh', background: 'black' }}>
       <HiddenFleetSimulator excludeCurrentSector />
+      {/* Always simulate construction TLs, even in current sector, to keep them moving cross-sector */}
+      <HiddenFleetSimulator behaviors={['construction']} />
       <Canvas
         shadows
         gl={{ logarithmicDepthBuffer: true, antialias: true }}
@@ -912,7 +916,7 @@ function EconomyAdmin() {
   const elapsedTimeSec = useGameStore((s) => s.elapsedTimeSec)
   const syncEconomy = useGameStore((s) => s.syncEconomy)
   const [sectorFilter, setSectorFilter] = useState('all')
-  const [activeTab, setActiveTab] = useState<'economy' | 'fleets' | 'corporations'>('economy')
+  const [activeTab, setActiveTab] = useState<'economy' | 'fleets' | 'corporations' | 'characters'>('economy')
   const sectorList = Array.from(new Set<string>([...stations.map((st) => st.sectorId), ...Object.keys(sectorPrices)])).sort()
   const wareMap = new Map<string, string>(wares.map((w) => [w.id, w.name]))
   const warePriceMap = new Map<string, number>(wares.map((w) => [w.id, w.basePrice]))
@@ -1030,6 +1034,17 @@ function EconomyAdmin() {
               borderRadius: '4px 4px 0 0'
             }}
           >Corporations ({corporations.length})</button>
+          <button
+            onClick={() => setActiveTab('characters')}
+            style={{
+              padding: '6px 16px',
+              border: activeTab === 'characters' ? '1px solid #ffcc44' : '1px solid #184b6a',
+              background: activeTab === 'characters' ? '#2a3a20' : '#0f2230',
+              color: activeTab === 'characters' ? '#ffcc44' : '#8ab6d6',
+              cursor: 'pointer',
+              borderRadius: '4px 4px 0 0'
+            }}
+          >Characters</button>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span>Sector</span>
@@ -1326,7 +1341,8 @@ function EconomyAdmin() {
               </div>
             </div>
           </div>
-        ) : (
+        
+        ) : activeTab === 'corporations' ? (
           /* Corporations Tab */
           <div style={{ background: '#0f2230', border: '1px solid #184b6a', borderRadius: 6, padding: 12, overflow: 'auto', height: '100%' }}>
             <div style={{ marginBottom: 12, color: '#8ab6d6', fontSize: 16, fontWeight: 'bold' }}>Corporations</div>
@@ -1368,10 +1384,134 @@ function EconomyAdmin() {
               ))}
             </div>
           </div>
-        )}
+        ) : activeTab === 'characters' ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+            {/* CEOs Section */}
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ color: '#88cc44', fontSize: 14, marginBottom: 8, borderBottom: '1px solid #184b6a', paddingBottom: 4 }}>
+                Corporation CEOs
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
+                {corporations.map((corp) => (
+                  <div key={corp.id} style={{ background: '#0f2230', border: '1px solid #184b6a', borderRadius: 6, padding: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                      <div>
+                        <div style={{ fontWeight: 'bold', color: '#ffcc44', fontSize: 14 }}>CEO of {corp.name}</div>
+                        <div style={{ fontSize: 11, color: '#6090a0' }}>{corp.type.toUpperCase()} - {corp.race.toUpperCase()}</div>
+                      </div>
+                      <div style={{ textAlign: 'right', fontSize: 11, color: '#8ab6d6' }}>
+                        <div>{corp.stationIds.length} Stations</div>
+                        <div>{corp.fleetIds.length} Fleets</div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12, marginBottom: 12 }}>
+                      <div style={{ background: '#1a2a30', padding: 4, borderRadius: 4 }}>
+                        <div style={{ color: '#6090a0', fontSize: 10 }}>FUNDS</div>
+                        <div style={{ color: '#c3e7ff' }}>{Math.floor(corp.credits).toLocaleString()} Cr</div>
+                      </div>
+                      <div style={{ background: '#1a2a30', padding: 4, borderRadius: 4 }}>
+                        <div style={{ color: '#6090a0', fontSize: 10 }}>NET WORTH</div>
+                        <div style={{ color: '#88cc44' }}>{Math.floor(corp.netWorth).toLocaleString()} Cr</div>
+                      </div>
+                    </div>
+
+                    {/* Personality Traits */}
+                    <div style={{ fontSize: 11 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <div style={{ width: 80, color: '#6090a0' }}>Aggressiveness</div>
+                        <div style={{ flex: 1, height: 4, background: '#183040', borderRadius: 2 }}>
+                          <div style={{ width: `${corp.aggressiveness * 100}%`, height: '100%', background: '#ff8888', borderRadius: 2 }} />
+                        </div>
+                        <div style={{ width: 30, textAlign: 'right', color: '#888' }}>{(corp.aggressiveness * 100).toFixed(0)}%</div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <div style={{ width: 80, color: '#6090a0' }}>Risk Tolerance</div>
+                        <div style={{ flex: 1, height: 4, background: '#183040', borderRadius: 2 }}>
+                          <div style={{ width: `${corp.riskTolerance * 100}%`, height: '100%', background: '#ffcc44', borderRadius: 2 }} />
+                        </div>
+                        <div style={{ width: 30, textAlign: 'right', color: '#888' }}>{(corp.riskTolerance * 100).toFixed(0)}%</div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ width: 80, color: '#6090a0' }}>Expansion $$$</div>
+                        <div style={{ color: '#8ab6d6' }}>{corp.expansionBudget.toLocaleString()} Cr</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Independent Traders Section */}
+            <div>
+              <div style={{ color: '#ff9944', fontSize: 14, marginBottom: 8, borderBottom: '1px solid #184b6a', paddingBottom: 4 }}>
+                Independent Traders (Sole Proprietors)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
+                {fleets.filter(f => f.ownerType === 'independent').map((trader) => {
+                  const promotionProgress = Math.min(100, (trader.credits / 500000) * 100)
+                  return (
+                    <div key={trader.id} style={{ background: '#0f2230', border: '1px solid #184b6a', borderRadius: 6, padding: 12 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                        <div>
+                          <div style={{ fontWeight: 'bold', color: '#ff9944' }}>{trader.name}</div>
+                          <div style={{ fontSize: 11, color: '#6090a0' }}>{trader.shipType} - Home: {trader.homeSectorId}</div>
+                        </div>
+                        <div style={{ padding: '2px 8px', background: '#1a2a30', borderRadius: 4, fontSize: 11, color: getStateColor(trader.state), border: `1px solid ${getStateColor(trader.state)}44` }}>
+                          {trader.state.toUpperCase()}
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12, marginBottom: 12 }}>
+                        <div style={{ background: '#1a2a30', padding: 4, borderRadius: 4 }}>
+                          <div style={{ color: '#6090a0', fontSize: 10 }}>FUNDS</div>
+                          <div style={{ color: '#c3e7ff' }}>{Math.floor(trader.credits).toLocaleString()} Cr</div>
+                        </div>
+                        <div style={{ background: '#1a2a30', padding: 4, borderRadius: 4 }}>
+                          <div style={{ color: '#6090a0', fontSize: 10 }}>PROFIT</div>
+                          <div style={{ color: '#88cc44' }}>+{Math.floor(trader.totalProfit).toLocaleString()} Cr</div>
+                        </div>
+                      </div>
+
+                      {/* Current Activity / Order */}
+                      <div style={{ background: '#0a1520', padding: 6, borderRadius: 4, marginBottom: 12, fontSize: 11, minHeight: 32 }}>
+                        <div style={{ color: '#6090a0', fontSize: 9, marginBottom: 2 }}>CURRENT ACTIVITY</div>
+                        {trader.currentOrder ? (
+                          <div style={{ color: '#c3e7ff' }}>
+                            {trader.state === 'loading' || trader.state === 'in-transit' && Object.keys(trader.cargo).length === 0 ? (
+                              <span>Buying <span style={{ color: '#fff' }}>{trader.currentOrder.buyWareName}</span> at {trader.currentOrder.buyStationName}</span>
+                            ) : (
+                              <span>Selling <span style={{ color: '#fff' }}>{trader.currentOrder.sellWareName}</span> at {trader.currentOrder.sellStationName}</span>
+                            )}
+                          </div>
+                        ) : (
+                          <div style={{ color: '#888', fontStyle: 'italic' }}>Thinking... ({trader.currentSectorId})</div>
+                        )}
+                      </div>
+
+                      {/* Promotion Progress Bar */}
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#6090a0', marginBottom: 2 }}>
+                          <span>Corp Founding Progress</span>
+                          <span>{promotionProgress.toFixed(0)}%</span>
+                        </div>
+                        <div style={{ height: 4, background: '#1a2a30', borderRadius: 2, overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${promotionProgress}%`, background: promotionProgress >= 100 ? '#88cc44' : '#ffcc44', transition: 'width 0.3s' }} />
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+                {fleets.filter(f => f.ownerType === 'independent').length === 0 && (
+                  <div style={{ color: '#6090a0', fontStyle: 'italic' }}>No independent traders yet. They spawn over time...</div>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
-  )
+  );
 }
 
 function PerfOverlay({ glRef, sceneRef }: { glRef: React.RefObject<WebGLRenderer | null>; sceneRef: React.RefObject<ThreeScene | null> }) {

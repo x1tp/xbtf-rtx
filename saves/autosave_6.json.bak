@@ -348,7 +348,7 @@
       "recipeId": "bliss_place",
       "sectorId": "teladi_gain",
       "inventory": {
-        "space_weed": 90,
+        "space_weed": 72,
         "sunrise_flowers": 4,
         "energy_cells": 15
       },
@@ -522,7 +522,7 @@
     "teladi_gain": {
       "sunrise_flowers": 94.5,
       "energy_cells": 32,
-      "space_weed": 630,
+      "space_weed": 504,
       "sun_oil": 159.89999999999998
     },
     "profit_share": {
@@ -547,7 +547,7 @@
   },
   "timeScale": 10,
   "acc": 10,
-  "elapsedTimeSec": 7201,
+  "elapsedTimeSec": 18001,
   "corporations": [
     {
       "id": "teladi_company",
@@ -574,7 +574,7 @@
       "lifetimeProfit": 0,
       "lifetimeTrades": 0,
       "aiState": {
-        "lastExpansionCheck": 1765213076646,
+        "lastExpansionCheck": 1765214157254,
         "currentGoal": "expand",
         "pendingConstructions": [
           {
@@ -611,7 +611,7 @@
       "lifetimeProfit": 0,
       "lifetimeTrades": 0,
       "aiState": {
-        "lastExpansionCheck": 1765213076646,
+        "lastExpansionCheck": 1765214157254,
         "currentGoal": "expand",
         "pendingConstructions": []
       }
@@ -637,7 +637,7 @@
       "lifetimeProfit": 0,
       "lifetimeTrades": 0,
       "aiState": {
-        "lastExpansionCheck": 1765213076646,
+        "lastExpansionCheck": 1765214157254,
         "currentGoal": "expand",
         "pendingConstructions": []
       }
@@ -662,7 +662,7 @@
       "lifetimeProfit": 0,
       "lifetimeTrades": 0,
       "aiState": {
-        "lastExpansionCheck": 1765213076646,
+        "lastExpansionCheck": 1765214157254,
         "currentGoal": "expand",
         "pendingConstructions": []
       }
@@ -687,7 +687,7 @@
       "lifetimeProfit": 0,
       "lifetimeTrades": 0,
       "aiState": {
-        "lastExpansionCheck": 1765213076646,
+        "lastExpansionCheck": 1765214157254,
         "currentGoal": "expand",
         "pendingConstructions": []
       }
@@ -714,7 +714,7 @@
       "lifetimeProfit": 0,
       "lifetimeTrades": 0,
       "aiState": {
-        "lastExpansionCheck": 1765213076646,
+        "lastExpansionCheck": 1765214157254,
         "currentGoal": "expand",
         "pendingConstructions": []
       }
@@ -1538,9 +1538,9 @@
       "profitShare": 0,
       "currentSectorId": "seizewell",
       "position": [
-        33765.73755826493,
-        573.6717153589442,
-        9281.690676521619
+        33461.15472553836,
+        566.9240506791779,
+        9205.073979463734
       ],
       "state": "in-transit",
       "stateStartTime": 1765212416214,
@@ -1574,9 +1574,9 @@
       "profitShare": 0.5,
       "currentSectorId": "seizewell",
       "position": [
-        644.8124823787216,
-        -586.6027360931039,
-        4631.438640904658
+        640.5306830664234,
+        -587.882834679834,
+        4647.5445532066815
       ],
       "state": "in-transit",
       "stateStartTime": 1765212425218,
@@ -1610,9 +1610,9 @@
       "profitShare": 0,
       "currentSectorId": "teladi_gain",
       "position": [
-        615.8875773017885,
-        -613.81626585308,
-        4886.3096372473265
+        725.5953779747573,
+        -579.4551483339789,
+        4671.65716748506
       ],
       "state": "in-transit",
       "stateStartTime": 1765212416214,
@@ -1648,7 +1648,7 @@
       "position": [
         0,
         0,
-        -89113.9821841743
+        -89381.6130961911
       ],
       "state": "in-transit",
       "stateStartTime": 1765212477302,
@@ -1682,32 +1682,25 @@
       "profitShare": 1,
       "currentSectorId": "teladi_gain",
       "position": [
-        1145.1543221691984,
-        -296.53883322291546,
-        -1862.1795823055174
+        1225.2331113565062,
+        -326.49501759790417,
+        1950.5264735859346
       ],
-      "state": "idle",
+      "state": "undocking",
       "stateStartTime": 1765213016613,
-      "cargo": {},
-      "credits": 30000,
+      "cargo": {
+        "space_weed": 18
+      },
+      "credits": 18660,
       "commandQueue": [
-        {
-          "type": "trade-buy",
-          "targetStationId": "tg_bliss",
-          "targetSectorId": "teladi_gain",
-          "wareId": "space_weed",
-          "amount": 18,
-          "id": "yyrzg536b",
-          "createdAt": 1765213016613
-        },
         {
           "type": "trade-sell",
           "targetStationId": "gp_dream",
           "targetSectorId": "greater_profit",
           "wareId": "space_weed",
           "amount": 18,
-          "id": "cbs4x5iud",
-          "createdAt": 1765213016613
+          "id": "zyjpsb1r1",
+          "createdAt": 1765213137339
         }
       ],
       "totalProfit": 0,
@@ -1734,6 +1727,6 @@
     }
   ],
   "tradeLog": [],
-  "lastTickTime": 1765213134677,
-  "lastTraderSpawnCheck": 1765213016613
+  "lastTickTime": 1765214215288,
+  "lastTraderSpawnCheck": 1765213917120
 }

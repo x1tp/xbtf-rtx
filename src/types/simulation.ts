@@ -74,6 +74,7 @@ export type ShipCommandType =
   | 'wait'            // Hold position
   | 'trade-buy'       // Travel to station, dock, and buy ware
   | 'trade-sell'      // Travel to station, dock, and sell ware
+  | 'move-to-sector'  // Travel to a specific sector (multi-hop)
 
 export interface ShipCommand {
   id: string

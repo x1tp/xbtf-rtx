@@ -185,24 +185,16 @@ export class CorporationAI {
     }
 
     private static issueMoveCommand(fleet: NPCFleet, targetSector: string) {
-        // If we simply set destinationSectorId, the NPCTrader logic (which this TL uses?) should handle the hops.
-        // Wait, we need to assign a component to this fleet?
-        // The game loop renders `NPCFleet` using `NPCShip`. 
-        // We need to ensure `NPCShip` handles 'construction' behavior or falls back to 'idle' but still moves?
-        // `NPCMilitary` handles 'patrol', 'travel', etc.
-        // `NPCTrader` handles 'trade'.
-        // We probably need a `NPCBuilder` component or reuse one.
-        // For now, if we set `destinationSectorId`, does any component pick it up?
-        // `AIShip.tsx` handles movement if `navGraph` is there.
-        // But `NPCTrader` handles sector hops.
-        // If we don't have a specific `NPCBuilder` component, this fleet might just sit there if checking for behavior 'construction'.
-        // We should add 'construction' to one of the components or make a new one.
-        // FOR NOW: Let's assume standard behavior works if we set behavior to 'freelance' temporarily or add 'construction' support later.
-        // But we set behavior to 'construction'.
-        // Critical: If no component handles 'construction', it won't move.
-        // Phase 3 is logistics.
-
         fleet.destinationSectorId = targetSector
+
+        // Push command to drive the NPCBuilder component
+        // We overwrite the queue to ensure immediate execution
+        fleet.commandQueue = [{
+            id: `cmd_move_${fleet.id}_${Date.now()}`,
+            type: 'move-to-sector',
+            targetSectorId: targetSector,
+            createdAt: Date.now()
+        }]
     }
 
     private static attemptExpansion(

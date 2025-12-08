@@ -38,7 +38,7 @@ interface NPCBuilderProps {
 const tmpVec = new Vector3();
 const tmpDir = new Vector3();
 const DOCK_DISTANCE = 120;     // Builders are large, need more space
-const ARRIVAL_DISTANCE = 80;   
+const ARRIVAL_DISTANCE = 80;
 const DOCK_HOLD_DAMPING = 0.95;
 
 // Builder flight characteristics (Slow, heavy)
@@ -105,10 +105,10 @@ export const NPCBuilder: FC<NPCBuilderProps> = ({
   const getGateData = useCallback((destSectorId: string): { pos: Vector3; radius: number; gateType?: string } | null => {
     let gate = gatePositions.find(g => g.destinationSectorId === destSectorId);
     if (!gate && destSectorId !== fleet.currentSectorId) {
-       const nextHop = findNextHop(fleet.currentSectorId, destSectorId);
-       if (nextHop) {
-         gate = gatePositions.find(g => g.destinationSectorId === nextHop);
-       }
+      const nextHop = findNextHop(fleet.currentSectorId, destSectorId);
+      if (nextHop) {
+        gate = gatePositions.find(g => g.destinationSectorId === nextHop);
+      }
     }
     if (gate) {
       const radius = typeof gate.radius === 'number' ? gate.radius : 300;
@@ -147,10 +147,11 @@ export const NPCBuilder: FC<NPCBuilderProps> = ({
     }));
   }, [fleet.id]);
 
-  const report = useCallback((type: ShipReportType, extra?: { stationId?: string; wareId?: string; amount?: number; sectorIdOverride?: string; gateType?: string }) => {
+  const report = useCallback((type: ShipReportType, extra?: { stationId?: string; wareId?: string; amount?: number; sectorIdOverride?: string; gateType?: string; position?: [number, number, number] }) => {
     const ship = shipRef.current;
     if (!ship || !onReport) return;
-    const pos: [number, number, number] = [ship.position.x, ship.position.y, ship.position.z];
+    const currentPos: [number, number, number] = [ship.position.x, ship.position.y, ship.position.z];
+    const pos = extra?.position || currentPos;
 
     if (type !== 'position-update') {
       const reportKey = `${type}-${extra?.stationId || ''}-${extra?.wareId || ''}`;
@@ -220,33 +221,33 @@ export const NPCBuilder: FC<NPCBuilderProps> = ({
         exitGateType = gatePos.z > 0 ? 'S' : 'N';
       }
     }
-    
+
     const entryGateTypeMap: Record<string, string> = { 'E': 'W', 'W': 'E', 'N': 'S', 'S': 'N' };
     const expectedEntryGateType = entryGateTypeMap[exitGateType] || 'N';
 
     const targetLayout = getSectorLayoutById(targetSectorId);
     const matchingGate = targetLayout.gates.find(g => g.gateType === expectedEntryGateType) || targetLayout.gates[0];
-    
+
     let destPos: [number, number, number] = [0, 0, 0];
     if (matchingGate) {
-        const scale = 30;
-        const gx = matchingGate.position[0] * scale;
-        const gy = matchingGate.position[1] * scale;
-        const gz = matchingGate.position[2] * scale;
-        
-        const offset = 2000; // Larger offset for builders
-        let offX = 0, offZ = 0;
-        
-        if (expectedEntryGateType === 'W') offX = offset;
-        else if (expectedEntryGateType === 'E') offX = -offset;
-        else if (expectedEntryGateType === 'N') offZ = offset;
-        else if (expectedEntryGateType === 'S') offZ = -offset;
-        
-        destPos = [gx + offX, gy, gz + offZ];
+      const scale = 30;
+      const gx = matchingGate.position[0] * scale;
+      const gy = matchingGate.position[1] * scale;
+      const gz = matchingGate.position[2] * scale;
+
+      const offset = 2000; // Larger offset for builders
+      let offX = 0, offZ = 0;
+
+      if (expectedEntryGateType === 'W') offX = offset;
+      else if (expectedEntryGateType === 'E') offX = -offset;
+      else if (expectedEntryGateType === 'N') offZ = offset;
+      else if (expectedEntryGateType === 'S') offZ = -offset;
+
+      destPos = [gx + offX, gy, gz + offZ];
     }
 
     report('entered-sector', { stationId: targetSectorId, sectorIdOverride: targetSectorId, gateType: exitGateType, position: destPos });
-    
+
     useGameStore.setState((state: GameState) => ({
       fleets: state.fleets.map((f) => f.id === fleet.id ? {
         ...f,
@@ -269,15 +270,15 @@ export const NPCBuilder: FC<NPCBuilderProps> = ({
   const prevSectorIdRef = useRef(fleet.currentSectorId);
   useEffect(() => {
     if (fleet.currentSectorId !== prevSectorIdRef.current) {
-       prevSectorIdRef.current = fleet.currentSectorId;
-       initializedRef.current = false;
-       // Only reset to idle if we were gone (in transit)
-       if (localState === 'gone') {
-         setLocalState('idle');
-       }
-       // Reset docking state to prevent teleportation to previous dock location
-       holdDockRef.current = false;
-       dockAnchorRef.current = null;
+      prevSectorIdRef.current = fleet.currentSectorId;
+      initializedRef.current = false;
+      // Only reset to idle if we were gone (in transit)
+      if (localState === 'gone') {
+        setLocalState('idle');
+      }
+      // Reset docking state to prevent teleportation to previous dock location
+      holdDockRef.current = false;
+      dockAnchorRef.current = null;
     }
   }, [fleet.currentSectorId, localState]);
 
@@ -294,23 +295,23 @@ export const NPCBuilder: FC<NPCBuilderProps> = ({
         if (localState === 'idle') {
           const targetSector = currentCommand.targetSectorId;
           const needsTravel = targetSector && targetSector !== fleet.currentSectorId;
-          
+
           if (needsTravel) {
-             setLocalState('flying-to-gate');
-             syncFleet({ state: 'in-transit', destinationSectorId: targetSector, stateStartTime: Date.now() });
-             const gateData = getGateData(targetSector);
-             buildPathTo(gateData?.pos || null);
+            setLocalState('flying-to-gate');
+            syncFleet({ state: 'in-transit', destinationSectorId: targetSector, stateStartTime: Date.now() });
+            const gateData = getGateData(targetSector);
+            buildPathTo(gateData?.pos || null);
           } else {
-             const stationPos = currentCommand.targetStationId ?
-               stationPositions.get(currentCommand.targetStationId) : null;
-             if (stationPos) {
-               setLocalState('flying-to-station');
-               syncFleet({ state: 'idle', targetStationId: currentCommand.targetStationId, stateStartTime: Date.now() });
-               buildPathTo(new Vector3(stationPos[0], stationPos[1], stationPos[2]));
-               dockAnchorRef.current = new Vector3(stationPos[0], stationPos[1], stationPos[2]);
-             } else {
-               advanceCommand();
-             }
+            const stationPos = currentCommand.targetStationId ?
+              stationPositions.get(currentCommand.targetStationId) : null;
+            if (stationPos) {
+              setLocalState('flying-to-station');
+              syncFleet({ state: 'idle', targetStationId: currentCommand.targetStationId, stateStartTime: Date.now() });
+              buildPathTo(new Vector3(stationPos[0], stationPos[1], stationPos[2]));
+              dockAnchorRef.current = new Vector3(stationPos[0], stationPos[1], stationPos[2]);
+            } else {
+              advanceCommand();
+            }
           }
         }
         break;
@@ -346,13 +347,32 @@ export const NPCBuilder: FC<NPCBuilderProps> = ({
 
       case 'use-gate':
         if (localState === 'idle') {
-          setLocalState('entering-gate');
+          // Use flying-to-gate to ensure proper pathfinding initiation
+          setLocalState('flying-to-gate');
           syncFleet({ state: 'in-transit', destinationSectorId: currentCommand.targetSectorId, stateStartTime: Date.now() });
           const gateData = currentCommand.targetSectorId ? getGateData(currentCommand.targetSectorId) : null;
           buildPathTo(gateData?.pos || null);
         }
         break;
-      
+
+      case 'move-to-sector':
+        if (localState === 'idle') {
+          const targetSector = currentCommand.targetSectorId;
+          const needsTravel = targetSector && targetSector !== fleet.currentSectorId;
+
+          if (needsTravel) {
+            setLocalState('flying-to-gate');
+            syncFleet({ state: 'in-transit', destinationSectorId: targetSector, stateStartTime: Date.now() });
+            const gateData = getGateData(targetSector);
+            buildPathTo(gateData?.pos || null);
+          } else {
+            // Already there
+            report('position-update', { sectorIdOverride: fleet.currentSectorId });
+            advanceCommand();
+          }
+        }
+        break;
+
       case 'wait':
         break;
     }
@@ -363,45 +383,45 @@ export const NPCBuilder: FC<NPCBuilderProps> = ({
     if (!ship || localState === 'gone') return;
 
     const delta = rawDelta * timeScale;
-    
+
     const shipAccel = BASE_ACCELERATION;
     const shipMaxSpeed = MAX_SPEED;
     const turnRate = BASE_TURN_RATE;
 
     if (localState === 'docked') {
       if (dockAnchorRef.current) {
-         ship.position.lerp(dockAnchorRef.current, 0.05); // Heavy ship damping
-         velocityRef.current.multiplyScalar(DOCK_HOLD_DAMPING);
+        ship.position.lerp(dockAnchorRef.current, 0.05); // Heavy ship damping
+        velocityRef.current.multiplyScalar(DOCK_HOLD_DAMPING);
       }
     } else if (localState === 'undocking') {
-       if (dockAnchorRef.current) {
-          const away = ship.position.clone().sub(dockAnchorRef.current).normalize();
-          velocityRef.current.add(away.multiplyScalar(shipAccel * delta));
-          ship.position.add(velocityRef.current.clone().multiplyScalar(delta));
-          
-          if (ship.position.distanceTo(dockAnchorRef.current) > DOCK_DISTANCE + 100) {
-             setLocalState('idle');
-             report('undocked');
-             advanceCommand();
-          }
-       }
+      if (dockAnchorRef.current) {
+        const away = ship.position.clone().sub(dockAnchorRef.current).normalize();
+        velocityRef.current.add(away.multiplyScalar(shipAccel * delta));
+        ship.position.add(velocityRef.current.clone().multiplyScalar(delta));
+
+        if (ship.position.distanceTo(dockAnchorRef.current) > DOCK_DISTANCE + 100) {
+          setLocalState('idle');
+          report('undocked');
+          advanceCommand();
+        }
+      }
     } else if (localState === 'docking') {
-       if (dockAnchorRef.current) {
-          const dist = ship.position.distanceTo(dockAnchorRef.current);
-          if (dist < ARRIVAL_DISTANCE) {
-             setLocalState('docked');
-             report('docked');
-             advanceCommand(true);
-          } else {
-             const dir = dockAnchorRef.current.clone().sub(ship.position).normalize();
-             const desiredVel = dir.multiplyScalar(shipMaxSpeed * 0.4);
-             velocityRef.current.lerp(desiredVel, delta * 0.5); // Slower response
-             ship.position.add(velocityRef.current.clone().multiplyScalar(delta));
-             
-             const targetQuat = new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), dir);
-             ship.quaternion.slerp(targetQuat, delta * turnRate);
-          }
-       }
+      if (dockAnchorRef.current) {
+        const dist = ship.position.distanceTo(dockAnchorRef.current);
+        if (dist < ARRIVAL_DISTANCE) {
+          setLocalState('docked');
+          report('docked');
+          advanceCommand(true);
+        } else {
+          const dir = dockAnchorRef.current.clone().sub(ship.position).normalize();
+          const desiredVel = dir.multiplyScalar(shipMaxSpeed * 0.4);
+          velocityRef.current.lerp(desiredVel, delta * 0.5); // Slower response
+          ship.position.add(velocityRef.current.clone().multiplyScalar(delta));
+
+          const targetQuat = new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), dir);
+          ship.quaternion.slerp(targetQuat, delta * turnRate);
+        }
+      }
     } else {
       switch (localState) {
         case 'flying-to-station':
@@ -409,17 +429,17 @@ export const NPCBuilder: FC<NPCBuilderProps> = ({
         case 'entering-gate': {
           const target = getCurrentWaypoint(pathRef.current[pathRef.current.length - 1]);
           if (!target) {
-              if (localState === 'flying-to-station') {
-                  setLocalState('idle');
-                  report('arrived-at-station');
-                  advanceCommand();
-              }
-              break;
+            if (localState === 'flying-to-station') {
+              setLocalState('idle');
+              report('arrived-at-station');
+              advanceCommand();
+            }
+            break;
           }
 
           const dist = ship.position.distanceTo(target);
           tmpDir.copy(target).sub(ship.position).normalize();
-          
+
           const avoidance = new Vector3();
           for (const o of obstacles) {
             const offset = ship.position.clone().sub(o.center);
@@ -435,7 +455,7 @@ export const NPCBuilder: FC<NPCBuilderProps> = ({
 
           let desiredSpeed = shipMaxSpeed;
           if (pathIndexRef.current >= pathRef.current.length - 1 && dist < BRAKE_DISTANCE) {
-             desiredSpeed = Math.max(10, shipMaxSpeed * (dist / BRAKE_DISTANCE));
+            desiredSpeed = Math.max(10, shipMaxSpeed * (dist / BRAKE_DISTANCE));
           }
 
           tmpVec.copy(tmpDir).multiplyScalar(desiredSpeed);
@@ -456,18 +476,18 @@ export const NPCBuilder: FC<NPCBuilderProps> = ({
           }
 
           if (localState === 'entering-gate' || localState === 'flying-to-gate') {
-              const gateData = currentCommand?.targetSectorId ? getGateData(currentCommand.targetSectorId) : null;
-              if (gateData && dist < 300) {
-                  const enterRadius = Math.max(150, gateData.radius * 0.8);
-                  if (dist < enterRadius) {
-                      const finalDest = currentCommand?.targetSectorId || fleet.currentSectorId;
-                      const nextHop = findNextHop(fleet.currentSectorId, finalDest);
-                      const actualTarget = nextHop || finalDest;
-                      const isFinalDest = actualTarget === finalDest;
-                      
-                      enterGate(actualTarget, gateData.pos, isFinalDest, gateData.gateType);
-                  }
+            const gateData = currentCommand?.targetSectorId ? getGateData(currentCommand.targetSectorId) : null;
+            if (gateData && dist < 300) {
+              const enterRadius = Math.max(150, gateData.radius * 0.8);
+              if (dist < enterRadius) {
+                const finalDest = currentCommand?.targetSectorId || fleet.currentSectorId;
+                const nextHop = findNextHop(fleet.currentSectorId, finalDest);
+                const actualTarget = nextHop || finalDest;
+                const isFinalDest = actualTarget === finalDest;
+
+                enterGate(actualTarget, gateData.pos, isFinalDest, gateData.gateType);
               }
+            }
           }
           break;
         }
@@ -476,21 +496,21 @@ export const NPCBuilder: FC<NPCBuilderProps> = ({
 
     const now = performance.now();
     if (localState === 'flying-to-station' || localState === 'flying-to-gate' || localState === 'entering-gate') {
-       if (now - lastProgressSampleRef.current.time > 1000) {
-          const moved = ship.position.distanceTo(lastProgressSampleRef.current.pos);
-          if (moved < 2) {
-             lastProgressSampleRef.current.stuckTime += 1;
-             if (lastProgressSampleRef.current.stuckTime > 8) { // Longer stuck time for builders
-                const target = pathRef.current[pathRef.current.length - 1];
-                buildPathTo(target);
-                lastProgressSampleRef.current.stuckTime = 0;
-             }
-          } else {
-             lastProgressSampleRef.current.stuckTime = 0;
+      if (now - lastProgressSampleRef.current.time > 1000) {
+        const moved = ship.position.distanceTo(lastProgressSampleRef.current.pos);
+        if (moved < 2) {
+          lastProgressSampleRef.current.stuckTime += 1;
+          if (lastProgressSampleRef.current.stuckTime > 8) { // Longer stuck time for builders
+            const target = pathRef.current[pathRef.current.length - 1];
+            buildPathTo(target);
+            lastProgressSampleRef.current.stuckTime = 0;
           }
-          lastProgressSampleRef.current.time = now;
-          lastProgressSampleRef.current.pos.copy(ship.position);
-       }
+        } else {
+          lastProgressSampleRef.current.stuckTime = 0;
+        }
+        lastProgressSampleRef.current.time = now;
+        lastProgressSampleRef.current.pos.copy(ship.position);
+      }
     }
 
     if (now - lastStoreUpdateTimeRef.current > 100) {

@@ -278,7 +278,7 @@
       "recipeId": "flower_farm",
       "sectorId": "seizewell",
       "inventory": {
-        "sunrise_flowers": 252,
+        "sunrise_flowers": 202,
         "energy_cells": 0
       },
       "reorderLevel": {
@@ -348,7 +348,7 @@
       "recipeId": "bliss_place",
       "sectorId": "teladi_gain",
       "inventory": {
-        "space_weed": 90,
+        "space_weed": 72,
         "sunrise_flowers": 4,
         "energy_cells": 15
       },
@@ -522,7 +522,7 @@
     "teladi_gain": {
       "sunrise_flowers": 94.5,
       "energy_cells": 32,
-      "space_weed": 630,
+      "space_weed": 504,
       "sun_oil": 159.89999999999998
     },
     "profit_share": {
@@ -547,7 +547,7 @@
   },
   "timeScale": 10,
   "acc": 10,
-  "elapsedTimeSec": 7201,
+  "elapsedTimeSec": 21601,
   "corporations": [
     {
       "id": "teladi_company",
@@ -574,7 +574,7 @@
       "lifetimeProfit": 0,
       "lifetimeTrades": 0,
       "aiState": {
-        "lastExpansionCheck": 1765213076646,
+        "lastExpansionCheck": 1765214517459,
         "currentGoal": "expand",
         "pendingConstructions": [
           {
@@ -611,7 +611,7 @@
       "lifetimeProfit": 0,
       "lifetimeTrades": 0,
       "aiState": {
-        "lastExpansionCheck": 1765213076646,
+        "lastExpansionCheck": 1765214517459,
         "currentGoal": "expand",
         "pendingConstructions": []
       }
@@ -637,7 +637,7 @@
       "lifetimeProfit": 0,
       "lifetimeTrades": 0,
       "aiState": {
-        "lastExpansionCheck": 1765213076646,
+        "lastExpansionCheck": 1765214517459,
         "currentGoal": "expand",
         "pendingConstructions": []
       }
@@ -662,7 +662,7 @@
       "lifetimeProfit": 0,
       "lifetimeTrades": 0,
       "aiState": {
-        "lastExpansionCheck": 1765213076646,
+        "lastExpansionCheck": 1765214517459,
         "currentGoal": "expand",
         "pendingConstructions": []
       }
@@ -687,7 +687,7 @@
       "lifetimeProfit": 0,
       "lifetimeTrades": 0,
       "aiState": {
-        "lastExpansionCheck": 1765213076646,
+        "lastExpansionCheck": 1765214517459,
         "currentGoal": "expand",
         "pendingConstructions": []
       }
@@ -714,7 +714,7 @@
       "lifetimeProfit": 0,
       "lifetimeTrades": 0,
       "aiState": {
-        "lastExpansionCheck": 1765213076646,
+        "lastExpansionCheck": 1765214517459,
         "currentGoal": "expand",
         "pendingConstructions": []
       }
@@ -1538,9 +1538,9 @@
       "profitShare": 0,
       "currentSectorId": "seizewell",
       "position": [
-        33765.73755826493,
-        573.6717153589442,
-        9281.690676521619
+        33553.44462341657,
+        568.9686218736481,
+        9228.289165434731
       ],
       "state": "in-transit",
       "stateStartTime": 1765212416214,
@@ -1574,9 +1574,9 @@
       "profitShare": 0.5,
       "currentSectorId": "seizewell",
       "position": [
-        644.8124823787216,
-        -586.6027360931039,
-        4631.438640904658
+        649.9899999556397,
+        -585.0548510908254,
+        4611.963500196914
       ],
       "state": "in-transit",
       "stateStartTime": 1765212425218,
@@ -1610,9 +1610,9 @@
       "profitShare": 0,
       "currentSectorId": "teladi_gain",
       "position": [
-        615.8875773017885,
-        -613.81626585308,
-        4886.3096372473265
+        699.771181867494,
+        -587.5434358759842,
+        4722.184362810346
       ],
       "state": "in-transit",
       "stateStartTime": 1765212416214,
@@ -1648,7 +1648,7 @@
       "position": [
         0,
         0,
-        -89113.9821841743
+        -89101.41459026022
       ],
       "state": "in-transit",
       "stateStartTime": 1765212477302,
@@ -1682,32 +1682,25 @@
       "profitShare": 1,
       "currentSectorId": "teladi_gain",
       "position": [
-        1145.1543221691984,
-        -296.53883322291546,
-        -1862.1795823055174
+        1225.2331113565062,
+        -326.49501759790417,
+        1950.5264735859346
       ],
-      "state": "idle",
+      "state": "undocking",
       "stateStartTime": 1765213016613,
-      "cargo": {},
-      "credits": 30000,
+      "cargo": {
+        "space_weed": 18
+      },
+      "credits": 18660,
       "commandQueue": [
-        {
-          "type": "trade-buy",
-          "targetStationId": "tg_bliss",
-          "targetSectorId": "teladi_gain",
-          "wareId": "space_weed",
-          "amount": 18,
-          "id": "yyrzg536b",
-          "createdAt": 1765213016613
-        },
         {
           "type": "trade-sell",
           "targetStationId": "gp_dream",
           "targetSectorId": "greater_profit",
           "wareId": "space_weed",
           "amount": 18,
-          "id": "cbs4x5iud",
-          "createdAt": 1765213016613
+          "id": "zyjpsb1r1",
+          "createdAt": 1765213137339
         }
       ],
       "totalProfit": 0,
@@ -1731,9 +1724,68 @@
         "expectedProfit": 2835,
         "createdAt": 1765213016613
       }
+    },
+    {
+      "id": "fleet_v05v2w4ni",
+      "name": "Independent 9rxa",
+      "shipType": "Vulture",
+      "modelPath": "/models/00007.obj",
+      "race": "teladi",
+      "capacity": 2800,
+      "speed": 0.9583326536536898,
+      "homeSectorId": "teladi_gain",
+      "ownerId": null,
+      "ownerType": "independent",
+      "behavior": "freelance",
+      "autonomy": 1,
+      "profitShare": 1,
+      "currentSectorId": "seizewell",
+      "position": [
+        3654.6698248257376,
+        -599,
+        12547.205963845116
+      ],
+      "state": "in-transit",
+      "stateStartTime": 1765214217290,
+      "cargo": {
+        "sunrise_flowers": 50
+      },
+      "credits": 25320,
+      "commandQueue": [
+        {
+          "type": "trade-sell",
+          "targetStationId": "gp_bliss",
+          "targetSectorId": "greater_profit",
+          "wareId": "sunrise_flowers",
+          "amount": 50,
+          "id": "idxi1mtye",
+          "createdAt": 1765214370719
+        }
+      ],
+      "totalProfit": 0,
+      "tripsCompleted": 0,
+      "currentOrder": {
+        "id": "t633pnk45",
+        "buyStationId": "sz_flower_b",
+        "buyStationName": "Flower Farm (beta)",
+        "buySectorId": "seizewell",
+        "buyWareId": "sunrise_flowers",
+        "buyWareName": "Sunrise Flowers",
+        "buyQty": 50,
+        "buyPrice": 93.60000000000001,
+        "sellStationId": "gp_bliss",
+        "sellStationName": "Bliss Place (L)",
+        "sellSectorId": "greater_profit",
+        "sellWareId": "sunrise_flowers",
+        "sellWareName": "Sunrise Flowers",
+        "sellQty": 50,
+        "sellPrice": 108,
+        "expectedProfit": 719.9999999999995,
+        "createdAt": 1765214217290
+      }
     }
   ],
   "tradeLog": [],
-  "lastTickTime": 1765213134677,
-  "lastTraderSpawnCheck": 1765213016613
+  "lastTickTime": 1765214575492,
+  "lastTraderSpawnCheck": 1765214517459
 }
