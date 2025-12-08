@@ -165,18 +165,7 @@ export class CorporationAI {
             modelPath: '/models/00187.obj', // Using Albatross for now as per plan
             race: corp.race,
             capacity: 50000,
-            speed: 150, // Should be roughly 80-150 m/s in new scale? 
-            // Player speed is ~200. TL should be slower.
-            // Old code used 0.6 but physics might expect different units now?
-            // Checking gameStore default maxSpeed is SHIP_STATS['player'].maxSpeed
-            // Checking stats: 0.6 was likely small ThreeJS units. 
-            // Let's stick to what other ships have. 
-            // View AIShip.ts showed speed physics.
-            // Let's stick to 150 for now (roughly 150 m/s if scale is 1 unit = 1m)
-            // Wait, previous code had 0.6 in `hireBuilder`. If `AIShip` uses explicit speed, 0.6 is tiny.
-            // Let's check `NPCMilitary` or `NPCTrader` defaults?
-            // Actually, `NPCFleet` speed is maxSpeed.
-            // Let's us 100.
+            speed: 0.4, // Normalized speed (0.4 * 180 = ~72 m/s)
             homeSectorId: spawnSector,
             ownerId: corp.id,
             ownerType: corp.type,

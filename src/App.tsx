@@ -209,22 +209,51 @@ function App() {
   const setNavObjects = useGameStore((s) => s.setNavObjects);
   const currentSectorId = useGameStore((s) => s.currentSectorId);
 
+  const economyStations = useGameStore((s) => s.stations);
+
   useEffect(() => {
     persist.init();
     const layout = getSectorLayoutById(currentSectorId || 'seizewell');
     const spacing = 30;
     const place = (p: [number, number, number]): [number, number, number] => [p[0] * spacing, p[1] * spacing, p[2] * spacing];
+
+    // 1. Static objects from layout
     const sector = UNIVERSE_SECTORS_XBTF.find((s) => s.id === (currentSectorId || 'seizewell')) || UNIVERSE_SECTORS_XBTF[0];
     const nbNames = (sector?.neighbors || []).slice(0, layout.gates.length);
     const nb = nbNames
       .map((nm) => UNIVERSE_SECTORS_XBTF.find((x) => x.name === nm)?.id)
       .filter((x): x is string => !!x);
+
     const objects: { name: string; position: [number, number, number]; type: 'station' | 'gate' | 'ship'; targetSectorId?: string }[] = [];
+
+    // Add layout stations
+    const layoutStationNames = new Set(layout.stations.map(s => s.name));
     for (const st of layout.stations) objects.push({ name: st.name, position: place(st.position), type: 'station' });
+
+    // Add dynamic stations from economy store
+    // Only add if they are in this sector, have a position, AND are not already in the layout (to avoid double rendering static ones)
+    economyStations.forEach(st => {
+      if (st.sectorId === (currentSectorId || 'seizewell') && st.position && !layoutStationNames.has(st.name)) {
+        // Dynamic stations store position in raw units, need to ensure scale is correct.
+        // Builder uses `randomPos` which returns [-5000..5000]. 
+        // `place` function scales by 30. 
+        // If `randomPos` was already "world space", we shouldn't scale?
+        // randomPos in vite.config.ts: `(Math.random() - 0.5) * 10000`.
+        // Layout positions are small integers (e.g. 10, -5). Scaling by 30 makes them 300.
+        // 10000 is HUGE compared to 300.
+        // It seems dynamic stations use a different scale or the visual scale is much larger.
+        // Let's assume dynamic positions are absolute and don't need `place` scaling if they are already large.
+        // IF however they are small like layout, they need scaling.
+        // `randomPos` seems to return large numbers.
+        // Let's pass them raw for now, or check coordinate magnitude.
+        objects.push({ name: st.name, position: st.position, type: 'station' });
+      }
+    });
+
     layout.gates.forEach((g, i) => { objects.push({ name: g.name, position: place(g.position), type: 'gate', targetSectorId: nb[i] }); });
     for (const s of layout.ships) objects.push({ name: s.name, position: place(s.position), type: 'ship' });
     setNavObjects(objects);
-  }, [setNavObjects, currentSectorId]);
+  }, [setNavObjects, currentSectorId, economyStations]);
 
   if (isViewer) {
     return (

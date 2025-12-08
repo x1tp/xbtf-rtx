@@ -50,7 +50,7 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
     const background = layout?.background || cfg.background;
     const spacing = 30; // spread layout objects apart to avoid overlaps
     const place = (p: [number, number, number]): [number, number, number] => [p[0] * spacing, p[1] * spacing, p[2] * spacing];
-    
+
     // Filter NPC fleets to current sector
     // Include in-transit fleets that are departing FROM this sector (so we see them fly to the gate)
     const sectorFleets = useMemo(() => {
@@ -70,7 +70,7 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
         }
         return result;
     }, [fleets, currentSectorId]);
-    
+
     // Build station position map for NPC traders
     // Maps economy station IDs to layout station positions by matching names
     const stationPositions = useMemo(() => {
@@ -81,7 +81,7 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
             for (const st of layout.stations) {
                 layoutByName.set(st.name, place(st.position));
             }
-            
+
             // Then map economy station IDs to positions by matching names
             for (const econStation of economyStations) {
                 const layoutPos = layoutByName.get(econStation.name);
@@ -92,7 +92,7 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
                     map.set(econStation.name, layoutPos);
                 }
             }
-            
+
             // Also add layout stations by name directly (for stations not in economy)
             for (const st of layout.stations) {
                 if (!map.has(st.name)) {
@@ -102,7 +102,7 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
         }
         return map;
     }, [layout, economyStations]);
-    
+
     // Build gate positions for NPC trader navigation
     const gatePositions = useMemo(() => {
         if (!layout) return [];
@@ -115,7 +115,34 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
                 gateType: g.gateType
             }));
     }, [layout]);
-    
+
+    // Merge static and dynamic stations for rendering
+    const stationsToRender = useMemo(() => {
+        if (!layout) return [];
+        const list = layout.stations.map(st => ({
+            ...st,
+            renderPosition: place(st.position),
+        }));
+
+        const layoutNames = new Set(layout.stations.map(s => s.name));
+
+        economyStations.forEach(st => {
+            if (st.sectorId === currentSectorId && st.position && !layoutNames.has(st.name)) {
+                list.push({
+                    name: st.name,
+                    position: [0, 0, 0], // Unused in renderPosition logic below
+                    renderPosition: st.position,
+                    modelPath: st.modelPath,
+                    scale: 30, // Default scale for dynamic stations
+                    rotationSpeed: 0.02,
+                    rotationAxis: 'y',
+                    collisions: true,
+                });
+            }
+        });
+        return list;
+    }, [layout, economyStations, currentSectorId]); // place depends on constant spacing
+
     const placedShips = React.useMemo(
         () => layout ? layout.ships.map((s) => ({ ...s, placedPosition: place(s.position) })) : [],
         [layout]
@@ -182,10 +209,10 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
             {layout
                 ? (
                     <>
-                        {layout.stations.map((st) => (
+                        {stationsToRender.map((st) => (
                             <Station
                                 key={st.name}
-                                position={place(st.position)}
+                                position={st.renderPosition}
                                 showLights={!hdr}
                                 rotate
                                 scale={st.scale ?? 30}

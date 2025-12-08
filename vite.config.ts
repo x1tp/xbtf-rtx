@@ -112,15 +112,48 @@ function createUniverse() {
     IDLE_RETHINK_TIME: 30,
   }
 
-  // Sector adjacency for routing (simple for now - all Teladi sectors connected in line)
+  // Sector adjacency for routing - MUST match universe_xbtf.ts neighbors (using sector IDs)
   const SECTOR_GRAPH: Record<string, string[]> = {
-    'seizewell': ['teladi_gain'],
-    'teladi_gain': ['seizewell', 'profit_share'],
-    'profit_share': ['teladi_gain', 'greater_profit'],
-    'greater_profit': ['profit_share', 'blue_profit'],
+    'seizewell': ['teladi_gain', 'greater_profit', 'profit_share'],
+    'teladi_gain': ['ceo_s_buckzoid', 'family_whi', 'seizewell'],
+    'profit_share': ['ceo_s_buckzoid', 'spaceweed_drift', 'seizewell'],
+    'greater_profit': ['seizewell', 'spaceweed_drift', 'blue_profit'],
+    'spaceweed_drift': ['profit_share', 'greater_profit'],
     'blue_profit': ['greater_profit', 'ceo_s_sprite'],
     'ceo_s_sprite': ['blue_profit', 'company_pride'],
-    'company_pride': ['ceo_s_sprite'],
+    'company_pride': ['ceo_s_sprite', 'thuruks_beard'],
+    'ceo_s_buckzoid': ['menelaus_frontier', 'teladi_gain', 'profit_share'],
+    // Add more sectors as needed
+  }
+
+  // BFS pathfinding for multi-hop sector navigation
+  const findSectorPath = (fromSectorId: string, toSectorId: string): string[] | null => {
+    if (fromSectorId === toSectorId) return []
+    if (!SECTOR_GRAPH[fromSectorId]) {
+      console.warn(`[Pathfinding] Unknown sector: ${fromSectorId}`)
+      return null
+    }
+
+    const queue: { sector: string; path: string[] }[] = [{ sector: fromSectorId, path: [] }]
+    const visited = new Set<string>([fromSectorId])
+
+    while (queue.length > 0) {
+      const { sector, path } = queue.shift()!
+      const neighbors = SECTOR_GRAPH[sector] || []
+
+      for (const neighbor of neighbors) {
+        if (neighbor === toSectorId) {
+          return [...path, neighbor] // Found! Return path (excludes start, includes end)
+        }
+        if (!visited.has(neighbor)) {
+          visited.add(neighbor)
+          queue.push({ sector: neighbor, path: [...path, neighbor] })
+        }
+      }
+    }
+
+    console.warn(`[Pathfinding] No path from ${fromSectorId} to ${toSectorId}`)
+    return null // No path found
   }
 
   // Helper: Generate unique ID
@@ -423,12 +456,27 @@ function createUniverse() {
           } else {
             // Debug why it's not matching
             if (Math.random() < 0.05) console.log(`[CorpAI] TL ${tl.name} at ${tl.currentSectorId}, target ${job.targetSectorId}`)
-            // Move it
-            // If it's idle, give it a move command
-            if (tl.commandQueue.length === 0 && tl.state === 'idle') {
-              issueCommand(tl.id, { type: 'goto-gate', targetSectorId: job.targetSectorId })
-              issueCommand(tl.id, { type: 'use-gate', targetSectorId: job.targetSectorId })
-              tl.state = 'in-transit'
+            // If TL is idle, recalculate path and issue new commands
+            // (clear stale commands from previous sector that may reference non-existent gates)
+            if (tl.state === 'idle') {
+              // Clear any stale commands from previous hop
+              tl.commandQueue = []
+
+              // Use BFS pathfinding for multi-hop navigation
+              const path = findSectorPath(tl.currentSectorId, job.targetSectorId)
+              if (path && path.length > 0) {
+                console.log(`[CorpAI] TL ${tl.name} path: ${tl.currentSectorId} → ${path.join(' → ')}`)
+                // Issue commands for ONLY the next hop (recalculate after each sector)
+                const nextSector = path[0]
+                issueCommand(tl.id, { type: 'goto-gate', targetSectorId: nextSector })
+                issueCommand(tl.id, { type: 'use-gate', targetSectorId: nextSector })
+                tl.state = 'in-transit'
+              } else if (path && path.length === 0) {
+                // Already at destination (shouldn't happen due to check above, but be safe)
+                console.log(`[CorpAI] TL ${tl.name} already at ${job.targetSectorId}`)
+              } else {
+                console.warn(`[CorpAI] TL ${tl.name} cannot find path from ${tl.currentSectorId} to ${job.targetSectorId}`)
+              }
             }
           }
         }

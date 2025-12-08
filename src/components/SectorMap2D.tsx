@@ -83,6 +83,7 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
     const storeObjects = useGameStore((s: GameState) => s.navObjects);
     const fleets = useGameStore((s: GameState) => s.fleets);
     const fleetPositions = useFleetPositions(30); // Poll at 30fps
+    const economyStations = useGameStore((s: GameState) => s.stations);
 
     const [activeTab, setActiveTab] = useState<TabType>('all');
     const [zoom, setZoom] = useState(1);
@@ -118,7 +119,16 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
             const nb = nbNames.map((nm) => UNIVERSE_SECTORS_XBTF.find((x) => x.name === nm)?.id).filter((x): x is string => !!x);
 
             const list: SectorObject[] = [];
+            const layoutStationNames = new Set(layout.stations.map(s => s.name));
             for (const st of layout.stations) list.push({ name: st.name, position: place(st.position), type: 'station' });
+
+            // Add dynamic stations for remote sector
+            economyStations.forEach(st => {
+                if (st.sectorId === selectedSectorId && st.position && !layoutStationNames.has(st.name)) {
+                    list.push({ name: st.name, position: st.position, type: 'station' });
+                }
+            });
+
             layout.gates.forEach((g, i) => { list.push({ name: g.name, position: place(g.position), type: 'gate', targetSectorId: nb[i] }); });
             for (const s of layout.ships) list.push({ name: s.name, position: place(s.position), type: 'ship' });
 
@@ -140,7 +150,7 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
         }));
 
         return [...storeObjects, ...fleetObjects];
-    }, [objects, selectedSectorId, currentSectorId, storeObjects, fleets, fleetPositions]);
+    }, [objects, selectedSectorId, currentSectorId, storeObjects, fleets, fleetPositions, economyStations]);
 
     const mapRef = useRef<SVGSVGElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
