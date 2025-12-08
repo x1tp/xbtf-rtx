@@ -87,33 +87,33 @@ const HiddenFleetSimulator: FC<{ excludeCurrentSector?: boolean }> = ({ excludeC
         }
       }
       const gatePositions = layout.gates
-            .filter((g) => g.destinationSectorId)
-            .map((g) => {
-              const pos = place(g.position) as [number, number, number];
-              obstacles.push({
-                id: `gate-${g.name}`,
-                center: new Vector3(pos[0], pos[1], pos[2]),
-                radius: (g.scale ?? 40) * 6,
-                label: g.name
-              });
-              return {
-                position: pos,
-                destinationSectorId: g.destinationSectorId!,
-                radius: (g.scale ?? 40) * 5,
-                gateType: g.gateType,
-              };
-            });
-            
+        .filter((g) => g.destinationSectorId)
+        .map((g) => {
+          const pos = place(g.position) as [number, number, number];
+          obstacles.push({
+            id: `gate-${g.name}`,
+            center: new Vector3(pos[0], pos[1], pos[2]),
+            radius: (g.scale ?? 40) * 6,
+            label: g.name
+          });
+          return {
+            position: pos,
+            destinationSectorId: g.destinationSectorId!,
+            radius: (g.scale ?? 40) * 5,
+            gateType: g.gateType,
+          };
+        });
+
       // Add planet obstacle if present
       if (layout.planet) {
-         // Planet is usually huge and far away, but let's add it just in case ships fly through it
-         // Use a conservative radius
-         obstacles.push({
-             id: 'planet',
-             center: new Vector3(layout.planet.position[0] * spacing, layout.planet.position[1] * spacing, layout.planet.position[2] * spacing),
-             radius: layout.planet.size * 0.8, // Reduced radius to be safe against phantom collisions
-             label: 'planet'
-         });
+        // Planet is usually huge and far away, but let's add it just in case ships fly through it
+        // Use a conservative radius
+        obstacles.push({
+          id: 'planet',
+          center: new Vector3(layout.planet.position[0] * spacing, layout.planet.position[1] * spacing, layout.planet.position[2] * spacing),
+          radius: layout.planet.size * 0.8, // Reduced radius to be safe against phantom collisions
+          label: 'planet'
+        });
       }
 
       const nodes = buildNavNodesFromLayout(layout, spacing);
@@ -138,7 +138,7 @@ const HiddenFleetSimulator: FC<{ excludeCurrentSector?: boolean }> = ({ excludeC
         {filteredFleets.map((fleet: NPCFleet) => {
           const nav = navDataBySector.get(fleet.currentSectorId || 'seizewell');
           if (!nav) return null;
-          
+
           let Component: any = NPCTrader;
           if (fleet.behavior === 'patrol') Component = NPCMilitary;
           if (fleet.behavior === 'construction') Component = NPCBuilder;
@@ -890,7 +890,7 @@ function EconomyAdmin() {
   const recipeMap = new Map<string, { id: string; productId: string; inputs: { wareId: string; amount: number }[]; cycleTimeSec: number; batchSize: number }>(recipes.map((r) => [r.id, r]))
   const visibleStations = stations.filter((st) => sectorFilter === 'all' || st.sectorId === sectorFilter)
   const visibleFleets = fleets.filter((f) => sectorFilter === 'all' || f.currentSectorId === sectorFilter || f.destinationSectorId === sectorFilter)
-  
+
   // Calculate Total Economy Value
   const totalStationValue = stations.reduce((sum, st) => {
     return sum + Object.entries(st.inventory).reduce((s, [wid, qty]) => s + qty * (warePriceMap.get(wid) || 0), 0)
@@ -953,6 +953,11 @@ function EconomyAdmin() {
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button onClick={() => {
+            if (confirm('Are you sure you want to start a NEW GAME? This will archive your current save and restart the universe.')) {
+              useGameStore.getState().resetEconomy()
+            }
+          }} style={{ padding: '6px 10px', border: '1px solid #ff4444', background: '#0f2230', color: '#ff4444', cursor: 'pointer', fontWeight: 'bold' }}>New Game</button>
           <button onClick={() => initEconomy()} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff', cursor: 'pointer' }}>Init</button>
           <button onClick={() => tickEconomy(10)} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff', cursor: 'pointer' }}>Tick +10s</button>
           <button onClick={() => setTimeScale(timeScale === 1 ? 10 : 1)} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff', cursor: 'pointer' }}>Time {timeScale.toFixed(1)}x</button>
@@ -963,35 +968,35 @@ function EconomyAdmin() {
       {/* Tabs and Filter */}
       <div style={{ padding: '8px 20px', display: 'flex', alignItems: 'center', gap: 16, borderBottom: '1px solid #184b6a', background: '#0c1820' }}>
         <div style={{ display: 'flex', gap: 4 }}>
-          <button 
-            onClick={() => setActiveTab('economy')} 
-            style={{ 
-              padding: '6px 16px', 
-              border: activeTab === 'economy' ? '1px solid #3fb6ff' : '1px solid #184b6a', 
-              background: activeTab === 'economy' ? '#1a3a50' : '#0f2230', 
-              color: activeTab === 'economy' ? '#fff' : '#8ab6d6', 
+          <button
+            onClick={() => setActiveTab('economy')}
+            style={{
+              padding: '6px 16px',
+              border: activeTab === 'economy' ? '1px solid #3fb6ff' : '1px solid #184b6a',
+              background: activeTab === 'economy' ? '#1a3a50' : '#0f2230',
+              color: activeTab === 'economy' ? '#fff' : '#8ab6d6',
               cursor: 'pointer',
               borderRadius: '4px 4px 0 0'
             }}
           >Economy</button>
-          <button 
-            onClick={() => setActiveTab('fleets')} 
-            style={{ 
-              padding: '6px 16px', 
-              border: activeTab === 'fleets' ? '1px solid #3fb6ff' : '1px solid #184b6a', 
-              background: activeTab === 'fleets' ? '#1a3a50' : '#0f2230', 
-              color: activeTab === 'fleets' ? '#fff' : '#8ab6d6', 
+          <button
+            onClick={() => setActiveTab('fleets')}
+            style={{
+              padding: '6px 16px',
+              border: activeTab === 'fleets' ? '1px solid #3fb6ff' : '1px solid #184b6a',
+              background: activeTab === 'fleets' ? '#1a3a50' : '#0f2230',
+              color: activeTab === 'fleets' ? '#fff' : '#8ab6d6',
               cursor: 'pointer',
               borderRadius: '4px 4px 0 0'
             }}
           >Fleets ({fleets.length})</button>
-          <button 
-            onClick={() => setActiveTab('corporations')} 
-            style={{ 
-              padding: '6px 16px', 
-              border: activeTab === 'corporations' ? '1px solid #3fb6ff' : '1px solid #184b6a', 
-              background: activeTab === 'corporations' ? '#1a3a50' : '#0f2230', 
-              color: activeTab === 'corporations' ? '#fff' : '#8ab6d6', 
+          <button
+            onClick={() => setActiveTab('corporations')}
+            style={{
+              padding: '6px 16px',
+              border: activeTab === 'corporations' ? '1px solid #3fb6ff' : '1px solid #184b6a',
+              background: activeTab === 'corporations' ? '#1a3a50' : '#0f2230',
+              color: activeTab === 'corporations' ? '#fff' : '#8ab6d6',
               cursor: 'pointer',
               borderRadius: '4px 4px 0 0'
             }}
@@ -1010,110 +1015,110 @@ function EconomyAdmin() {
       <div style={{ flex: 1, padding: 20, overflow: 'auto' }}>
         {activeTab === 'economy' ? (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, height: '100%' }}>
-        <div style={{ background: '#0f2230', border: '1px solid #184b6a', borderRadius: 6, padding: 12, overflow: 'auto' }}>
-          <div style={{ marginBottom: 8, color: '#8ab6d6' }}>Sector Prices</div>
-          {sectorFilter === 'all' ? (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              {Object.keys(sectorPrices).map((sid) => {
-                const sp = sectorPrices[sid] || {}
-                const items = Object.entries(sp)
-                return (
-                  <div key={sid} style={{ border: '1px solid #184b6a', borderRadius: 6, padding: 8 }}>
-                    <div style={{ color: '#c3e7ff', marginBottom: 6 }}>{sid}</div>
-                    {items.length === 0 ? (
-                      <div style={{ color: '#6090a0' }}>no prices</div>
-                    ) : (
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 4 }}>
-                        {items.map(([wid, price]) => (
-                          <>
-                            <div style={{ color: '#c3e7ff' }}>{wareMap.get(wid) || wid}</div>
-                            <div style={{ color: '#88cc44', textAlign: 'right' }}>{Math.round(price)}</div>
-                          </>
-                        ))}
+            <div style={{ background: '#0f2230', border: '1px solid #184b6a', borderRadius: 6, padding: 12, overflow: 'auto' }}>
+              <div style={{ marginBottom: 8, color: '#8ab6d6' }}>Sector Prices</div>
+              {sectorFilter === 'all' ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  {Object.keys(sectorPrices).map((sid) => {
+                    const sp = sectorPrices[sid] || {}
+                    const items = Object.entries(sp)
+                    return (
+                      <div key={sid} style={{ border: '1px solid #184b6a', borderRadius: 6, padding: 8 }}>
+                        <div style={{ color: '#c3e7ff', marginBottom: 6 }}>{sid}</div>
+                        {items.length === 0 ? (
+                          <div style={{ color: '#6090a0' }}>no prices</div>
+                        ) : (
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 4 }}>
+                            {items.map(([wid, price]) => (
+                              <>
+                                <div style={{ color: '#c3e7ff' }}>{wareMap.get(wid) || wid}</div>
+                                <div style={{ color: '#88cc44', textAlign: 'right' }}>{Math.round(price)}</div>
+                              </>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            (() => {
-              const sp = sectorPrices[sectorFilter] || {}
-              const items = Object.entries(sp)
-              return items.length === 0 ? (
-                <div style={{ color: '#6090a0' }}>no prices</div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 4 }}>
-                  {items.map(([wid, price]) => (
-                    <>
-                      <div style={{ color: '#c3e7ff' }}>{wareMap.get(wid) || wid}</div>
-                      <div style={{ color: '#88cc44', textAlign: 'right' }}>{Math.round(price)}</div>
-                    </>
-                  ))}
+                    )
+                  })}
                 </div>
-              )
-            })()
-          )}
-        </div>
-        <div style={{ background: '#0f2230', border: '1px solid #184b6a', borderRadius: 6, padding: 12, overflow: 'auto' }}>
-          <div style={{ marginBottom: 8, color: '#8ab6d6' }}>Stations</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
-            {visibleStations.length === 0 ? (
-              <div style={{ color: '#6090a0' }}>no stations</div>
-            ) : (
-              visibleStations.map((st) => {
-                const r = recipeMap.get(st.recipeId)
-                const prodName = r ? (wareMap.get(r.productId) || r.productId) : st.recipeId
-                const inv = Object.entries(st.inventory)
-                return (
-                  <div key={st.id} style={{ border: '1px solid #184b6a', borderRadius: 6, padding: 8 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                      <div style={{ color: '#c3e7ff' }}>{st.name}</div>
-                      <div style={{ color: '#88cc44' }}>{st.sectorId}</div>
+              ) : (
+                (() => {
+                  const sp = sectorPrices[sectorFilter] || {}
+                  const items = Object.entries(sp)
+                  return items.length === 0 ? (
+                    <div style={{ color: '#6090a0' }}>no prices</div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 4 }}>
+                      {items.map(([wid, price]) => (
+                        <>
+                          <div style={{ color: '#c3e7ff' }}>{wareMap.get(wid) || wid}</div>
+                          <div style={{ color: '#88cc44', textAlign: 'right' }}>{Math.round(price)}</div>
+                        </>
+                      ))}
                     </div>
-                    <div style={{ color: '#8ab6d6', marginBottom: 6 }}>{prodName}</div>
-                    {inv.length === 0 ? (
-                      <div style={{ color: '#6090a0' }}>empty</div>
-                    ) : (
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 4 }}>
-                        {inv.map(([wid, qty]) => (
-                          <Fragment key={wid}>
-                            <div style={{ color: '#c3e7ff' }}>{wareMap.get(wid) || wid}</div>
-                            <div style={{ color: '#ffaa44', textAlign: 'right' }}>{Math.round(qty)}</div>
-                          </Fragment>
-                        ))}
+                  )
+                })()
+              )}
+            </div>
+            <div style={{ background: '#0f2230', border: '1px solid #184b6a', borderRadius: 6, padding: 12, overflow: 'auto' }}>
+              <div style={{ marginBottom: 8, color: '#8ab6d6' }}>Stations</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
+                {visibleStations.length === 0 ? (
+                  <div style={{ color: '#6090a0' }}>no stations</div>
+                ) : (
+                  visibleStations.map((st) => {
+                    const r = recipeMap.get(st.recipeId)
+                    const prodName = r ? (wareMap.get(r.productId) || r.productId) : st.recipeId
+                    const inv = Object.entries(st.inventory)
+                    return (
+                      <div key={st.id} style={{ border: '1px solid #184b6a', borderRadius: 6, padding: 8 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                          <div style={{ color: '#c3e7ff' }}>{st.name}</div>
+                          <div style={{ color: '#88cc44' }}>{st.sectorId}</div>
+                        </div>
+                        <div style={{ color: '#8ab6d6', marginBottom: 6 }}>{prodName}</div>
+                        {inv.length === 0 ? (
+                          <div style={{ color: '#6090a0' }}>empty</div>
+                        ) : (
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 4 }}>
+                            {inv.map(([wid, qty]) => (
+                              <Fragment key={wid}>
+                                <div style={{ color: '#c3e7ff' }}>{wareMap.get(wid) || wid}</div>
+                                <div style={{ color: '#ffaa44', textAlign: 'right' }}>{Math.round(qty)}</div>
+                              </Fragment>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                )
-              })
-            )}
-          </div>
-        </div>
-        <div style={{ background: '#0f2230', border: '1px solid #184b6a', borderRadius: 6, padding: 12, overflow: 'auto' }}>
-          <div style={{ marginBottom: 8, color: '#8ab6d6' }}>Wares</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 4 }}>
-            {wares.map((w) => (
-              <>
-                <div style={{ color: '#c3e7ff' }}>{w.name}</div>
-                <div style={{ color: '#6090a0', textAlign: 'right' }}>{w.category}</div>
-                <div style={{ color: '#88cc44', textAlign: 'right' }}>{w.basePrice}</div>
-              </>
-            ))}
-          </div>
-        </div>
-        <div style={{ background: '#0f2230', border: '1px solid #184b6a', borderRadius: 6, padding: 12, overflow: 'auto' }}>
-          <div style={{ marginBottom: 8, color: '#8ab6d6' }}>Recipes</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 4 }}>
-            {recipes.map((r) => (
-              <>
-                <div style={{ color: '#c3e7ff' }}>{wareMap.get(r.productId) || r.productId}</div>
-                <div style={{ color: '#6090a0', textAlign: 'right' }}>{r.batchSize}</div>
-                <div style={{ color: '#6090a0', textAlign: 'right' }}>{r.cycleTimeSec}s</div>
-              </>
-            ))}
-          </div>
-        </div>
+                    )
+                  })
+                )}
+              </div>
+            </div>
+            <div style={{ background: '#0f2230', border: '1px solid #184b6a', borderRadius: 6, padding: 12, overflow: 'auto' }}>
+              <div style={{ marginBottom: 8, color: '#8ab6d6' }}>Wares</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 4 }}>
+                {wares.map((w) => (
+                  <>
+                    <div style={{ color: '#c3e7ff' }}>{w.name}</div>
+                    <div style={{ color: '#6090a0', textAlign: 'right' }}>{w.category}</div>
+                    <div style={{ color: '#88cc44', textAlign: 'right' }}>{w.basePrice}</div>
+                  </>
+                ))}
+              </div>
+            </div>
+            <div style={{ background: '#0f2230', border: '1px solid #184b6a', borderRadius: 6, padding: 12, overflow: 'auto' }}>
+              <div style={{ marginBottom: 8, color: '#8ab6d6' }}>Recipes</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 4 }}>
+                {recipes.map((r) => (
+                  <>
+                    <div style={{ color: '#c3e7ff' }}>{wareMap.get(r.productId) || r.productId}</div>
+                    <div style={{ color: '#6090a0', textAlign: 'right' }}>{r.batchSize}</div>
+                    <div style={{ color: '#6090a0', textAlign: 'right' }}>{r.cycleTimeSec}s</div>
+                  </>
+                ))}
+              </div>
+            </div>
           </div>
         ) : activeTab === 'fleets' ? (
           /* Fleets Tab */
@@ -1152,7 +1157,7 @@ function EconomyAdmin() {
                           </div>
                           <span style={{ color: getStateColor(f.state), fontSize: 12, textTransform: 'uppercase' }}>{f.state}</span>
                         </div>
-                        
+
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12, marginBottom: 8, flexShrink: 0 }}>
                           <div>
                             <span style={{ color: '#6090a0' }}>Location: </span>
@@ -1186,8 +1191,8 @@ function EconomyAdmin() {
                         <div style={{ height: 24, marginBottom: 4, flexShrink: 0 }}>
                           {f.state === 'in-transit' && (
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
-                                <span style={{ color: '#6090a0' }}>In Transit</span>
-                                <span style={{ color: '#88cc44' }}>{timeInState.toFixed(0)}s</span>
+                              <span style={{ color: '#6090a0' }}>In Transit</span>
+                              <span style={{ color: '#88cc44' }}>{timeInState.toFixed(0)}s</span>
                             </div>
                           )}
                         </div>
@@ -1242,15 +1247,15 @@ function EconomyAdmin() {
                   <span style={{ color: getStateColor('idle') }}>●</span>
                   <span>Idle</span>
                   <span style={{ color: '#c3e7ff' }}>{fleets.filter(f => f.state === 'idle').length}</span>
-                  
+
                   <span style={{ color: getStateColor('loading') }}>●</span>
                   <span>Loading</span>
                   <span style={{ color: '#c3e7ff' }}>{fleets.filter(f => f.state === 'loading').length}</span>
-                  
+
                   <span style={{ color: getStateColor('in-transit') }}>●</span>
                   <span>In Transit</span>
                   <span style={{ color: '#c3e7ff' }}>{fleets.filter(f => f.state === 'in-transit').length}</span>
-                  
+
                   <span style={{ color: getStateColor('unloading') }}>●</span>
                   <span>Unloading</span>
                   <span style={{ color: '#c3e7ff' }}>{fleets.filter(f => f.state === 'unloading').length}</span>
@@ -1303,7 +1308,7 @@ function EconomyAdmin() {
                     <span style={{ fontSize: 16, fontWeight: 'bold', color: getOwnerColor(corp.race) }}>{corp.name}</span>
                     <span style={{ fontSize: 12, color: '#6090a0', textTransform: 'capitalize' }}>{corp.type}</span>
                   </div>
-                  
+
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 13 }}>
                     <div>
                       <div style={{ color: '#6090a0', marginBottom: 2 }}>Credits</div>

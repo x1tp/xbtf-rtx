@@ -1,8 +1,6 @@
 import {
     type Corporation,
-    type CorporationAIState,
     type PendingConstruction,
-    type SectorEvent,
     type NPCFleet,
 } from '../types/simulation'
 import type { Station } from '../store/gameStore'
@@ -45,7 +43,7 @@ export class CorporationAI {
         allStations: Station[],
         wares: Ware[],
         recipes: Recipe[],
-        events: SectorEvent[],
+        // events: SectorEvent[],
         fleets: NPCFleet[]
     ): TurnResult {
         const ai = corp.aiState

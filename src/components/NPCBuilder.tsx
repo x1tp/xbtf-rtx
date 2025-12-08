@@ -70,6 +70,7 @@ export const NPCBuilder: FC<NPCBuilderProps> = ({
     stuckTime: 0
   });
   const dockAnchorRef = useRef<Vector3 | null>(null);
+  const holdDockRef = useRef(false);
   const lastPositionReportTimeRef = useRef(0);
   const lastStoreUpdateTimeRef = useRef(0);
   const timeScale = useGameStore((s: GameState) => s.timeScale);

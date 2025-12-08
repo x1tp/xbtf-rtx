@@ -7,7 +7,6 @@ import {
   type NPCFleet,
   type ShipReport,
   type ShipCommand,
-  type SectorEvent, // Ensure this is imported
 } from '../types/simulation'
 import type { Station } from '../store/gameStore'
 import { CorporationAI } from './CorporationAI'
@@ -295,20 +294,29 @@ export class UniverseService {
     productionStep(this.state.stations, this.state.recipes, deltaSec)
 
     // AI Processing
+    // AI Processing
     this.state.corporations.forEach(corp => {
-      const newFleets = CorporationAI.processTurn(
+      const result = CorporationAI.processTurn(
         corp,
         this.state.stations,
         this.state.wares,
         this.state.recipes,
-        this.state.activeEvents as SectorEvent[],
+        // this.state.activeEvents as SectorEvent[], 
         this.state.fleets
       )
 
-      if (newFleets.length > 0) {
-        this.state.fleets.push(...newFleets)
+      if (result.newFleets.length > 0) {
+        this.state.fleets.push(...result.newFleets)
         // Also register with corp
-        corp.fleetIds.push(...newFleets.map(f => f.id))
+        corp.fleetIds.push(...result.newFleets.map(f => f.id))
+      }
+      if (result.newStations.length > 0) {
+        this.state.stations.push(...result.newStations)
+        corp.stationIds.push(...result.newStations.map(s => s.id))
+      }
+      if (result.removedFleetIds.length > 0) {
+        this.state.fleets = this.state.fleets.filter(f => !result.removedFleetIds.includes(f.id))
+        corp.fleetIds = corp.fleetIds.filter(id => !result.removedFleetIds.includes(id))
       }
     })
 

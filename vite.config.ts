@@ -2,18 +2,48 @@ import { defineConfig } from 'vite'
 import type { ViteDevServer } from 'vite'
 import type { IncomingMessage, ServerResponse } from 'http'
 import react from '@vitejs/plugin-react'
-import fs from 'node:fs'
-import path from 'node:path'
+// fs and path are already imported at the top
 
 type Ware = { id: string; name: string; category: 'primary' | 'food' | 'intermediate' | 'end'; basePrice: number; volume: number }
 type Recipe = { id: string; productId: string; inputs: { wareId: string; amount: number }[]; cycleTimeSec: number; batchSize: number; productStorageCap: number }
-type Station = { id: string; name: string; recipeId: string; sectorId: string; inventory: Record<string, number>; reorderLevel: Record<string, number>; reserveLevel: Record<string, number>; productionProgress?: number }
+type Station = {
+  id: string; name: string; recipeId: string; sectorId: string;
+  inventory: Record<string, number>; reorderLevel: Record<string, number>; reserveLevel: Record<string, number>;
+  productionProgress?: number; position?: [number, number, number]; modelPath?: string; ownerId?: string
+}
+
+type PendingConstruction = {
+  id: string
+  stationType: string
+  targetSectorId: string
+  status: 'planning' | 'in-transit' | 'building'
+  builderShipId?: string
+  createdAt: number
+}
+
+type CorporationAIState = {
+  lastExpansionCheck: number
+  currentGoal: 'expand' | 'consolidate' | 'war'
+  pendingConstructions: PendingConstruction[]
+}
 
 // Fleet and Corporation types (mirroring simulation.ts but inline for vite backend)
-type FleetState = 'idle' | 'loading' | 'in-transit' | 'unloading' | 'docking' | 'undocking'
+type FleetState = 'idle' | 'loading' | 'in-transit' | 'unloading' | 'docking' | 'undocking' | 'building'
 type OwnershipType = 'corporation' | 'guild' | 'family' | 'state' | 'independent' | 'player'
 type FleetBehavior = 'station-supply' | 'station-distribute' | 'corp-logistics' | 'guild-assigned' | 'freelance' | 'player-manual' | 'player-auto' | 'patrol' | 'construction'
 type RaceType = 'argon' | 'boron' | 'paranid' | 'split' | 'teladi' | 'pirate' | 'xenon'
+
+// AI Constants
+const STATION_BLUEPRINTS: Record<string, { id: string; name: string; cost: number; modelPath: string }> = {
+  'spp_cycle': { id: 'teladi_spp', name: 'Teladi Solar Power Plant', cost: 846104, modelPath: '/models/00285.obj' },
+  'mine_ore': { id: 'ore_mine', name: 'Ore Mine', cost: 588256, modelPath: '/models/00114.obj' },
+  'mine_silicon': { id: 'silicon_mine', name: 'Silicon Mine', cost: 1118256, modelPath: '/models/00114.obj' },
+  'flower_farm': { id: 'teladi_flower_farm', name: 'Flower Farm', cost: 461104, modelPath: '/models/00282.obj' },
+  'oil_refinery': { id: 'teladi_oil_refinery', name: 'Sun Oil Refinery', cost: 1661104, modelPath: '/models/00283.obj' },
+  'teladianium_foundry': { id: 'teladianium_foundry', name: 'Teladianium Foundry', cost: 661104, modelPath: '/models/00283.obj' },
+  'ire_forge': { id: 'ire_forge', name: 'Beta I.R.E. Forge', cost: 2861104, modelPath: '/models/00430.obj' },
+  'spaceweed_cycle': { id: 'dream_farm', name: 'Dream Farm', cost: 1200000, modelPath: '/models/00282.obj' }
+}
 
 // Ship command types for autonomous ships
 type ShipCommandType = 'goto-station' | 'dock' | 'load-cargo' | 'unload-cargo' | 'undock' | 'goto-gate' | 'use-gate' | 'patrol' | 'wait' | 'trade-buy' | 'trade-sell'
@@ -53,6 +83,7 @@ type Corporation = {
   credits: number; netWorth: number
   aggressiveness: number; expansionBudget: number; riskTolerance: number
   lifetimeProfit: number; lifetimeTrades: number
+  aiState?: CorporationAIState
 }
 
 type TradeLogEntry = {
@@ -71,7 +102,7 @@ type UniverseState = {
 
 function createUniverse() {
   const state: UniverseState = { wares: [], recipes: [], stations: [], sectorPrices: {}, timeScale: 1, acc: 0, elapsedTimeSec: 0, corporations: [], fleets: [], tradeLog: [], lastTickTime: Date.now() }
-  
+
   // Fleet constants
   const FLEET_CONSTANTS = {
     BASE_JUMP_TIME: 120,    // seconds between sectors
@@ -80,7 +111,7 @@ function createUniverse() {
     MIN_PROFIT_MARGIN: 50,
     IDLE_RETHINK_TIME: 30,
   }
-  
+
   // Sector adjacency for routing (simple for now - all Teladi sectors connected in line)
   const SECTOR_GRAPH: Record<string, string[]> = {
     'seizewell': ['teladi_gain'],
@@ -91,10 +122,10 @@ function createUniverse() {
     'ceo_s_sprite': ['blue_profit', 'company_pride'],
     'company_pride': ['ceo_s_sprite'],
   }
-  
+
   // Helper: Generate unique ID
   const genId = () => Math.random().toString(36).substr(2, 9)
-  
+
   // Helper: Random position in sector (scaled to match sector layout spacing of 30)
   // Station positions are typically [-200, 200] * 30 = [-6000, 6000]
   const randomPos = (): [number, number, number] => [
@@ -102,13 +133,75 @@ function createUniverse() {
     (Math.random() - 0.5) * 600,   // Y: -300 to +300
     (Math.random() - 0.5) * 8000   // Z: -4000 to +4000
   ]
-  
+
   // Helper: Get ware name
   const getWareName = (wareId: string) => state.wares.find(w => w.id === wareId)?.name || wareId
-  
+
   // Helper: Get station by ID
   const getStation = (stationId: string) => state.stations.find(s => s.id === stationId)
-  const init = () => {
+  // Helper: Try to load the latest autosave
+  const tryLoadLatestSave = (): UniverseState | null => {
+    try {
+      const saveDir = path.resolve(process.cwd(), 'saves')
+      if (!fs.existsSync(saveDir)) return null
+
+      const files = fs.readdirSync(saveDir).filter(f => f.startsWith('autosave_') && f.endsWith('.json'))
+      if (files.length === 0) return null
+
+      // Find latest by mtime
+      const latestFile = files.map(f => {
+        const fullPath = path.join(saveDir, f)
+        return { file: f, mtime: fs.statSync(fullPath).mtime.getTime() }
+      }).sort((a, b) => b.mtime - a.mtime)[0]
+
+      if (!latestFile) return null
+
+      console.log(`[Universe] Loading state from ${latestFile.file}...`)
+      const content = fs.readFileSync(path.join(saveDir, latestFile.file), 'utf-8')
+      const data = JSON.parse(content)
+      return data as UniverseState
+    } catch (e) {
+      console.error('[Universe] Failed to load save:', e)
+      return null
+    }
+  }
+
+  const init = (options?: { fresh?: boolean }) => {
+    // Try loading save first (unless fresh start requested)
+    if (!options?.fresh) {
+      const loadedState = tryLoadLatestSave()
+      if (loadedState) {
+        state.wares = loadedState.wares
+        state.recipes = loadedState.recipes
+        state.stations = loadedState.stations
+        state.sectorPrices = loadedState.sectorPrices
+        state.timeScale = 1 // Reset time scale on load
+        state.elapsedTimeSec = loadedState.elapsedTimeSec
+        state.corporations = loadedState.corporations
+        state.fleets = loadedState.fleets
+        state.tradeLog = loadedState.tradeLog || []
+        console.log(`[Universe] State restored! ${state.stations.length} stations, ${state.fleets.length} fleets.`)
+        return
+      }
+    } else {
+      // Archive existing saves
+      try {
+        const saveDir = path.resolve(process.cwd(), 'saves')
+        if (fs.existsSync(saveDir)) {
+          const files = fs.readdirSync(saveDir).filter(f => f.startsWith('autosave_') && f.endsWith('.json'))
+          files.forEach(f => {
+            const oldPath = path.join(saveDir, f)
+            const newPath = path.join(saveDir, f + '.bak')
+            fs.renameSync(oldPath, newPath)
+            console.log(`[Universe] Archived save ${f} to ${f}.bak`)
+          })
+        }
+      } catch (e) {
+        console.error('[Universe] Failed to archive saves:', e)
+      }
+    }
+
+    console.log('[Universe] No save found, initializing fresh start...')
     // Wares based on actual Teladi sector stations
     const wares: Ware[] = [
       { id: 'energy_cells', name: 'Energy Cells', category: 'primary', basePrice: 16, volume: 1 },
@@ -153,16 +246,16 @@ function createUniverse() {
       { id: 'sz_flower_g', name: 'Flower Farm (gamma)', recipeId: 'flower_farm', sectorId: 'seizewell', inventory: { sunrise_flowers: 120, energy_cells: 70 }, reorderLevel: { energy_cells: 60 }, reserveLevel: { sunrise_flowers: 150 } },
       { id: 'sz_flower_d', name: 'Flower Farm (delta)', recipeId: 'flower_farm', sectorId: 'seizewell', inventory: { sunrise_flowers: 80, energy_cells: 90 }, reorderLevel: { energy_cells: 60 }, reserveLevel: { sunrise_flowers: 150 } },
       { id: 'sz_ire', name: 'Beta I.R.E. Laser Forge (alpha)', recipeId: 'ire_forge', sectorId: 'seizewell', inventory: { ire_laser: 2, teladianium: 10, energy_cells: 200 }, reorderLevel: { teladianium: 8, energy_cells: 100 }, reserveLevel: { ire_laser: 5 } },
-      
+
       // === TELADI GAIN ===
       { id: 'tg_bliss', name: 'Bliss Place (M)', recipeId: 'bliss_place', sectorId: 'teladi_gain', inventory: { space_weed: 30, sunrise_flowers: 60, energy_cells: 120 }, reorderLevel: { sunrise_flowers: 40, energy_cells: 80 }, reserveLevel: { space_weed: 60 } },
       { id: 'tg_oil', name: 'Sun Oil Refinery (M)', recipeId: 'sun_oil_refinery', sectorId: 'teladi_gain', inventory: { sun_oil: 40, sunrise_flowers: 30, energy_cells: 80 }, reorderLevel: { sunrise_flowers: 20, energy_cells: 50 }, reserveLevel: { sun_oil: 80 } },
       { id: 'tg_flower', name: 'Flower Farm (M)', recipeId: 'flower_farm', sectorId: 'teladi_gain', inventory: { sunrise_flowers: 150, energy_cells: 100 }, reorderLevel: { energy_cells: 60 }, reserveLevel: { sunrise_flowers: 200 } },
-      
+
       // === PROFIT SHARE ===
       { id: 'ps_spp', name: 'Solar Power Plant (M)', recipeId: 'spp_teladi', sectorId: 'profit_share', inventory: { energy_cells: 600, crystals: 25 }, reorderLevel: { crystals: 12 }, reserveLevel: { energy_cells: 250 } },
       { id: 'ps_foundry', name: 'Teladianium Foundry (L)', recipeId: 'teladianium_foundry', sectorId: 'profit_share', inventory: { teladianium: 40, ore: 50, energy_cells: 150 }, reorderLevel: { ore: 30, energy_cells: 100 }, reserveLevel: { teladianium: 60 } },
-      
+
       // === GREATER PROFIT ===
       { id: 'gp_dream', name: 'Dream Farm (M)', recipeId: 'dream_farm', sectorId: 'greater_profit', inventory: { space_fuel: 20, space_weed: 30, energy_cells: 100 }, reorderLevel: { space_weed: 20, energy_cells: 60 }, reserveLevel: { space_fuel: 40 } },
       { id: 'gp_bliss', name: 'Bliss Place (L)', recipeId: 'bliss_place', sectorId: 'greater_profit', inventory: { space_weed: 50, sunrise_flowers: 80, energy_cells: 150 }, reorderLevel: { sunrise_flowers: 50, energy_cells: 100 }, reserveLevel: { space_weed: 80 } },
@@ -175,7 +268,7 @@ function createUniverse() {
     state.recipes = recipes
     state.stations = stations
     state.sectorPrices = {}
-    
+
     // Initialize corporations
     const corporations: Corporation[] = [
       { id: 'teladi_company', name: 'Teladi Company', race: 'teladi', type: 'state', stationIds: ['ps_foundry'], fleetIds: [], credits: 5_000_000, netWorth: 50_000_000, aggressiveness: 0.4, expansionBudget: 500_000, riskTolerance: 0.3, lifetimeProfit: 0, lifetimeTrades: 0 },
@@ -185,7 +278,7 @@ function createUniverse() {
       { id: 'crimson_commerce', name: 'Crimson Commerce Guild', race: 'teladi', type: 'guild', stationIds: ['sz_ire'], fleetIds: [], credits: 1_200_000, netWorth: 6_000_000, aggressiveness: 0.7, expansionBudget: 200_000, riskTolerance: 0.6, lifetimeProfit: 0, lifetimeTrades: 0 },
       { id: 'profit_guild', name: 'Profit Guild', race: 'teladi', type: 'guild', stationIds: ['tg_bliss', 'gp_dream', 'gp_bliss'], fleetIds: [], credits: 600_000, netWorth: 3_000_000, aggressiveness: 0.65, expansionBudget: 80_000, riskTolerance: 0.55, lifetimeProfit: 0, lifetimeTrades: 0 },
     ]
-    
+
     // Initial fleet spawn configs
     const fleetConfigs = [
       { ownerId: 'teladi_company', ownerType: 'state' as OwnershipType, behavior: 'corp-logistics' as FleetBehavior, shipType: 'Vulture', capacity: 2800, speed: 1.0, autonomy: 0.3, profitShare: 0.1, homeSectorId: 'seizewell' },
@@ -202,7 +295,7 @@ function createUniverse() {
       { ownerId: null, ownerType: 'independent' as OwnershipType, behavior: 'freelance' as FleetBehavior, shipType: 'Vulture', capacity: 2800, speed: 1.05, autonomy: 1.0, profitShare: 1.0, homeSectorId: 'seizewell' },
       { ownerId: null, ownerType: 'independent' as OwnershipType, behavior: 'freelance' as FleetBehavior, shipType: 'Vulture', capacity: 2800, speed: 0.95, autonomy: 1.0, profitShare: 1.0, homeSectorId: 'profit_share' },
       { ownerId: null, ownerType: 'independent' as OwnershipType, behavior: 'freelance' as FleetBehavior, shipType: 'Vulture', capacity: 2800, speed: 1.0, autonomy: 1.0, profitShare: 1.0, homeSectorId: 'teladi_gain' },
-      
+
       // === Military / Special Ships ===
       // Seizewell: Teladi Destroyer Phoenix (M2)
       { ownerId: 'teladi_company', ownerType: 'state' as OwnershipType, behavior: 'patrol' as FleetBehavior, shipType: 'Phoenix', capacity: 5000, speed: 0.6, autonomy: 0.9, profitShare: 0, homeSectorId: 'seizewell' },
@@ -211,14 +304,14 @@ function createUniverse() {
       // Teladi Gain: Osprey (M6)
       { ownerId: 'teladi_company', ownerType: 'state' as OwnershipType, behavior: 'patrol' as FleetBehavior, shipType: 'Osprey', capacity: 1500, speed: 0.8, autonomy: 0.9, profitShare: 0, homeSectorId: 'teladi_gain' },
     ]
-    
+
     // Spawn fleets
     const fleets: NPCFleet[] = fleetConfigs.map((cfg, i) => {
       let modelPath = '/models/00007.obj' // Default Vulture
       if (cfg.shipType === 'Phoenix') modelPath = '/models/00140.obj'
       else if (cfg.shipType === 'Albatross') modelPath = '/models/00187.obj'
       else if (cfg.shipType === 'Osprey') modelPath = '/models/00141.obj'
-      
+
       const fleet: NPCFleet = {
         id: `fleet_${genId()}`,
         name: `${cfg.shipType} ${cfg.ownerId ? corporations.find(c => c.id === cfg.ownerId)?.name?.split(' ')[0] || '' : 'Independent'}-${i + 1}`,
@@ -251,7 +344,7 @@ function createUniverse() {
       }
       return fleet
     })
-    
+
     state.corporations = corporations
     state.fleets = fleets
     state.tradeLog = []
@@ -259,6 +352,157 @@ function createUniverse() {
     state.elapsedTimeSec = 0
     state.lastTickTime = Date.now()
   }
+
+  // ============ Corporation AI Logic ============
+  const runCorporationAI = () => {
+    const now = Date.now()
+
+    state.corporations.forEach(corp => {
+      // Initialize AI state if missing
+      if (!corp.aiState) {
+        corp.aiState = { lastExpansionCheck: now, currentGoal: 'expand', pendingConstructions: [] }
+      }
+      const ai = corp.aiState
+
+      // Manage Pending Constructions
+      for (let i = ai.pendingConstructions.length - 1; i >= 0; i--) {
+        const job = ai.pendingConstructions[i]
+
+        if (job.status === 'planning') {
+          // Hire TL
+          const tlId = `tl_${corp.id}_${genId()}`
+          const spawnSector = 'seizewell' // Default shipyard
+
+          const tl: NPCFleet = {
+            id: tlId,
+            name: `${corp.name} Supply Mammoth ${genId().substring(0, 4)}`,
+            shipType: 'Albatross',
+            modelPath: '/models/00187.obj',
+            race: corp.race,
+            capacity: 50000,
+            speed: 0.5,
+            homeSectorId: spawnSector,
+            ownerId: corp.id,
+            ownerType: corp.type,
+            behavior: 'construction',
+            autonomy: 0,
+            profitShare: 0,
+            currentSectorId: spawnSector,
+            position: [0, 0, 0],
+            state: 'idle',
+            stateStartTime: now,
+            cargo: {},
+            credits: 0,
+            commandQueue: [],
+            totalProfit: 0,
+            tripsCompleted: 0
+          }
+          state.fleets.push(tl)
+          corp.fleetIds.push(tl.id)
+
+          job.builderShipId = tl.id
+          job.status = 'in-transit'
+          console.log(`[CorpAI] ${corp.name} hired TL ${tl.name} for ${job.stationType}`)
+        }
+        else if (job.status === 'in-transit') {
+          // Check if TL is there
+          const tl = state.fleets.find(f => f.id === job.builderShipId)
+          if (!tl) {
+            console.warn(`[CorpAI] Builder ship ${job.builderShipId} not found for job ${job.id}. Resetting to PLANNING.`)
+            job.status = 'planning' // Retry
+            continue
+          }
+
+
+          if (tl.currentSectorId === job.targetSectorId) {
+            console.log(`[CorpAI] TL ${tl.name} arrived at target ${job.targetSectorId}. Starting construction.`)
+            job.status = 'building'
+            // Stop the ship
+            tl.commandQueue = []
+            tl.state = 'idle'
+          } else {
+            // Debug why it's not matching
+            if (Math.random() < 0.05) console.log(`[CorpAI] TL ${tl.name} at ${tl.currentSectorId}, target ${job.targetSectorId}`)
+            // Move it
+            // If it's idle, give it a move command
+            if (tl.commandQueue.length === 0 && tl.state === 'idle') {
+              issueCommand(tl.id, { type: 'goto-gate', targetSectorId: job.targetSectorId })
+              issueCommand(tl.id, { type: 'use-gate', targetSectorId: job.targetSectorId })
+              tl.state = 'in-transit'
+            }
+          }
+        }
+        else if (job.status === 'building') {
+          // DEPLOY
+          const blueprint = STATION_BLUEPRINTS[job.stationType]
+          if (blueprint) {
+            const station: Station = {
+              id: `station_${corp.id}_${genId()}`,
+              name: blueprint.name,
+              recipeId: job.stationType === 'spp_cycle' ? 'spp_teladi' : job.stationType, // Map to recipe
+              sectorId: job.targetSectorId,
+              position: randomPos(),
+              modelPath: blueprint.modelPath,
+              ownerId: corp.id,
+              inventory: {},
+              reorderLevel: {},
+              reserveLevel: {}
+            }
+            // Seed
+            const recipe = state.recipes.find(r => r.id === station.recipeId)
+            if (recipe) {
+              station.inventory[recipe.productId] = recipe.batchSize
+              recipe.inputs.forEach(inp => station.inventory[inp.wareId] = inp.amount * 5)
+            }
+
+            state.stations.push(station)
+            corp.stationIds.push(station.id)
+
+            console.log(`[CorpAI] ${corp.name} DEPLOYED ${blueprint.name} in ${job.targetSectorId}`)
+
+            // Remove TL
+            state.fleets = state.fleets.filter(f => f.id !== job.builderShipId)
+            corp.fleetIds = corp.fleetIds.filter(f => f !== job.builderShipId)
+
+            // Done
+            ai.pendingConstructions.splice(i, 1)
+          }
+        }
+      }
+
+      // Strategy: Expand (Every 60s)
+      if (now - ai.lastExpansionCheck > 60000) {
+        ai.lastExpansionCheck = now
+
+        // Limit concurrent constructions to 1 per corp to prevent swarms
+        if (ai.pendingConstructions.length > 0) return
+
+        // Market Analysis (Simplified)
+        if (corp.credits > 2000000) { // Min budget
+          // For now, expand randomly to test mechanism
+          const typeKeys = Object.keys(STATION_BLUEPRINTS)
+          const type = typeKeys[Math.floor(Math.random() * typeKeys.length)]
+          const blueprint = STATION_BLUEPRINTS[type]
+
+          if (blueprint && corp.credits >= blueprint.cost) {
+            const sectorKeys = Object.keys(SECTOR_GRAPH)
+            const targetSector = sectorKeys[Math.floor(Math.random() * sectorKeys.length)]
+
+            corp.credits -= blueprint.cost
+            ai.pendingConstructions.push({
+              id: genId(),
+              stationType: type,
+              targetSectorId: targetSector,
+              status: 'planning',
+              createdAt: now
+            })
+            console.log(`[CorpAI] ${corp.name} ordered NEW ${blueprint.name} in ${targetSector}`)
+          }
+        }
+      }
+    })
+  }
+
   const tick = (deltaSec: number) => {
     const tickLen = 10
     if (deltaSec < tickLen) return
@@ -267,11 +511,11 @@ function createUniverse() {
     for (const st of nextStations) {
       const r = recipeById.get(st.recipeId)
       if (!r) continue
-      
+
       const canRun = r.inputs.every((x) => (st.inventory[x.wareId] || 0) >= x.amount)
-      
+
       if (typeof st.productionProgress !== 'number') st.productionProgress = 0
-      
+
       if (canRun) {
         st.productionProgress += deltaSec / r.cycleTimeSec
         if (st.productionProgress >= 1.0) {
@@ -302,27 +546,30 @@ function createUniverse() {
     }
     state.stations = nextStations
     state.sectorPrices = sectorPrices
-    
+
+    // Run AI
+    runCorporationAI()
+
     // ============ Fleet Tick Logic ============
     const now = Date.now()
-    
+
     // Helper: Find best trade route for a fleet
     const findBestTradeRoute = (fleet: NPCFleet): TradeOrder | null => {
       const routes: { buyStation: Station; sellStation: Station; wareId: string; profit: number; qty: number }[] = []
-      
+
       // For station-supply behavior: find wares the home station needs
       if ((fleet.behavior === 'station-supply' || fleet.behavior === 'station-distribute') && fleet.homeStationId) {
         const homeSt = getStation(fleet.homeStationId)
         if (!homeSt) return null
         const recipe = recipeById.get(homeSt.recipeId)
         if (!recipe) return null
-        
+
         if (fleet.behavior === 'station-supply') {
           // Find stations selling inputs that home station needs
           for (const input of recipe.inputs) {
             const need = (homeSt.reorderLevel[input.wareId] || 0) - (homeSt.inventory[input.wareId] || 0)
             if (need <= 0) continue
-            
+
             // Find selling stations
             for (const seller of state.stations) {
               if (seller.id === homeSt.id) continue
@@ -330,7 +577,7 @@ function createUniverse() {
               if (!sellerRecipe || sellerRecipe.productId !== input.wareId) continue
               const available = (seller.inventory[input.wareId] || 0) - (seller.reserveLevel[input.wareId] || 0)
               if (available <= 0) continue
-              
+
               const qty = Math.min(available, need, fleet.capacity)
               const buyPrice = (state.sectorPrices[seller.sectorId]?.[input.wareId] || state.wares.find(w => w.id === input.wareId)?.basePrice || 100)
               const sellPrice = buyPrice * 1.1 // Internal transfer markup
@@ -354,7 +601,7 @@ function createUniverse() {
               if (!needsProduct) continue
               const buyerNeed = (buyer.reorderLevel[productId] || 0) - (buyer.inventory[productId] || 0)
               if (buyerNeed <= 0) continue
-              
+
               const qty = Math.min(available, buyerNeed, fleet.capacity)
               const sellPrice = (state.sectorPrices[buyer.sectorId]?.[productId] || state.wares.find(w => w.id === productId)?.basePrice || 100)
               const buyPrice = sellPrice * 0.9
@@ -375,7 +622,7 @@ function createUniverse() {
             const available = (st.inventory[ware.id] || 0) - (st.reserveLevel[ware.id] || 0)
             return available > 0
           })
-          
+
           // Find buyers (consumers needing this ware)
           const buyers = state.stations.filter(st => {
             const r = recipeById.get(st.recipeId)
@@ -385,7 +632,7 @@ function createUniverse() {
             const need = (st.reorderLevel[ware.id] || 0) - (st.inventory[ware.id] || 0)
             return need > 0
           })
-          
+
           for (const seller of sellers) {
             for (const buyer of buyers) {
               if (seller.id === buyer.id) continue
@@ -393,7 +640,7 @@ function createUniverse() {
               const need = (buyer.reorderLevel[ware.id] || 0) - (buyer.inventory[ware.id] || 0)
               const qty = Math.min(available, need, fleet.capacity)
               if (qty <= 0) continue
-              
+
               const buyPrice = state.sectorPrices[seller.sectorId]?.[ware.id] || ware.basePrice
               const sellPrice = state.sectorPrices[buyer.sectorId]?.[ware.id] || ware.basePrice
               const profit = (sellPrice - buyPrice) * qty
@@ -404,13 +651,13 @@ function createUniverse() {
           }
         }
       }
-      
+
       if (routes.length === 0) return null
-      
+
       // Pick best route (highest profit, with some randomness for variety)
       routes.sort((a, b) => b.profit - a.profit)
       const pick = routes[Math.floor(Math.random() * Math.min(3, routes.length))]
-      
+
       return {
         id: genId(),
         buyStationId: pick.buyStation.id,
@@ -431,16 +678,68 @@ function createUniverse() {
         createdAt: now,
       }
     }
-    
+
     // Process each fleet
     for (const fleet of state.fleets) {
       // Autonomous mode: if fleet has commands queued, let frontend handle it
       // Backend only issues new commands when queue is empty
       const hasQueuedCommands = fleet.commandQueue.length > 0
-      
+
       if (!hasQueuedCommands && !fleet.currentOrder) {
         // Fleet is idle and needs work
-        
+
+        // Check if fleet has cargo (stuck?)
+        const cargoKeys = Object.keys(fleet.cargo)
+        if (cargoKeys.length > 0 && cargoKeys.some(k => fleet.cargo[k] > 0)) {
+          // Fleet has cargo but no order. Sell it!
+          const wareId = cargoKeys.find(k => fleet.cargo[k] > 0)
+          if (wareId) {
+            // Find buyer
+            const buyers = state.stations.filter(st => {
+              const r = recipeById.get(st.recipeId)
+              if (!r) return false
+              const needsWare = r.inputs.some(i => i.wareId === wareId)
+              if (!needsWare) return false
+              const need = (st.reorderLevel[wareId] || 0) - (st.inventory[wareId] || 0)
+              return need > 0
+            })
+
+            // Sort by price
+            buyers.sort((a, b) => {
+              const priceA = state.sectorPrices[a.sectorId]?.[wareId] || 0
+              const priceB = state.sectorPrices[b.sectorId]?.[wareId] || 0
+              return priceB - priceA
+            })
+
+            // Default to best price
+            let bestBuyer = buyers[0]
+
+            // Try to find a buyer that is NOT the current station to avoid loops
+            if (fleet.targetStationId) {
+              const alt = buyers.find(b => b.id !== fleet.targetStationId)
+              if (alt) bestBuyer = alt
+            }
+
+            // Only rescue if we have significant cargo (ignoring trace amounts < 10)
+            if (bestBuyer && (fleet.cargo[wareId] || 0) > 10) {
+              console.log(`[Universe] Rescuing stuck fleet ${fleet.name} with ${fleet.cargo[wareId]} ${wareId}. Sending to ${bestBuyer.name}`)
+              issueCommand(fleet.id, {
+                type: 'trade-sell',
+                targetStationId: bestBuyer.id,
+                targetSectorId: bestBuyer.sectorId,
+                wareId: wareId,
+                amount: fleet.cargo[wareId]
+              })
+              fleet.state = 'in-transit'
+              fleet.stateStartTime = now
+              continue
+            } else if ((fleet.cargo[wareId] || 0) <= 10) {
+              // Clear trace amounts
+              delete fleet.cargo[wareId]
+            }
+          }
+        }
+
         if (fleet.behavior === 'patrol') {
           // Patrol logic: Fly to random station in current sector
           const sectorStations = state.stations.filter(s => s.sectorId === fleet.currentSectorId)
@@ -471,8 +770,8 @@ function createUniverse() {
             const randomStation = sectorStations[Math.floor(Math.random() * sectorStations.length)]
             // Don't just fly to the same station we are at
             if (randomStation.id !== fleet.targetStationId) {
-              issueCommand(fleet.id, { 
-                type: 'goto-station', 
+              issueCommand(fleet.id, {
+                type: 'goto-station',
                 targetStationId: randomStation.id,
                 targetSectorId: fleet.currentSectorId
               })
@@ -484,17 +783,17 @@ function createUniverse() {
           // Construction logic: Mostly idle, occasionally move
           // For now, just stay put or move very rarely
           if (Math.random() < 0.05) {
-             const sectorStations = state.stations.filter(s => s.sectorId === fleet.currentSectorId)
-             if (sectorStations.length > 0) {
-                const randomStation = sectorStations[Math.floor(Math.random() * sectorStations.length)]
-                issueCommand(fleet.id, { 
-                  type: 'goto-station', 
-                  targetStationId: randomStation.id,
-                  targetSectorId: fleet.currentSectorId
-                })
-                fleet.state = 'in-transit'
-                fleet.stateStartTime = now
-             }
+            const sectorStations = state.stations.filter(s => s.sectorId === fleet.currentSectorId)
+            if (sectorStations.length > 0) {
+              const randomStation = sectorStations[Math.floor(Math.random() * sectorStations.length)]
+              issueCommand(fleet.id, {
+                type: 'goto-station',
+                targetStationId: randomStation.id,
+                targetSectorId: fleet.currentSectorId
+              })
+              fleet.state = 'in-transit'
+              fleet.stateStartTime = now
+            }
           }
         } else {
           // Trade logic
@@ -503,12 +802,20 @@ function createUniverse() {
             fleet.currentOrder = order
             // Issue high-level trade command
             // The frontend will handle navigation, docking, and loading
-            issueCommand(fleet.id, { 
-              type: 'trade-buy', 
+            issueCommand(fleet.id, {
+              type: 'trade-buy',
               targetStationId: order.buyStationId,
               targetSectorId: order.buySectorId,
-              wareId: order.buyWareId, 
-              amount: order.buyQty 
+              wareId: order.buyWareId,
+              amount: order.buyQty
+            })
+            // Queue Sell command immediately
+            issueCommand(fleet.id, {
+              type: 'trade-sell',
+              targetStationId: order.sellStationId,
+              targetSectorId: order.sellSectorId,
+              wareId: order.sellWareId,
+              amount: order.sellQty
             })
             fleet.state = 'in-transit' // Generic busy state
             fleet.stateStartTime = now
@@ -516,7 +823,7 @@ function createUniverse() {
         }
       }
     }
-    
+
     state.lastTickTime = now
   }
 
@@ -527,11 +834,11 @@ function createUniverse() {
       if (!fs.existsSync(saveDir)) {
         fs.mkdirSync(saveDir)
       }
-      
+
       const hour = Math.floor(state.elapsedTimeSec / 3600)
       const slot = (hour % 10) + 1
       const filename = path.join(saveDir, `autosave_${slot}.json`)
-      
+
       // We don't want to save the entire state if it contains massive logs or unnecessary data
       // but strictly speaking, we should save everything to restore it.
       // state.tradeLog is capped at 100 entries, so it's fine.
@@ -545,14 +852,14 @@ function createUniverse() {
 
   const advanceTime = (deltaSec: number) => {
     if (deltaSec <= 0) return
-    
+
     const lastHour = Math.floor(state.elapsedTimeSec / 3600)
-    
+
     state.acc += deltaSec
     state.elapsedTimeSec += deltaSec
-    
+
     const currentHour = Math.floor(state.elapsedTimeSec / 3600)
-    
+
     // Auto-save every in-game hour (3600 seconds)
     if (currentHour > lastHour && currentHour > 0) {
       saveGame()
@@ -568,7 +875,7 @@ function createUniverse() {
     advanceTime(delta)
   }
   const setTimeScale = (v: number) => { state.timeScale = v }
-  
+
   // Helper: Issue a command to a fleet
   const issueCommand = (fleetId: string, command: Omit<ShipCommand, 'id' | 'createdAt'>) => {
     const fleet = state.fleets.find(f => f.id === fleetId)
@@ -580,7 +887,7 @@ function createUniverse() {
     }
     fleet.commandQueue.push(cmd)
   }
-  
+
   // Handle ship reports from autonomous frontend ships
   const handleShipReport = (report: {
     fleetId: string
@@ -595,15 +902,15 @@ function createUniverse() {
   }) => {
     const fleet = state.fleets.find(f => f.id === report.fleetId)
     if (!fleet) return
-    
+
     // Update fleet position from frontend
     fleet.position = report.position
     fleet.currentSectorId = report.sectorId
-    
+
     if (report.type !== 'position-update') {
       console.log(`[Universe] Ship report: ${fleet.name} - ${report.type}`)
     }
-    
+
     // Handle specific report types
     switch (report.type) {
       case 'arrived-at-station':
@@ -619,6 +926,13 @@ function createUniverse() {
         fleet.state = 'undocking'
         break
 
+      case 'queue-complete':
+        console.log(`[Universe] Fleet ${fleet.name} finished queue. Resetting to IDLE.`)
+        fleet.commandQueue = []
+        fleet.currentOrder = undefined
+        fleet.state = 'idle'
+        break
+
       case 'arrived-at-gate':
         fleet.state = 'in-transit'
         break
@@ -628,35 +942,35 @@ function createUniverse() {
           fleet.currentSectorId = report.stationId
           fleet.destinationSectorId = undefined
           fleet.state = 'idle'
-          
+
           // Use the position provided in the report (calculated by frontend with correct scale)
           if (report.position) {
-             fleet.position = report.position
+            fleet.position = report.position
           } else {
             // Fallback: Calculate spawn position based on arrival gate
             // Standard gate positions in frontend are scaled by 30 (5000 * 30 = 150000)
             // N: [0,0,-150000], S: [0,0,150000], W: [-150000,0,0], E: [150000,0,0]
-            
+
             let spawnPos: [number, number, number] = [0, 0, 0]
             const offset = 2000 // Distance from gate center
             const GATE_DIST = 150000
-            
+
             if (report.gateType === 'N') {
-               // Arrive at South Gate
-               spawnPos = [0, 0, GATE_DIST - offset]
+              // Arrive at South Gate
+              spawnPos = [0, 0, GATE_DIST - offset]
             } else if (report.gateType === 'S') {
-               // Arrive at North Gate
-               spawnPos = [0, 0, -GATE_DIST + offset]
+              // Arrive at North Gate
+              spawnPos = [0, 0, -GATE_DIST + offset]
             } else if (report.gateType === 'W') {
-               // Arrive at East Gate
-               spawnPos = [GATE_DIST - offset, 0, 0]
+              // Arrive at East Gate
+              spawnPos = [GATE_DIST - offset, 0, 0]
             } else if (report.gateType === 'E') {
-               // Arrive at West Gate
-               spawnPos = [-GATE_DIST + offset, 0, 0]
+              // Arrive at West Gate
+              spawnPos = [-GATE_DIST + offset, 0, 0]
             } else {
-               spawnPos = randomPos()
+              spawnPos = randomPos()
             }
-            
+
             fleet.position = spawnPos
           }
         }
@@ -667,49 +981,55 @@ function createUniverse() {
         if (report.wareId && report.amount && report.stationId) {
           const station = state.stations.find(s => s.id === report.stationId)
           const order = fleet.currentOrder
-          
+
           if (station && order) {
             // Deduct from station, add to fleet
-            station.inventory[report.wareId] = (station.inventory[report.wareId] || 0) - report.amount
-            fleet.cargo[report.wareId] = (fleet.cargo[report.wareId] || 0) + report.amount
-            fleet.credits -= report.amount * order.buyPrice
-            
+            const available = station.inventory[report.wareId] || 0
+            const actualAmount = Math.min(report.amount, available)
+
+            station.inventory[report.wareId] = Math.max(0, available - actualAmount)
+            fleet.cargo[report.wareId] = (fleet.cargo[report.wareId] || 0) + actualAmount
+            fleet.credits -= actualAmount * order.buyPrice
+
             // Issue next command: Sell
             // Remove the buy command from queue (it should be done)
-            fleet.commandQueue = [] 
-            
-            issueCommand(fleet.id, { 
-              type: 'trade-sell', 
+            fleet.commandQueue = []
+
+            issueCommand(fleet.id, {
+              type: 'trade-sell',
               targetStationId: order.sellStationId,
               targetSectorId: order.sellSectorId,
-              wareId: order.sellWareId, 
-              amount: report.amount 
+              wareId: order.sellWareId,
+              amount: actualAmount
             })
             fleet.state = 'in-transit'
           }
         }
         break
-        
+
       case 'cargo-unloaded':
         // Transaction: Sell to station
         if (report.wareId && report.amount && report.stationId) {
           const station = state.stations.find(s => s.id === report.stationId)
           const order = fleet.currentOrder
-          
-          if (station && order) {
+
+          if (station) {
             // Add to station, remove from fleet
             station.inventory[report.wareId] = (station.inventory[report.wareId] || 0) + report.amount
             fleet.cargo[report.wareId] = Math.max(0, (fleet.cargo[report.wareId] || 0) - report.amount)
             if (fleet.cargo[report.wareId] === 0) delete fleet.cargo[report.wareId]
-            
-            const revenue = report.amount * order.sellPrice
-            const cost = report.amount * order.buyPrice
+
+            const sellPrice = order ? order.sellPrice : (state.sectorPrices[station.sectorId]?.[report.wareId] || 0)
+            const buyPrice = order ? order.buyPrice : 0 // We don't track buy price for lost orders/rescues
+
+            const revenue = report.amount * sellPrice
+            const cost = report.amount * buyPrice
             const profit = revenue - cost
-            
+
             fleet.credits += revenue
             fleet.totalProfit += profit
             fleet.tripsCompleted++
-            
+
             // Log trade
             state.tradeLog.unshift({
               id: genId(),
@@ -717,18 +1037,18 @@ function createUniverse() {
               fleetId: fleet.id,
               fleetName: fleet.name,
               wareId: report.wareId,
-              wareName: order.sellWareName,
+              wareName: order ? order.sellWareName : getWareName(report.wareId),
               quantity: report.amount,
-              buyPrice: order.buyPrice,
-              sellPrice: order.sellPrice,
+              buyPrice: buyPrice,
+              sellPrice: sellPrice,
               profit,
-              buySectorId: order.buySectorId,
-              sellSectorId: order.sellSectorId,
-              buyStationName: order.buyStationName,
-              sellStationName: order.sellStationName,
+              buySectorId: order ? order.buySectorId : 'unknown',
+              sellSectorId: order ? order.sellSectorId : station.sectorId,
+              buyStationName: order ? order.buyStationName : 'unknown',
+              sellStationName: order ? order.sellStationName : station.name,
             })
             if (state.tradeLog.length > 100) state.tradeLog.length = 100
-            
+
             // Profit share
             if (fleet.ownerId) {
               const corp = state.corporations.find(c => c.id === fleet.ownerId)
@@ -739,7 +1059,7 @@ function createUniverse() {
                 corp.lifetimeTrades++
               }
             }
-            
+
             // Order complete
             fleet.currentOrder = undefined
             fleet.commandQueue = []
@@ -747,11 +1067,11 @@ function createUniverse() {
           }
         }
         break
-        
+
         break
     }
   }
-  
+
   return { state, init, tick, loop, setTimeScale, handleShipReport, issueCommand, advanceTime }
 }
 
@@ -767,11 +1087,11 @@ function universePlugin() {
         const url = req.url || ''
         if (req.method === 'GET' && url.startsWith('/__universe/state')) {
           res.setHeader('content-type', 'application/json')
-          res.end(JSON.stringify({ 
-            wares: u.state.wares, 
-            recipes: u.state.recipes, 
-            stations: u.state.stations, 
-            sectorPrices: u.state.sectorPrices, 
+          res.end(JSON.stringify({
+            wares: u.state.wares,
+            recipes: u.state.recipes,
+            stations: u.state.stations,
+            sectorPrices: u.state.sectorPrices,
             timeScale: u.state.timeScale,
             fleets: u.state.fleets,
             corporations: u.state.corporations,
@@ -796,7 +1116,9 @@ function universePlugin() {
           return
         }
         if (req.method === 'POST' && url.startsWith('/__universe/init')) {
-          u.init()
+          const full = new URL(url, 'http://localhost')
+          const fresh = full.searchParams.get('fresh') === 'true'
+          u.init({ fresh })
           res.statusCode = 204
           res.end()
           return

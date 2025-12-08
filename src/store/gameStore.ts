@@ -86,6 +86,7 @@ export interface GameState {
   stations: Station[];
   sectorPrices: Record<string, Record<string, number>>;
   initEconomy: () => void;
+  resetEconomy: () => void;
   tickEconomy: (deltaSec: number) => void;
   syncEconomy: () => Promise<void>;
 
@@ -202,6 +203,12 @@ export const useGameStore = create<GameState>((set, get) => ({
   sectorPrices: {},
   initEconomy: () => {
     fetch('/__universe/init', { method: 'POST' }).then(() => {
+      const sync = useGameStore.getState().syncEconomy
+      return sync()
+    })
+  },
+  resetEconomy: () => {
+    fetch('/__universe/init?fresh=true', { method: 'POST' }).then(() => {
       const sync = useGameStore.getState().syncEconomy
       return sync()
     })

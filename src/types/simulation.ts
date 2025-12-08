@@ -95,6 +95,7 @@ export type ShipReportType =
   | 'arrived-at-gate'
   | 'entered-sector'
   | 'position-update'
+  | 'queue-complete'
 
 export interface ShipReport {
   fleetId: string

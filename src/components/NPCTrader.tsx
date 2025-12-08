@@ -106,9 +106,14 @@ export const NPCTrader: FC<NPCTraderProps> = ({
 
   // Auto-reset command index if the queue has been replaced by the backend
   useEffect(() => {
+    // If the backend has replaced the queue with a new one (e.g. queue cleared or new orders)
+    // and our index is out of bounds, reset.
+    // BUT DO NOT auto-loop if the queue is simply finished.
     const queue = fleet.commandQueue || [];
-    if (queue.length > 0 && currentCommandIndex >= queue.length) {
+    if (currentCommandIndex > 0 && queue.length === 0) {
+      // Queue cleared by backend
       setCurrentCommandIndex(0);
+      setLocalState('idle');
     }
   }, [fleet.commandQueue, currentCommandIndex]);
 
@@ -128,13 +133,13 @@ export const NPCTrader: FC<NPCTraderProps> = ({
       // Add slight offset based on ship id for variety
       const hash = fleet.id.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
       const angle = (hash % 360) * Math.PI / 180;
-      
+
       // Capital ships should park further away (they don't dock inside)
       const isCapital = ['Phoenix', 'Albatross', 'Condor', 'Titan', 'Colossus', 'Mammoth', 'Odysseus', 'Zeus', 'Hercules', 'Ray', 'Shark', 'Orca', 'Python', 'Raptor', 'Elephant'].includes(fleet.shipType);
-      
+
       const baseDist = isCapital ? 800 : 30;
       const varDist = isCapital ? 200 : 50;
-      
+
       const dist = baseDist + (hash % varDist);
       return new Vector3(
         pos[0] + Math.cos(angle) * dist,
@@ -148,13 +153,13 @@ export const NPCTrader: FC<NPCTraderProps> = ({
   // Get gate data for a destination sector
   const getGateData = useCallback((destSectorId: string): { pos: Vector3; radius: number; gateType?: string } | null => {
     let gate = gatePositions.find(g => g.destinationSectorId === destSectorId);
-    
+
     // If not found, try pathfinding
     if (!gate && destSectorId !== fleet.currentSectorId) {
-       const nextHop = findNextHop(fleet.currentSectorId, destSectorId);
-       if (nextHop) {
-         gate = gatePositions.find(g => g.destinationSectorId === nextHop);
-       }
+      const nextHop = findNextHop(fleet.currentSectorId, destSectorId);
+      if (nextHop) {
+        gate = gatePositions.find(g => g.destinationSectorId === nextHop);
+      }
     }
 
     if (gate) {
@@ -198,10 +203,11 @@ export const NPCTrader: FC<NPCTraderProps> = ({
     }));
   }, [fleet.id]);
 
-  const report = useCallback((type: ShipReportType, extra?: { stationId?: string; wareId?: string; amount?: number; sectorIdOverride?: string; gateType?: string }) => {
+  const report = useCallback((type: ShipReportType, extra?: { stationId?: string; wareId?: string; amount?: number; sectorIdOverride?: string; gateType?: string; position?: [number, number, number] }) => {
     const ship = shipRef.current;
     if (!ship || !onReport) return;
-    const pos: [number, number, number] = [ship.position.x, ship.position.y, ship.position.z];
+    const currentPos: [number, number, number] = [ship.position.x, ship.position.y, ship.position.z];
+    const pos = extra?.position || currentPos;
 
     // Allow repeated position updates; dedupe the rest
     if (type !== 'position-update') {
@@ -273,13 +279,29 @@ export const NPCTrader: FC<NPCTraderProps> = ({
   // Advance to next command
   // preserveDocked: if true, stay in 'docked' state instead of resetting to 'idle'
   const advanceCommand = useCallback((preserveDocked = false) => {
-    setCurrentCommandIndex(prev => prev + 1);
+    setCurrentCommandIndex(prev => {
+      const nextIndex = prev + 1;
+      const queue = fleet.commandQueue || [];
+
+      // Check if we are done with all commands
+      if (nextIndex >= queue.length) {
+        console.log(`[NPCTrader] ${fleet.name} queue complete`);
+        report('queue-complete');
+        if (!preserveDocked) {
+          setLocalState('idle');
+        }
+        return prev + 1; // Increment index so we know we are "past" the end
+      }
+
+      return nextIndex;
+    });
+
     actionTimerRef.current = 0;
     // Don't reset to idle if we should preserve docked state (for load/unload after dock)
     if (!preserveDocked) {
       setLocalState('idle');
     }
-  }, []);
+  }, [fleet.commandQueue, fleet.name, report]);
 
   // Teleport through gate and update store/report
   const enterGate = useCallback((targetSectorId: string, gatePos: Vector3, shouldAdvance = true, usedGateType?: string) => {
@@ -292,7 +314,7 @@ export const NPCTrader: FC<NPCTraderProps> = ({
         exitGateType = gatePos.z > 0 ? 'S' : 'N';
       }
     }
-    
+
     // Determine expected entry gate type in the new sector
     // E -> W, W -> E, N -> S, S -> N
     const entryGateTypeMap: Record<string, string> = { 'E': 'W', 'W': 'E', 'N': 'S', 'S': 'N' };
@@ -302,27 +324,27 @@ export const NPCTrader: FC<NPCTraderProps> = ({
     const targetLayout = getSectorLayoutById(targetSectorId);
     // Find matching gate (fallback to first gate if not found)
     const matchingGate = targetLayout.gates.find(g => g.gateType === expectedEntryGateType) || targetLayout.gates[0];
-    
+
     let destPos: [number, number, number] = [0, 0, 0];
     if (matchingGate) {
-        const scale = 30; // Scene scaling factor
-        const gx = matchingGate.position[0] * scale;
-              const gy = matchingGate.position[1] * scale;
-              const gz = matchingGate.position[2] * scale;
-              
-              const offset = 2000;
-              let offX = 0, offZ = 0;
-              
-              if (expectedEntryGateType === 'W') offX = offset;
-              else if (expectedEntryGateType === 'E') offX = -offset;
-              else if (expectedEntryGateType === 'N') offZ = offset;
-              else if (expectedEntryGateType === 'S') offZ = -offset;
-              
-              destPos = [gx + offX, gy, gz + offZ];
+      const scale = 30; // Scene scaling factor
+      const gx = matchingGate.position[0] * scale;
+      const gy = matchingGate.position[1] * scale;
+      const gz = matchingGate.position[2] * scale;
+
+      const offset = 2000;
+      let offX = 0, offZ = 0;
+
+      if (expectedEntryGateType === 'W') offX = offset;
+      else if (expectedEntryGateType === 'E') offX = -offset;
+      else if (expectedEntryGateType === 'N') offZ = offset;
+      else if (expectedEntryGateType === 'S') offZ = -offset;
+
+      destPos = [gx + offX, gy, gz + offZ];
     }
 
     report('entered-sector', { stationId: targetSectorId, sectorIdOverride: targetSectorId, gateType: exitGateType, position: destPos });
-    
+
     useGameStore.setState((state: GameState) => ({
       fleets: state.fleets.map((f) => f.id === fleet.id ? {
         ...f,
@@ -345,15 +367,15 @@ export const NPCTrader: FC<NPCTraderProps> = ({
   const prevSectorIdRef = useRef(fleet.currentSectorId);
   useEffect(() => {
     if (fleet.currentSectorId !== prevSectorIdRef.current) {
-       prevSectorIdRef.current = fleet.currentSectorId;
-       initializedRef.current = false;
-       // Only reset to idle if we were gone (in transit)
-       if (localState === 'gone') {
-         setLocalState('idle');
-       }
-       // Reset docking state to prevent teleportation to previous dock location
-       holdDockRef.current = false;
-       dockAnchorRef.current = null;
+      prevSectorIdRef.current = fleet.currentSectorId;
+      initializedRef.current = false;
+      // Only reset to idle if we were gone (in transit)
+      if (localState === 'gone') {
+        setLocalState('idle');
+      }
+      // Reset docking state to prevent teleportation to previous dock location
+      holdDockRef.current = false;
+      dockAnchorRef.current = null;
     }
   }, [fleet.currentSectorId, localState]);
 
@@ -395,15 +417,15 @@ export const NPCTrader: FC<NPCTraderProps> = ({
         } else if (localState === 'docked') {
           // If we are docked, check if it's the right station
           if (currentCommand.targetStationId && fleet.targetStationId === currentCommand.targetStationId) {
-             // We are at the right station, start operation
-             const nextState = currentCommand.type === 'trade-buy' ? 'loading' : 'unloading';
-             setLocalState(nextState);
-             syncFleet({ state: nextState, stateStartTime: Date.now() });
-             actionTimerRef.current = 0;
+            // We are at the right station, start operation
+            const nextState = currentCommand.type === 'trade-buy' ? 'loading' : 'unloading';
+            setLocalState(nextState);
+            syncFleet({ state: nextState, stateStartTime: Date.now() });
+            actionTimerRef.current = 0;
           } else {
-             // Wrong station, undock
-             setLocalState('undocking');
-             syncFleet({ state: 'undocking', stateStartTime: Date.now() });
+            // Wrong station, undock
+            setLocalState('undocking');
+            syncFleet({ state: 'undocking', stateStartTime: Date.now() });
           }
         }
         break;
@@ -413,25 +435,25 @@ export const NPCTrader: FC<NPCTraderProps> = ({
           // Check if station is in current sector or need gate travel
           const targetSector = currentCommand.targetSectorId;
           const needsTravel = targetSector && targetSector !== fleet.currentSectorId;
-          
+
           if (needsTravel) {
-             setLocalState('flying-to-gate');
-             syncFleet({ state: 'in-transit', destinationSectorId: targetSector, stateStartTime: Date.now() });
-             const gateData = getGateData(targetSector);
-             buildPathTo(gateData?.pos || null);
+            setLocalState('flying-to-gate');
+            syncFleet({ state: 'in-transit', destinationSectorId: targetSector, stateStartTime: Date.now() });
+            const gateData = getGateData(targetSector);
+            buildPathTo(gateData?.pos || null);
           } else {
-             const stationPos = currentCommand.targetStationId ?
-               stationPositions.get(currentCommand.targetStationId) : null;
-             if (stationPos) {
-               setLocalState('flying-to-station');
-               syncFleet({ state: 'idle', targetStationId: currentCommand.targetStationId, stateStartTime: Date.now() });
-               buildPathTo(new Vector3(stationPos[0], stationPos[1], stationPos[2]));
-               dockAnchorRef.current = new Vector3(stationPos[0], stationPos[1], stationPos[2]);
-               holdDockRef.current = false;
-             } else {
-               console.warn(`[NPCTrader] ${fleet.name} cannot goto station ${currentCommand.targetStationId} - skipping`);
-               advanceCommand();
-             }
+            const stationPos = currentCommand.targetStationId ?
+              stationPositions.get(currentCommand.targetStationId) : null;
+            if (stationPos) {
+              setLocalState('flying-to-station');
+              syncFleet({ state: 'idle', targetStationId: currentCommand.targetStationId, stateStartTime: Date.now() });
+              buildPathTo(new Vector3(stationPos[0], stationPos[1], stationPos[2]));
+              dockAnchorRef.current = new Vector3(stationPos[0], stationPos[1], stationPos[2]);
+              holdDockRef.current = false;
+            } else {
+              console.warn(`[NPCTrader] ${fleet.name} cannot goto station ${currentCommand.targetStationId} - skipping`);
+              advanceCommand();
+            }
           }
         }
         break;
@@ -484,7 +506,7 @@ export const NPCTrader: FC<NPCTraderProps> = ({
 
       case 'use-gate':
         if (localState === 'idle') {
-          setLocalState('entering-gate');
+          setLocalState('flying-to-gate');
           syncFleet({ state: 'in-transit', destinationSectorId: currentCommand.targetSectorId, stateStartTime: Date.now() });
           const gateData = currentCommand.targetSectorId ? getGateData(currentCommand.targetSectorId) : null;
           buildPathTo(gateData?.pos || null);
@@ -505,7 +527,7 @@ export const NPCTrader: FC<NPCTraderProps> = ({
           buildPathTo(patrolPoint);
         }
         break;
-      
+
       case 'wait':
         // Stay idle
         break;
@@ -518,7 +540,7 @@ export const NPCTrader: FC<NPCTraderProps> = ({
     if (!ship || localState === 'gone') return;
 
     const delta = rawDelta * timeScale;
-    
+
     // Adjust physics based on ship class
     let physicsMult = 1.0;
     if (fleet.shipType === 'Phoenix' || fleet.shipType === 'Albatross') physicsMult = 0.15;
@@ -547,11 +569,11 @@ export const NPCTrader: FC<NPCTraderProps> = ({
           lp.stuckTime += (now - lp.time) / 1000;
           if (lp.stuckTime > 2.0) {
             if (currentCommand?.type === 'trade-buy' || currentCommand?.type === 'trade-sell') {
-               if (currentCommand.targetSectorId && currentCommand.targetSectorId !== fleet.currentSectorId) {
-                  buildPathTo(getGateData(currentCommand.targetSectorId)?.pos || null);
-               } else if (currentCommand.targetStationId) {
-                  buildPathTo(getStationPosition(currentCommand.targetStationId));
-               }
+              if (currentCommand.targetSectorId && currentCommand.targetSectorId !== fleet.currentSectorId) {
+                buildPathTo(getGateData(currentCommand.targetSectorId)?.pos || null);
+              } else if (currentCommand.targetStationId) {
+                buildPathTo(getStationPosition(currentCommand.targetStationId));
+              }
             } else if (currentCommand?.type === 'goto-station' && currentCommand.targetStationId) {
               buildPathTo(getStationPosition(currentCommand.targetStationId));
             } else if ((currentCommand?.type === 'goto-gate' || currentCommand?.type === 'use-gate') && currentCommand.targetSectorId) {
@@ -674,12 +696,12 @@ export const NPCTrader: FC<NPCTraderProps> = ({
           // Arrived at station - kill velocity
           velocityRef.current.multiplyScalar(0.8);
           report('arrived-at-station', { stationId: currentCommand.targetStationId });
-          
+
           if (currentCommand.type === 'trade-buy' || currentCommand.type === 'trade-sell') {
-             setLocalState('docking');
-             dockAnchorRef.current = targetPos.clone();
+            setLocalState('docking');
+            dockAnchorRef.current = targetPos.clone();
           } else {
-             advanceCommand();
+            advanceCommand();
           }
         }
         break;
@@ -702,8 +724,14 @@ export const NPCTrader: FC<NPCTraderProps> = ({
         const waypoint = getCurrentWaypoint(gatePos);
         const dist = ship.position.distanceTo(gatePos);
 
-        const enterPrepRadius = gateRadius * 0.8;
+        const enterPrepRadius = fleet.shipType === 'Albatross' || fleet.shipType === 'Phoenix' || fleet.shipType === 'Condor'
+          ? gateRadius * 2.0 // Larger acceptance radius for capital ships to avoid collision struggles
+          : gateRadius * 0.8;
         if (dist > enterPrepRadius) {
+          if (fleet.shipType === 'Albatross' && now % 2000 < 20) {
+            console.log(`[NPCTrader] Albatross flying-to-gate dist=${dist.toFixed(1)} vel=${velocityRef.current.length().toFixed(1)} enterPrep=${enterPrepRadius.toFixed(1)}`)
+          }
+
           // Calculate desired direction
           tmpDir.copy(waypoint || gatePos).sub(ship.position).normalize();
           // Avoid obstacles while far from gate only
@@ -746,7 +774,7 @@ export const NPCTrader: FC<NPCTraderProps> = ({
           // Arrived at gate
           report('arrived-at-gate');
           if (currentCommand.type === 'trade-buy' || currentCommand.type === 'trade-sell') {
-             setLocalState('entering-gate');
+            setLocalState('entering-gate');
           } else if (nextCommand?.type === 'use-gate') {
             setLocalState('entering-gate');
             advanceCommand();
@@ -756,7 +784,7 @@ export const NPCTrader: FC<NPCTraderProps> = ({
             const nextHop = findNextHop(fleet.currentSectorId, finalDest);
             const actualTarget = nextHop || finalDest;
             const isFinalDest = actualTarget === finalDest;
-            
+
             enterGate(actualTarget, gatePos, isFinalDest, gateData.gateType);
           }
         }
@@ -812,28 +840,28 @@ export const NPCTrader: FC<NPCTraderProps> = ({
           report('docked', { stationId });
 
           if (currentCommand?.type === 'trade-buy') {
-             setLocalState('loading');
-             actionTimerRef.current = 0;
+            setLocalState('loading');
+            actionTimerRef.current = 0;
           } else if (currentCommand?.type === 'trade-sell') {
-             setLocalState('unloading');
-             actionTimerRef.current = 0;
+            setLocalState('unloading');
+            actionTimerRef.current = 0;
           } else {
-             // Check next command and transition directly to avoid React batching issues
-             // Current command is 'dock', next command is at currentCommandIndex + 1
-             const nextCmdIndex = currentCommandIndex + 1;
-             const nextCmd = fleet.commandQueue?.[nextCmdIndex];
-             if (nextCmd?.type === 'load-cargo') {
-               setLocalState('loading');
-               actionTimerRef.current = 0;
-               setCurrentCommandIndex(nextCmdIndex);  // Move to load-cargo command
-             } else if (nextCmd?.type === 'unload-cargo') {
-               setLocalState('unloading');
-               actionTimerRef.current = 0;
-               setCurrentCommandIndex(nextCmdIndex);  // Move to unload-cargo command
-             } else {
-               setLocalState('docked');
-               advanceCommand(true);  // Preserve docked state
-             }
+            // Check next command and transition directly to avoid React batching issues
+            // Current command is 'dock', next command is at currentCommandIndex + 1
+            const nextCmdIndex = currentCommandIndex + 1;
+            const nextCmd = fleet.commandQueue?.[nextCmdIndex];
+            if (nextCmd?.type === 'load-cargo') {
+              setLocalState('loading');
+              actionTimerRef.current = 0;
+              setCurrentCommandIndex(nextCmdIndex);  // Move to load-cargo command
+            } else if (nextCmd?.type === 'unload-cargo') {
+              setLocalState('unloading');
+              actionTimerRef.current = 0;
+              setCurrentCommandIndex(nextCmdIndex);  // Move to unload-cargo command
+            } else {
+              setLocalState('docked');
+              advanceCommand(true);  // Preserve docked state
+            }
           }
         }
         break;
@@ -861,27 +889,27 @@ export const NPCTrader: FC<NPCTraderProps> = ({
           actionTimerRef.current = 0;
 
           if (currentCommand?.type === 'trade-buy') {
-             setLocalState('docked');
-             advanceCommand(true);
+            setLocalState('docked');
+            advanceCommand(true);
           } else {
-             // Check next command and transition directly to avoid React batching issues
-             const nextCmdIndex = currentCommandIndex + 1;
-             const nextCmd = fleet.commandQueue?.[nextCmdIndex];
-             if (nextCmd?.type === 'undock') {
-               setLocalState('undocking');
-               setCurrentCommandIndex(nextCmdIndex);
-             } else if (nextCmd?.type === 'load-cargo') {
-               // Another load operation
-               actionTimerRef.current = 0;
-               setCurrentCommandIndex(nextCmdIndex);
-             } else if (nextCmd?.type === 'unload-cargo') {
-               setLocalState('unloading');
-               actionTimerRef.current = 0;
-               setCurrentCommandIndex(nextCmdIndex);
-             } else {
-               setLocalState('docked');
-               advanceCommand(true);
-             }
+            // Check next command and transition directly to avoid React batching issues
+            const nextCmdIndex = currentCommandIndex + 1;
+            const nextCmd = fleet.commandQueue?.[nextCmdIndex];
+            if (nextCmd?.type === 'undock') {
+              setLocalState('undocking');
+              setCurrentCommandIndex(nextCmdIndex);
+            } else if (nextCmd?.type === 'load-cargo') {
+              // Another load operation
+              actionTimerRef.current = 0;
+              setCurrentCommandIndex(nextCmdIndex);
+            } else if (nextCmd?.type === 'unload-cargo') {
+              setLocalState('unloading');
+              actionTimerRef.current = 0;
+              setCurrentCommandIndex(nextCmdIndex);
+            } else {
+              setLocalState('docked');
+              advanceCommand(true);
+            }
           }
         }
         break;
@@ -900,27 +928,27 @@ export const NPCTrader: FC<NPCTraderProps> = ({
           actionTimerRef.current = 0;
 
           if (currentCommand?.type === 'trade-sell') {
-             setLocalState('docked');
-             advanceCommand(true);
+            setLocalState('docked');
+            advanceCommand(true);
           } else {
-             // Check next command and transition directly to avoid React batching issues
-             const nextCmdIndex = currentCommandIndex + 1;
-             const nextCmd = fleet.commandQueue?.[nextCmdIndex];
-             if (nextCmd?.type === 'undock') {
-               setLocalState('undocking');
-               setCurrentCommandIndex(nextCmdIndex);
-             } else if (nextCmd?.type === 'load-cargo') {
-               setLocalState('loading');
-               actionTimerRef.current = 0;
-               setCurrentCommandIndex(nextCmdIndex);
-             } else if (nextCmd?.type === 'unload-cargo') {
-               // Another unload operation
-               actionTimerRef.current = 0;
-               setCurrentCommandIndex(nextCmdIndex);
-             } else {
-               setLocalState('docked');
-               advanceCommand(true);
-             }
+            // Check next command and transition directly to avoid React batching issues
+            const nextCmdIndex = currentCommandIndex + 1;
+            const nextCmd = fleet.commandQueue?.[nextCmdIndex];
+            if (nextCmd?.type === 'undock') {
+              setLocalState('undocking');
+              setCurrentCommandIndex(nextCmdIndex);
+            } else if (nextCmd?.type === 'load-cargo') {
+              setLocalState('loading');
+              actionTimerRef.current = 0;
+              setCurrentCommandIndex(nextCmdIndex);
+            } else if (nextCmd?.type === 'unload-cargo') {
+              // Another unload operation
+              actionTimerRef.current = 0;
+              setCurrentCommandIndex(nextCmdIndex);
+            } else {
+              setLocalState('docked');
+              advanceCommand(true);
+            }
           }
         }
         break;
@@ -967,47 +995,47 @@ export const NPCTrader: FC<NPCTraderProps> = ({
           holdDockRef.current = false;
 
           if (currentCommand?.type === 'trade-buy' || currentCommand?.type === 'trade-sell') {
-             setLocalState('idle');
+            setLocalState('idle');
           } else {
-             // Check next command and transition directly to avoid React batching issues
-             const nextCmdIndex = currentCommandIndex + 1;
-             const nextCmd = fleet.commandQueue?.[nextCmdIndex];
-             if (nextCmd?.type === 'goto-station') {
-               const stationPos = nextCmd.targetStationId ? stationPositions.get(nextCmd.targetStationId) : null;
-               if (stationPos) {
-                 setLocalState('flying-to-station');
-                 buildPathTo(new Vector3(stationPos[0], stationPos[1], stationPos[2]));
-                 dockAnchorRef.current = new Vector3(stationPos[0], stationPos[1], stationPos[2]);
-                 setCurrentCommandIndex(nextCmdIndex);
-               } else {
-                 // Station not found, skip
-                 setLocalState('idle');
-                 setCurrentCommandIndex(nextCmdIndex + 1);
-               }
-             } else if (nextCmd?.type === 'goto-gate') {
-               const gateData = nextCmd.targetSectorId ? getGateData(nextCmd.targetSectorId) : null;
-               if (gateData) {
-                 setLocalState('flying-to-gate');
-                 buildPathTo(gateData.pos);
-                 setCurrentCommandIndex(nextCmdIndex);
-               } else {
-                 setLocalState('idle');
-                 setCurrentCommandIndex(nextCmdIndex + 1);
-               }
-             } else if (nextCmd?.type === 'use-gate') {
-               const gateData = nextCmd.targetSectorId ? getGateData(nextCmd.targetSectorId) : null;
-               if (gateData) {
-                 setLocalState('entering-gate');
-                 buildPathTo(gateData.pos);
-                 setCurrentCommandIndex(nextCmdIndex);
-               } else {
-                 setLocalState('idle');
-                 setCurrentCommandIndex(nextCmdIndex + 1);
-               }
-             } else {
-               setLocalState('idle');
-               advanceCommand();
-             }
+            // Check next command and transition directly to avoid React batching issues
+            const nextCmdIndex = currentCommandIndex + 1;
+            const nextCmd = fleet.commandQueue?.[nextCmdIndex];
+            if (nextCmd?.type === 'goto-station') {
+              const stationPos = nextCmd.targetStationId ? stationPositions.get(nextCmd.targetStationId) : null;
+              if (stationPos) {
+                setLocalState('flying-to-station');
+                buildPathTo(new Vector3(stationPos[0], stationPos[1], stationPos[2]));
+                dockAnchorRef.current = new Vector3(stationPos[0], stationPos[1], stationPos[2]);
+                setCurrentCommandIndex(nextCmdIndex);
+              } else {
+                // Station not found, skip
+                setLocalState('idle');
+                setCurrentCommandIndex(nextCmdIndex + 1);
+              }
+            } else if (nextCmd?.type === 'goto-gate') {
+              const gateData = nextCmd.targetSectorId ? getGateData(nextCmd.targetSectorId) : null;
+              if (gateData) {
+                setLocalState('flying-to-gate');
+                buildPathTo(gateData.pos);
+                setCurrentCommandIndex(nextCmdIndex);
+              } else {
+                setLocalState('idle');
+                setCurrentCommandIndex(nextCmdIndex + 1);
+              }
+            } else if (nextCmd?.type === 'use-gate') {
+              const gateData = nextCmd.targetSectorId ? getGateData(nextCmd.targetSectorId) : null;
+              if (gateData) {
+                setLocalState('entering-gate');
+                buildPathTo(gateData.pos);
+                setCurrentCommandIndex(nextCmdIndex);
+              } else {
+                setLocalState('idle');
+                setCurrentCommandIndex(nextCmdIndex + 1);
+              }
+            } else {
+              setLocalState('idle');
+              advanceCommand();
+            }
           }
         }
         break;
@@ -1024,29 +1052,29 @@ export const NPCTrader: FC<NPCTraderProps> = ({
           );
           buildPathTo(patrolPoint);
         }
-        
+
         const target = getCurrentWaypoint(pathRef.current[pathRef.current.length - 1]);
         if (!target) {
-            nextRepathAtRef.current = 0;
-            break;
+          nextRepathAtRef.current = 0;
+          break;
         }
 
         const dist = ship.position.distanceTo(target);
-        
+
         tmpDir.copy(target).sub(ship.position).normalize();
-        
+
         // Avoidance
         const avoidance = new Vector3();
         for (const o of obstacles) {
-            const offset = ship.position.clone().sub(o.center);
-            const d = offset.length();
-            if (d < o.radius + 160 && d > 1e-3) {
-                const strength = (o.radius + 160 - d) / (o.radius + 160);
-                avoidance.add(offset.normalize().multiplyScalar(strength));
-            }
+          const offset = ship.position.clone().sub(o.center);
+          const d = offset.length();
+          if (d < o.radius + 160 && d > 1e-3) {
+            const strength = (o.radius + 160 - d) / (o.radius + 160);
+            avoidance.add(offset.normalize().multiplyScalar(strength));
+          }
         }
         if (avoidance.lengthSq() > 0) {
-            tmpDir.add(avoidance.multiplyScalar(1.5)).normalize();
+          tmpDir.add(avoidance.multiplyScalar(1.5)).normalize();
         }
 
         tmpVec.copy(tmpDir).multiplyScalar(shipMaxSpeed * 0.8);
@@ -1054,20 +1082,20 @@ export const NPCTrader: FC<NPCTraderProps> = ({
         const velDiff = tmpVec.clone().sub(velocityRef.current);
         const accelMag = Math.min(shipAccel * delta, velDiff.length());
         if (accelMag > 0.01) {
-            velDiff.normalize().multiplyScalar(accelMag);
-            velocityRef.current.add(velDiff);
+          velDiff.normalize().multiplyScalar(accelMag);
+          velocityRef.current.add(velDiff);
         }
 
         ship.position.add(velocityRef.current.clone().multiplyScalar(delta));
 
         if (velocityRef.current.lengthSq() > 5) {
-            tmpDir.copy(velocityRef.current).normalize();
-            const targetQuat = new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), tmpDir);
-            ship.quaternion.slerp(targetQuat, delta * turnRate);
+          tmpDir.copy(velocityRef.current).normalize();
+          const targetQuat = new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), tmpDir);
+          ship.quaternion.slerp(targetQuat, delta * turnRate);
         }
 
         if (pathRef.current.length <= 1 && dist < 100) {
-             nextRepathAtRef.current = 0; 
+          nextRepathAtRef.current = 0;
         }
         break;
       }
@@ -1129,9 +1157,9 @@ export const NPCTrader: FC<NPCTraderProps> = ({
             const nextHop = findNextHop(fleet.currentSectorId, finalDest);
             const actualTarget = nextHop || finalDest;
             const isFinalDest = actualTarget === finalDest;
-            
+
             const isTrade = currentCommand.type === 'trade-buy' || currentCommand.type === 'trade-sell';
-            
+
             // Advance if we reached final dest AND it's not a trade command (which needs to dock)
             const shouldAdvance = isFinalDest && !isTrade;
 
