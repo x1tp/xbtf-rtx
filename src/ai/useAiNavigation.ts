@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useThree } from '@react-three/fiber';
-import type { SeizewellLayout } from '../config/seizewell';
+import type { SeizewellLayout } from '../config/sectors/seizewell';
 import { buildNavGraph, buildNavNodesFromLayout, computeSceneObstacles } from './navigation';
 import type { NavGraph, NavNode, NavObstacle } from './navigation';
 

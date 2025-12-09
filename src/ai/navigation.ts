@@ -1,5 +1,5 @@
 import { Box3, Object3D, Vector3 } from 'three';
-import type { SeizewellLayout } from '../config/seizewell';
+import type { SeizewellLayout } from '../config/sectors/seizewell';
 
 export type NavObstacle = { id: string; center: Vector3; radius: number; label?: string };
 
