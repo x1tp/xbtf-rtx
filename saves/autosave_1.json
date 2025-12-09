@@ -976,7 +976,7 @@
   },
   "timeScale": 10,
   "acc": 10,
-  "elapsedTimeSec": 291607,
+  "elapsedTimeSec": 288007,
   "corporations": [
     {
       "id": "teladi_company",
@@ -1006,7 +1006,7 @@
       "lifetimeProfit": 34019.651999999995,
       "lifetimeTrades": 14,
       "aiState": {
-        "lastExpansionCheck": 1765281456686,
+        "lastExpansionCheck": 1765281096388,
         "currentGoal": "expand",
         "pendingConstructions": []
       }
@@ -1034,7 +1034,7 @@
       "lifetimeProfit": 2884.2879999999996,
       "lifetimeTrades": 2,
       "aiState": {
-        "lastExpansionCheck": 1765281456686,
+        "lastExpansionCheck": 1765281096388,
         "currentGoal": "expand",
         "pendingConstructions": []
       }
@@ -1060,7 +1060,7 @@
       "lifetimeProfit": 288,
       "lifetimeTrades": 3,
       "aiState": {
-        "lastExpansionCheck": 1765281456686,
+        "lastExpansionCheck": 1765281096388,
         "currentGoal": "expand",
         "pendingConstructions": []
       }
@@ -1085,7 +1085,7 @@
       "lifetimeProfit": 0,
       "lifetimeTrades": 1,
       "aiState": {
-        "lastExpansionCheck": 1765281456686,
+        "lastExpansionCheck": 1765281096388,
         "currentGoal": "expand",
         "pendingConstructions": []
       }
@@ -1110,7 +1110,7 @@
       "lifetimeProfit": 5143.2,
       "lifetimeTrades": 9,
       "aiState": {
-        "lastExpansionCheck": 1765281456686,
+        "lastExpansionCheck": 1765281096388,
         "currentGoal": "expand",
         "pendingConstructions": []
       }
@@ -1137,7 +1137,7 @@
       "lifetimeProfit": 4473.6,
       "lifetimeTrades": 5,
       "aiState": {
-        "lastExpansionCheck": 1765281456686,
+        "lastExpansionCheck": 1765281096388,
         "currentGoal": "expand",
         "pendingConstructions": []
       }
@@ -4259,6 +4259,6 @@
       "sellStationName": "Crystal Fab (M)"
     }
   ],
-  "lastTickTime": 1765281491714,
-  "lastTraderSpawnCheck": 1765281453683
+  "lastTickTime": 1765281131417,
+  "lastTraderSpawnCheck": 1765280853188
 }
