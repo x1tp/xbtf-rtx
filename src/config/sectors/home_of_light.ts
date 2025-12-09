@@ -7,8 +7,8 @@ export const HOME_OF_LIGHT_BLUEPRINT: SeizewellLayout = {
   playerStart: [0, 0, 0],
   stations: [
     { name: 'TerraCorp HQ', modelPath: '/models/00022.obj', position: [0, 100, 0], scale: 50, rotationAxis: 'y', rotationSpeed: 0.005, collisions: true },
-    { name: 'Argon Trading Station', modelPath: '/models/00020.obj', position: [-500, -50, 500], scale: 35, rotationAxis: 'y', rotationSpeed: 0.02, collisions: true },
-    { name: 'Quantum Tube Fab (M)', modelPath: '/models/00145.obj', position: [500, 50, -500], scale: 30, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Argon Trading Station', modelPath: '/models/00186.obj', position: [-500, -50, 500], scale: 35, rotationAxis: 'y', rotationSpeed: 0.02, collisions: true },
+    { name: 'Quantum Tube Fab (M)', modelPath: '/models/00232.obj', position: [500, 50, -500], scale: 30, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
   ],
   gates: [
     { name: 'North Gate', modelPath: '/models/00088.obj', position: [0, 0, -5000], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, Math.PI, 0], destinationSectorId: 'argon_prime', gateType: 'N' },

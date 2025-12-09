@@ -8,7 +8,7 @@ export const GREATER_PROFIT_BLUEPRINT: SeizewellLayout = {
   stations: [
     { name: 'Teladi Trading Station', modelPath: '/models/00001.obj', position: [0, 0, 0], scale: 32, rotationAxis: 'z', rotationSpeed: -0.05, collisions: true },
     { name: 'Dream Farm (M)', modelPath: '/models/00282.obj', position: [200, -20, -200], scale: 26, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
-    { name: 'Bliss Place (L)', modelPath: '/models/00287.obj', position: [-200, 20, 200], scale: 28, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Bliss Place (L)', modelPath: '/models/00283.obj', position: [-200, 20, 200], scale: 28, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
     { name: 'Crystal Fab (M)', modelPath: '/models/00432.obj', position: [300, 0, 300], scale: 26, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true }
   ],
   gates: [

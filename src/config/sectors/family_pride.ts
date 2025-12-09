@@ -8,10 +8,10 @@ export const FAMILY_PRIDE_BLUEPRINT: SeizewellLayout = {
   stations: [
     { name: 'Split Shipyard', modelPath: '/models/00444.obj', position: [0, 0, 500], scale: 38, rotationAxis: 'z', rotationSpeed: -0.00, collisions: true },
     { name: 'Split Equipment Dock', modelPath: '/models/00448.obj', position: [-500, 100, -500], scale: 34, rotationAxis: 'z', rotationSpeed: -0.00, collisions: true },
-    { name: 'Split Trading Station', modelPath: '/models/00001.obj', position: [500, -100, -500], scale: 32, rotationAxis: 'z', rotationSpeed: -0.08, collisions: true },
-    { name: 'Solar Power Plant (M)', modelPath: '/models/00285.obj', position: [1000, 0, 1000], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
-    { name: 'Chelt Aquarium (M)', modelPath: '/models/00282.obj', position: [-1000, 0, 1000], scale: 26, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
-    { name: 'Rastar Refinery (M)', modelPath: '/models/00283.obj', position: [1000, 0, -1000], scale: 30, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Split Trading Station', modelPath: '/models/00127.obj', position: [500, -100, -500], scale: 32, rotationAxis: 'z', rotationSpeed: -0.08, collisions: true },
+    { name: 'Solar Power Plant (M)', modelPath: '/models/00275.obj', position: [1000, 0, 1000], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Chelt Aquarium (M)', modelPath: '/models/00272.obj', position: [-1000, 0, 1000], scale: 26, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Rastar Refinery (M)', modelPath: '/models/00273.obj', position: [1000, 0, -1000], scale: 30, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
   ],
   gates: [
     { name: 'West Gate', modelPath: '/models/00088.obj', position: [-5000, 0, 0], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, -Math.PI / 2, 0], destinationSectorId: 'thuruks_pride', gateType: 'W' },

@@ -210,6 +210,15 @@ function App() {
   const path = window.location.pathname;
   const setNavObjects = useGameStore((s) => s.setNavObjects);
   const currentSectorId = useGameStore((s) => s.currentSectorId);
+  const setCurrentSectorId = useGameStore((s) => s.setCurrentSectorId);
+
+  useEffect(() => {
+      // DEBUG: Force jump to Kingdom End to investigate model loading
+      if (currentSectorId !== 'kingdom_end') {
+          console.log('DEBUG: Forcing jump to Kingdom End');
+          setCurrentSectorId('kingdom_end');
+      }
+  }, []);
 
   const economyStations = useGameStore((s) => s.stations);
 

@@ -7,7 +7,7 @@ export const SPACEWEED_DRIFT_BLUEPRINT: SeizewellLayout = {
   playerStart: [0, 0, 0],
   stations: [
     { name: 'Solar Power Plant (M)', modelPath: '/models/00285.obj', position: [200, 0, 300], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
-    { name: 'Bliss Place (L)', modelPath: '/models/00139.obj', position: [-300, 0, -300], scale: 35, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Bliss Place (L)', modelPath: '/models/00283.obj', position: [-300, 0, -300], scale: 35, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
   ],
   gates: [
     { name: 'North Gate', modelPath: '/models/00088.obj', position: [0, 0, -5000], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, Math.PI, 0], destinationSectorId: 'profit_share', gateType: 'N' },

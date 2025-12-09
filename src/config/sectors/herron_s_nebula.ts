@@ -6,8 +6,8 @@ export const HERRON_S_NEBULA_BLUEPRINT: SeizewellLayout = {
   asteroids: { count: 120, range: 1600, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
-    { name: 'Argon Trading Station', modelPath: '/models/00020.obj', position: [0, 0, 0], scale: 35, rotationAxis: 'y', rotationSpeed: 0.02, collisions: true },
-    { name: 'Solar Power Plant (M)', modelPath: '/models/00285.obj', position: [400, 50, 400], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Argon Trading Station', modelPath: '/models/00186.obj', position: [0, 0, 0], scale: 35, rotationAxis: 'y', rotationSpeed: 0.02, collisions: true },
+    { name: 'Solar Power Plant (M)', modelPath: '/models/00184.obj', position: [400, 50, 400], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
     { name: 'Space Fuel Distillery (L)', modelPath: '/models/00138.obj', position: [-500, -50, -500], scale: 35, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
   ],
   gates: [

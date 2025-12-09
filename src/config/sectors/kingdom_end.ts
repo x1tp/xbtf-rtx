@@ -8,9 +8,9 @@ export const KINGDOM_END_BLUEPRINT: SeizewellLayout = {
   stations: [
     { name: 'Boron Shipyard', modelPath: '/models/00444.obj', position: [100, -50, 200], scale: 38, rotationAxis: 'z', rotationSpeed: -0.00, collisions: true },
     { name: 'Boron Equipment Dock', modelPath: '/models/00448.obj', position: [-100, 50, -200], scale: 34, rotationAxis: 'z', rotationSpeed: -0.00, collisions: true },
-    { name: 'Boron Trading Station', modelPath: '/models/00001.obj', position: [0, 0, 0], scale: 32, rotationAxis: 'z', rotationSpeed: -0.08, collisions: true },
-    { name: 'Solar Power Plant (M)', modelPath: '/models/00285.obj', position: [200, 0, 300], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
-    { name: 'BoGas Factory (M)', modelPath: '/models/00283.obj', position: [-200, -20, 100], scale: 30, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Boron Trading Station', modelPath: '/models/00136.obj', position: [0, 0, 0], scale: 32, rotationAxis: 'z', rotationSpeed: -0.08, collisions: true },
+    { name: 'Solar Power Plant (M)', modelPath: '/models/00281.obj', position: [200, 0, 300], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'BoGas Factory (M)', modelPath: '/models/00011.obj', position: [-200, -20, 100], scale: 30, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
     { name: 'Crystal Fab (M)', modelPath: '/models/00432.obj', position: [150, 20, -150], scale: 26, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
   ],
   gates: [

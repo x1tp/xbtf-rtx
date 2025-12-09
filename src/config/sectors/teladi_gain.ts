@@ -7,7 +7,7 @@ export const TELADI_GAIN_BLUEPRINT: SeizewellLayout = {
   playerStart: [0, 50, 900],
   stations: [
     { name: 'Teladi Trading Station', modelPath: '/models/00001.obj', position: [-60, -10, -30], scale: 32, rotationAxis: 'z', rotationSpeed: -0.08, collisions: true },
-    { name: 'Bliss Place (M)', modelPath: '/models/00447.obj', position: [40, -10, 60], scale: 28, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Bliss Place (M)', modelPath: '/models/00283.obj', position: [40, -10, 60], scale: 28, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
     { name: 'Sun Oil Refinery (M)', modelPath: '/models/00283.obj', position: [22, -20, 160], scale: 30, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
     { name: 'Flower Farm (M)', modelPath: '/models/00282.obj', position: [120, -20, 420], scale: 26, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
   ],

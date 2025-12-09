@@ -6,7 +6,7 @@ export const XENON_SECTOR_6_BLUEPRINT: SeizewellLayout = {
   asteroids: { count: 260, range: 2600, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
-    { name: 'Xenon Station', modelPath: '/models/00444.obj', position: [2000, 0, -2000], scale: 45, rotationAxis: 'y', rotationSpeed: 0.02, collisions: true },
+    { name: 'Xenon Station', modelPath: '/models/00120.obj', position: [2000, 0, -2000], scale: 45, rotationAxis: 'y', rotationSpeed: 0.02, collisions: true },
     { name: 'Earth Jumpgate (Inactive)', modelPath: '/models/00088.obj', position: [0, 0, 0], scale: 350, rotationAxis: 'z', rotationSpeed: 0.01, collisions: true },
   ],
   gates: [

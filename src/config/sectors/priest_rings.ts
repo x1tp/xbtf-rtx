@@ -6,8 +6,8 @@ export const PRIEST_RINGS_BLUEPRINT: SeizewellLayout = {
   asteroids: { count: 120, range: 1400, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
-    { name: 'Solar Power Plant (M)', modelPath: '/models/00285.obj', position: [200, 0, 300], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
-    { name: 'Soyery (M)', modelPath: '/models/00283.obj', position: [-200, 50, -200], scale: 32, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Solar Power Plant (M)', modelPath: '/models/00279.obj', position: [200, 0, 300], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Soyery (M)', modelPath: '/models/00276.obj', position: [-200, 50, -200], scale: 32, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
     { name: 'Crystal Fab (M)', modelPath: '/models/00432.obj', position: [300, -30, -100], scale: 26, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
   ],
   gates: [

@@ -453,9 +453,17 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
                         urls.push('/models/true/' + bn);
                         urls.push('/models/tex/' + bn);
                         for (const u of urls) {
-                            const tex = await tloader.loadAsync(u).catch(() => null);
-                            if (tex) return tex;
+                            console.log(`[Station] Attempting to load texture: ${u}`);
+                            const tex = await tloader.loadAsync(u).catch((err) => {
+                                console.warn(`[Station] Failed to load texture ${u}: ${err.message}`);
+                                return null;
+                            });
+                            if (tex) {
+                                console.log(`[Station] Successfully loaded texture: ${u}`);
+                                return tex;
+                            }
                         }
+                        console.error(`[Station] No texture found for path: ${p}`);
                         return null;
                     };
                     obj.traverse((o) => {
@@ -463,6 +471,7 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
                         mesh.castShadow = true;
                         mesh.receiveShadow = true;
                         const apply = (m: MeshStandardMaterial, matIndex: number) => {
+                            console.log(`[Station] Applying material for ${modelPath}:`, m.name, 'Has map:', !!m.map);
                             m.side = DoubleSide;
                             // Reduce specular on Phong materials (OBJLoader default)
                             if ((m as unknown as { isMeshPhongMaterial: boolean }).isMeshPhongMaterial) {

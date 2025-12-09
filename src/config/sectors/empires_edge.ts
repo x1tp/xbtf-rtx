@@ -6,8 +6,8 @@ export const EMPIRES_EDGE_BLUEPRINT: SeizewellLayout = {
   asteroids: { count: 120, range: 2000, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
-    { name: 'Solar Power Plant (M)', modelPath: '/models/00285.obj', position: [-2000, 0, 2000], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
-    { name: 'Soyfarm (M)', modelPath: '/models/00279.obj', position: [2000, 100, -2000], scale: 30, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Solar Power Plant (M)', modelPath: '/models/00279.obj', position: [-2000, 0, 2000], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Soyfarm (M)', modelPath: '/models/00276.obj', position: [2000, 100, -2000], scale: 30, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
   ],
   gates: [
     { name: 'North Gate', modelPath: '/models/00088.obj', position: [0, 0, -5000], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, Math.PI, 0], destinationSectorId: 'paranid_prime', gateType: 'N' },

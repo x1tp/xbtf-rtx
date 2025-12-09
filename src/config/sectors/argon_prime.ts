@@ -6,12 +6,12 @@ export const ARGON_PRIME_BLUEPRINT: SeizewellLayout = {
   asteroids: { count: 100, range: 2000, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
-    { name: 'Argon Shipyard', modelPath: '/models/00021.obj', position: [0, 0, 500], scale: 40, rotationAxis: 'y', rotationSpeed: 0.01, collisions: true },
-    { name: 'Argon Equipment Dock', modelPath: '/models/00025.obj', position: [-500, 100, -500], scale: 35, rotationAxis: 'y', rotationSpeed: 0.01, collisions: true },
-    { name: 'Free Argon Trading Station', modelPath: '/models/00020.obj', position: [500, -100, -500], scale: 35, rotationAxis: 'y', rotationSpeed: 0.02, collisions: true },
-    { name: 'Solar Power Plant (M)', modelPath: '/models/00285.obj', position: [1000, 0, 1000], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
-    { name: 'Cattle Ranch (M)', modelPath: '/models/00136.obj', position: [-1000, 0, 1000], scale: 30, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
-    { name: 'Wheat Farm (M)', modelPath: '/models/00131.obj', position: [1000, 0, -1000], scale: 30, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Argon Shipyard', modelPath: '/models/00444.obj', position: [0, 0, 500], scale: 40, rotationAxis: 'y', rotationSpeed: 0.01, collisions: true },
+    { name: 'Argon Equipment Dock', modelPath: '/models/00448.obj', position: [-500, 100, -500], scale: 35, rotationAxis: 'y', rotationSpeed: 0.01, collisions: true },
+    { name: 'Free Argon Trading Station', modelPath: '/models/00186.obj', position: [500, -100, -500], scale: 35, rotationAxis: 'y', rotationSpeed: 0.02, collisions: true },
+    { name: 'Solar Power Plant (M)', modelPath: '/models/00184.obj', position: [1000, 0, 1000], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Cattle Ranch (M)', modelPath: '/models/00182.obj', position: [-1000, 0, 1000], scale: 30, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Wheat Farm (M)', modelPath: '/models/00182.obj', position: [1000, 0, -1000], scale: 30, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
     { name: 'Crystal Fab (M)', modelPath: '/models/00432.obj', position: [-1000, 0, -1000], scale: 26, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
   ],
   gates: [

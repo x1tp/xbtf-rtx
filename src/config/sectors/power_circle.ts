@@ -6,9 +6,9 @@ export const POWER_CIRCLE_BLUEPRINT: SeizewellLayout = {
   asteroids: { count: 60, range: 1200, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
-    { name: 'Solar Power Plant (M)', modelPath: '/models/00285.obj', position: [0, 0, 300], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
-    { name: 'Cattle Ranch (M)', modelPath: '/models/00136.obj', position: [-300, 50, -200], scale: 30, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
-    { name: 'Shield Plant (1MW)', modelPath: '/models/00135.obj', position: [300, -20, -200], scale: 28, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Solar Power Plant (M)', modelPath: '/models/00184.obj', position: [0, 0, 300], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Cattle Ranch (M)', modelPath: '/models/00182.obj', position: [-300, 50, -200], scale: 30, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Shield Plant (1MW)', modelPath: '/models/00232.obj', position: [300, -20, -200], scale: 28, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
   ],
   gates: [
     { name: 'West Gate', modelPath: '/models/00088.obj', position: [-5000, 0, 0], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, -Math.PI / 2, 0], destinationSectorId: 'three_worlds', gateType: 'W' },

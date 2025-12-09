@@ -7,7 +7,7 @@ export const FAMILY_WHI_BLUEPRINT: SeizewellLayout = {
   playerStart: [0, 0, 0],
   stations: [
     { name: 'Split Equipment Dock', modelPath: '/models/00448.obj', position: [0, 0, 0], scale: 34, rotationAxis: 'z', rotationSpeed: -0.00, collisions: true },
-    { name: '25MW Shield Prod. Facility (M)', modelPath: '/models/00135.obj', position: [300, 50, 300], scale: 30, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: '25MW Shield Prod. Facility (M)', modelPath: '/models/00237.obj', position: [300, 50, 300], scale: 30, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
   ],
   gates: [
     { name: 'West Gate', modelPath: '/models/00088.obj', position: [-5000, 0, 0], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, -Math.PI / 2, 0], destinationSectorId: 'teladi_gain', gateType: 'W' },

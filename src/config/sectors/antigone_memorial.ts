@@ -6,9 +6,9 @@ export const ANTIGONE_MEMORIAL_BLUEPRINT: SeizewellLayout = {
   asteroids: { count: 150, range: 1800, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
-    { name: 'Argon Equipment Dock', modelPath: '/models/00025.obj', position: [0, 0, 0], scale: 35, rotationAxis: 'y', rotationSpeed: 0.01, collisions: true },
-    { name: 'Solar Power Plant (M)', modelPath: '/models/00285.obj', position: [400, 0, 400], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
-    { name: 'Cattle Ranch (M)', modelPath: '/models/00136.obj', position: [-400, 50, 200], scale: 30, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Argon Equipment Dock', modelPath: '/models/00448.obj', position: [0, 0, 0], scale: 35, rotationAxis: 'y', rotationSpeed: 0.01, collisions: true },
+    { name: 'Solar Power Plant (M)', modelPath: '/models/00184.obj', position: [400, 0, 400], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Cattle Ranch (M)', modelPath: '/models/00182.obj', position: [-400, 50, 200], scale: 30, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
     { name: 'Ore Mine (M)', modelPath: '/models/00293.obj', position: [0, -100, -500], scale: 45, rotationAxis: 'y', rotationSpeed: 0.005, collisions: true },
   ],
   gates: [

@@ -6,11 +6,11 @@ export const THE_WALL_BLUEPRINT: SeizewellLayout = {
   asteroids: { count: 50, range: 1000, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
-    { name: 'Solar Power Plant (XL)', modelPath: '/models/00285.obj', position: [0, 0, 0], scale: 60, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
-    { name: 'Solar Power Plant (L)', modelPath: '/models/00285.obj', position: [500, 50, 500], scale: 50, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
-    { name: 'Solar Power Plant (L)', modelPath: '/models/00285.obj', position: [-500, -50, 500], scale: 50, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
-    { name: 'Solar Power Plant (M)', modelPath: '/models/00285.obj', position: [500, 50, -500], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
-    { name: 'Solar Power Plant (M)', modelPath: '/models/00285.obj', position: [-500, -50, -500], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Solar Power Plant (XL)', modelPath: '/models/00184.obj', position: [0, 0, 0], scale: 60, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Solar Power Plant (L)', modelPath: '/models/00184.obj', position: [500, 50, 500], scale: 50, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Solar Power Plant (L)', modelPath: '/models/00184.obj', position: [-500, -50, 500], scale: 50, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Solar Power Plant (M)', modelPath: '/models/00184.obj', position: [500, 50, -500], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Solar Power Plant (M)', modelPath: '/models/00184.obj', position: [-500, -50, -500], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
   ],
   gates: [
     { name: 'North Gate', modelPath: '/models/00088.obj', position: [0, 0, -5000], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, Math.PI, 0], destinationSectorId: 'the_hole', gateType: 'N' },

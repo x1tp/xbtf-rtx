@@ -6,8 +6,8 @@ export const CLOUDBASE_NORTH_WEST_BLUEPRINT: SeizewellLayout = {
   asteroids: { count: 90, range: 1300, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
-    { name: 'Solar Power Plant (M)', modelPath: '/models/00285.obj', position: [200, 0, 200], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
-    { name: 'Wheat Farm (M)', modelPath: '/models/00131.obj', position: [-200, 50, -200], scale: 30, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Solar Power Plant (M)', modelPath: '/models/00184.obj', position: [200, 0, 200], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Wheat Farm (M)', modelPath: '/models/00182.obj', position: [-200, 50, -200], scale: 30, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
     { name: 'Crystal Fab (M)', modelPath: '/models/00432.obj', position: [300, -30, -300], scale: 26, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
     { name: 'Gamma HEPT Forge', modelPath: '/models/00140.obj', position: [-300, 20, 300], scale: 35, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
   ],

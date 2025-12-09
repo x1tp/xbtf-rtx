@@ -9,7 +9,7 @@ export const CEO_S_BUCKZOID_BLUEPRINT: SeizewellLayout = {
     { name: 'Teladi Equipment Dock', modelPath: '/models/00448.obj', position: [0, 0, 0], scale: 34, rotationAxis: 'z', rotationSpeed: -0.00, collisions: true },
     { name: 'Solar Power Plant (M)', modelPath: '/models/00285.obj', position: [300, 50, 300], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
     { name: 'Sun Oil Refinery (M)', modelPath: '/models/00283.obj', position: [-200, -20, -200], scale: 32, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
-    { name: 'Teladianium Foundry (M)', modelPath: '/models/00431.obj', position: [150, 20, -150], scale: 30, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Teladianium Foundry (M)', modelPath: '/models/00283.obj', position: [150, 20, -150], scale: 30, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
   ],
   gates: [
     { name: 'West Gate', modelPath: '/models/00088.obj', position: [-5000, 0, 0], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, -Math.PI / 2, 0], destinationSectorId: 'menelaus_frontier', gateType: 'W' },

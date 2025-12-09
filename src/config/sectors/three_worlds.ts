@@ -6,9 +6,9 @@ export const THREE_WORLDS_BLUEPRINT: SeizewellLayout = {
   asteroids: { count: 80, range: 1500, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
-    { name: 'Argon Equipment Dock', modelPath: '/models/00025.obj', position: [0, 0, 0], scale: 35, rotationAxis: 'y', rotationSpeed: 0.01, collisions: true },
-    { name: 'Solar Power Plant (M)', modelPath: '/models/00285.obj', position: [500, 50, 500], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
-    { name: 'Cahoona Bakery (M)', modelPath: '/models/00132.obj', position: [-500, -20, 500], scale: 30, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Argon Equipment Dock', modelPath: '/models/00448.obj', position: [0, 0, 0], scale: 35, rotationAxis: 'y', rotationSpeed: 0.01, collisions: true },
+    { name: 'Solar Power Plant (M)', modelPath: '/models/00184.obj', position: [500, 50, 500], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Cahoona Bakery (M)', modelPath: '/models/00183.obj', position: [-500, -20, 500], scale: 30, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
     { name: 'Weapon Component Factory (M)', modelPath: '/models/00134.obj', position: [500, 20, -500], scale: 28, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
   ],
   gates: [

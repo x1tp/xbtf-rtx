@@ -6,9 +6,9 @@ export const CHINS_CLOUDS_BLUEPRINT: SeizewellLayout = {
   asteroids: { count: 160, range: 1400, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
-    { name: 'Pirate Base', modelPath: '/models/00088.obj', position: [1000, -500, 1000], scale: 50, rotationAxis: 'y', rotationSpeed: 0.05, collisions: true }, // Placeholder
-    { name: 'Solar Power Plant (M)', modelPath: '/models/00285.obj', position: [-300, 0, -300], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
-    { name: 'Scruffin Farm (M)', modelPath: '/models/00282.obj', position: [200, 50, -100], scale: 26, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Pirate Base', modelPath: '/models/00397.obj', position: [1000, -500, 1000], scale: 50, rotationAxis: 'y', rotationSpeed: 0.05, collisions: true }, // Placeholder
+    { name: 'Solar Power Plant (M)', modelPath: '/models/00275.obj', position: [-300, 0, -300], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Scruffin Farm (M)', modelPath: '/models/00272.obj', position: [200, 50, -100], scale: 26, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
   ],
   gates: [
     { name: 'West Gate', modelPath: '/models/00088.obj', position: [-5000, 0, 0], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, -Math.PI / 2, 0], destinationSectorId: 'chins_fire', gateType: 'W' },

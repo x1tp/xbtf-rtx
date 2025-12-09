@@ -6,9 +6,9 @@ export const PRIEST_PITY_BLUEPRINT: SeizewellLayout = {
   asteroids: { count: 180, range: 1500, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
-    { name: 'Pirate Base', modelPath: '/models/00088.obj', position: [1000, -500, 1000], scale: 50, rotationAxis: 'y', rotationSpeed: 0.05, collisions: true }, // Placeholder
-    { name: 'Solar Power Plant (M)', modelPath: '/models/00285.obj', position: [-300, 0, -300], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
-    { name: 'Snail Ranch (M)', modelPath: '/models/00282.obj', position: [200, 50, -100], scale: 26, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Pirate Base', modelPath: '/models/00397.obj', position: [1000, -500, 1000], scale: 50, rotationAxis: 'y', rotationSpeed: 0.05, collisions: true }, // Placeholder
+    { name: 'Solar Power Plant (M)', modelPath: '/models/00279.obj', position: [-300, 0, -300], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Snail Ranch (M)', modelPath: '/models/00276.obj', position: [200, 50, -100], scale: 26, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
   ],
   gates: [
     { name: 'North Gate', modelPath: '/models/00088.obj', position: [0, 0, -5000], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, Math.PI, 0], destinationSectorId: 'xenon_sector_5', gateType: 'N' },

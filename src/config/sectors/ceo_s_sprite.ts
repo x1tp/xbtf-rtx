@@ -7,7 +7,7 @@ export const CEO_S_SPRITE_BLUEPRINT: SeizewellLayout = {
   playerStart: [0, 0, 0],
   stations: [
     { name: 'Solar Power Plant (M)', modelPath: '/models/00285.obj', position: [200, 0, 300], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
-    { name: 'Quantum Tube Fab (M)', modelPath: '/models/00145.obj', position: [-200, 0, -200], scale: 30, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Quantum Tube Fab (M)', modelPath: '/models/00420.obj', position: [-200, 0, -200], scale: 30, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
   ],
   gates: [
     { name: 'North Gate', modelPath: '/models/00088.obj', position: [0, 0, -5000], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, Math.PI, 0], destinationSectorId: 'blue_profit', gateType: 'N' },

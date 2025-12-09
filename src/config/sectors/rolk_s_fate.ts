@@ -7,8 +7,8 @@ export const ROLK_S_FATE_BLUEPRINT: SeizewellLayout = {
   playerStart: [0, 0, 0],
   stations: [
     { name: 'Boron Equipment Dock', modelPath: '/models/00448.obj', position: [0, 0, 0], scale: 34, rotationAxis: 'z', rotationSpeed: -0.00, collisions: true },
-    { name: 'Solar Power Plant (M)', modelPath: '/models/00285.obj', position: [300, 50, 300], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
-    { name: 'Stott Mixery (M)', modelPath: '/models/00281.obj', position: [-200, -20, -200], scale: 28, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Solar Power Plant (M)', modelPath: '/models/00281.obj', position: [300, 50, 300], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Stott Mixery (M)', modelPath: '/models/00011.obj', position: [-200, -20, -200], scale: 28, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
     { name: 'Crystal Fab (M)', modelPath: '/models/00432.obj', position: [150, 20, -150], scale: 26, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
   ],
   gates: [

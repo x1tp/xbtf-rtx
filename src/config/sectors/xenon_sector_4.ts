@@ -6,7 +6,7 @@ export const XENON_SECTOR_4_BLUEPRINT: SeizewellLayout = {
   asteroids: { count: 220, range: 2200, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
-    { name: 'Xenon Station', modelPath: '/models/00444.obj', position: [1000, 500, -1000], scale: 45, rotationAxis: 'y', rotationSpeed: 0.02, collisions: true },
+    { name: 'Xenon Station', modelPath: '/models/00120.obj', position: [1000, 500, -1000], scale: 45, rotationAxis: 'y', rotationSpeed: 0.02, collisions: true },
   ],
   gates: [
     { name: 'North Gate', modelPath: '/models/00088.obj', position: [0, 0, -5000], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, Math.PI, 0], destinationSectorId: 'xenon_sector_2', gateType: 'N' },

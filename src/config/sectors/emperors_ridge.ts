@@ -7,8 +7,8 @@ export const EMPERORS_RIDGE_BLUEPRINT: SeizewellLayout = {
   playerStart: [0, 0, 0],
   stations: [
     { name: 'Paranid Equipment Dock', modelPath: '/models/00448.obj', position: [1000, 0, -1000], scale: 34, rotationAxis: 'z', rotationSpeed: -0.00, collisions: true },
-    { name: 'Solar Power Plant (M)', modelPath: '/models/00285.obj', position: [-2000, 0, 2000], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
-    { name: 'Majaglit Factory (M)', modelPath: '/models/00288.obj', position: [2000, -200, 1000], scale: 28, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Solar Power Plant (M)', modelPath: '/models/00279.obj', position: [-2000, 0, 2000], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Majaglit Factory (M)', modelPath: '/models/00276.obj', position: [2000, -200, 1000], scale: 28, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
   ],
   gates: [
     { name: 'North Gate', modelPath: '/models/00088.obj', position: [0, 0, -5000], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, Math.PI, 0], destinationSectorId: 'priest_pity', gateType: 'N' },

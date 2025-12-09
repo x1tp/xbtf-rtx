@@ -6,9 +6,9 @@ export const QUEENS_SPACE_BLUEPRINT: SeizewellLayout = {
   asteroids: { count: 180, range: 1100, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
-    { name: 'Solar Power Plant (M)', modelPath: '/models/00285.obj', position: [100, 50, 200], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
-    { name: 'BoGas Factory (M)', modelPath: '/models/00283.obj', position: [-150, -30, -100], scale: 30, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
-    { name: 'Stott Mixery (M)', modelPath: '/models/00281.obj', position: [200, 10, -200], scale: 28, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Solar Power Plant (M)', modelPath: '/models/00281.obj', position: [100, 50, 200], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'BoGas Factory (M)', modelPath: '/models/00011.obj', position: [-150, -30, -100], scale: 30, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Stott Mixery (M)', modelPath: '/models/00011.obj', position: [200, 10, -200], scale: 28, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
   ],
   gates: [
     { name: 'West Gate', modelPath: '/models/00088.obj', position: [-5000, 0, 0], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, -Math.PI / 2, 0], destinationSectorId: 'rolk_s_drift', gateType: 'W' },

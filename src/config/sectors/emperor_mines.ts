@@ -6,9 +6,9 @@ export const EMPEROR_MINES_BLUEPRINT: SeizewellLayout = {
   asteroids: { count: 200, range: 1600, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
-    { name: 'Solar Power Plant (M)', modelPath: '/models/00285.obj', position: [200, 0, 200], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Solar Power Plant (M)', modelPath: '/models/00279.obj', position: [200, 0, 200], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
     { name: 'Ore Mine (M)', modelPath: '/models/00293.obj', position: [-200, 50, -200], scale: 45, rotationAxis: 'y', rotationSpeed: 0.005, collisions: true },
-    { name: 'Soyfarm (M)', modelPath: '/models/00282.obj', position: [300, -30, -300], scale: 26, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
+    { name: 'Soyfarm (M)', modelPath: '/models/00276.obj', position: [300, -30, -300], scale: 26, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },
   ],
   gates: [
     { name: 'North Gate', modelPath: '/models/00088.obj', position: [0, 0, -5000], scale: 300, rotationAxis: 'y', rotationSpeed: 0, collisions: false, rotation: [0, Math.PI, 0], destinationSectorId: 'cloudbase_south_west', gateType: 'N' },
