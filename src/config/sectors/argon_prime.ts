@@ -3,7 +3,6 @@ import type { SeizewellLayout } from './seizewell'
 export const ARGON_PRIME_BLUEPRINT: SeizewellLayout = {
   sun: { position: [0, 100000000000, 0], size: 800000000, color: '#ffeecc', intensity: 1.2 },
   planet: { position: [0, -2000000, 20000000], size: 8000000 },
-  asteroids: { count: 100, range: 2000, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
     { name: 'Argon Shipyard', modelPath: '/models/00444.obj', position: [0, 0, 500], scale: 40, rotationAxis: 'y', rotationSpeed: 0.01, collisions: true },

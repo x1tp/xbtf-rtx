@@ -2,9 +2,7 @@ import type { SeizewellLayout } from './seizewell'
 
 export const PROFIT_SHARE_BLUEPRINT: SeizewellLayout = {
   sun: { position: [115200000000, 76800000000, 57600000000], size: 696340000, color: '#ffdcb2', intensity: 12.0 },
-  planet: { position: [-5534400, -1200400, -23838000], size: 6371000 },
-  asteroids: { count: 360, range: 1000, center: [-120, 30, -340] },
-  playerStart: [0, 50, 900],
+  planet: { position: [-5534400, -1200400, -23838000], size: 6371000 },  playerStart: [0, 50, 900],
   stations: [
     { name: 'Teladi Trading Station', modelPath: '/models/00001.obj', position: [-80, -10, -60], scale: 32, rotationAxis: 'z', rotationSpeed: -0.08, collisions: true },
     { name: 'Solar Power Plant (M)', modelPath: '/models/00285.obj', position: [-140, 0, 40], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },

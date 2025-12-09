@@ -3,7 +3,6 @@ import type { SeizewellLayout } from './seizewell'
 export const CLOUDBASE_SOUTH_EAST_BLUEPRINT: SeizewellLayout = {
   sun: { position: [60000000000, 50000000000, 40000000000], size: 500000000, color: '#ffeecc', intensity: 1.0 },
   planet: { position: [1500000, 1000000, 15000000], size: 5000000 },
-  asteroids: { count: 100, range: 1200, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
     { name: 'Solar Power Plant (M)', modelPath: '/models/00184.obj', position: [200, 0, 200], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },

@@ -3,7 +3,6 @@ import type { SeizewellLayout } from './seizewell'
 export const EMPERORS_RIDGE_BLUEPRINT: SeizewellLayout = {
   sun: { position: [-30000000000, 70000000000, 0], size: 680000000, color: '#ffcc66', intensity: 1.25 },
   planet: { position: [-4000000, 1000000, 22000000], size: 6200000 },
-  asteroids: { count: 160, range: 1600, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
     { name: 'Paranid Equipment Dock', modelPath: '/models/00448.obj', position: [1000, 0, -1000], scale: 34, rotationAxis: 'z', rotationSpeed: -0.00, collisions: true },

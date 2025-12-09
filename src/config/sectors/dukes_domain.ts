@@ -3,7 +3,6 @@ import type { SeizewellLayout } from './seizewell'
 export const DUKES_DOMAIN_BLUEPRINT: SeizewellLayout = {
   sun: { position: [0, 90000000000, 30000000000], size: 600000000, color: '#ffbb00', intensity: 1.1 },
   planet: { position: [5000000, -2000000, -20000000], size: 5800000 },
-  asteroids: { count: 140, range: 1800, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
     { name: 'Solar Power Plant (M)', modelPath: '/models/00279.obj', position: [0, 0, 0], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },

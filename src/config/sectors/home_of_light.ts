@@ -3,7 +3,6 @@ import type { SeizewellLayout } from './seizewell'
 export const HOME_OF_LIGHT_BLUEPRINT: SeizewellLayout = {
   sun: { position: [0, 80000000000, 40000000000], size: 600000000, color: '#ffeecc', intensity: 1.1 },
   planet: { position: [0, -1500000, 16000000], size: 5500000 },
-  asteroids: { count: 80, range: 1200, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
     { name: 'TerraCorp HQ', modelPath: '/models/00022.obj', position: [0, 100, 0], scale: 50, rotationAxis: 'y', rotationSpeed: 0.005, collisions: true },

@@ -3,7 +3,6 @@ import type { SeizewellLayout } from './seizewell'
 export const TELADI_GAIN_BLUEPRINT: SeizewellLayout = {
   sun: { position: [115200000000, 76800000000, 57600000000], size: 696340000, color: '#ffdcb2', intensity: 12.0 },
   planet: { position: [-4534400, -1700400, -19838000], size: 6371000 },
-  asteroids: { count: 400, range: 1200, center: [120, 20, -260] },
   playerStart: [0, 50, 900],
   stations: [
     { name: 'Teladi Trading Station', modelPath: '/models/00001.obj', position: [-60, -10, -30], scale: 32, rotationAxis: 'z', rotationSpeed: -0.08, collisions: true },

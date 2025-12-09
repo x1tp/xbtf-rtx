@@ -3,7 +3,6 @@ import type { SeizewellLayout } from './seizewell'
 export const THURUKS_PRIDE_BLUEPRINT: SeizewellLayout = {
   sun: { position: [-80000000000, 60000000000, 20000000000], size: 600000000, color: '#ffaa88', intensity: 1.1 },
   planet: { position: [3000000, 1500000, -16000000], size: 5800000 },
-  asteroids: { count: 140, range: 1400, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
     { name: 'Solar Power Plant (M)', modelPath: '/models/00275.obj', position: [200, 0, 300], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },

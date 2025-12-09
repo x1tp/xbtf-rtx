@@ -1,3 +1,5 @@
+import type { PlanetDatabaseEntry } from '../planetDatabase';
+
 export type BlueprintObject = {
     name: string;
     modelPath: string;
@@ -13,13 +15,13 @@ export type BlueprintObject = {
 
 export interface SeizewellLayout {
     sun: { position: [number, number, number]; size: number; color: string; intensity: number };
-    planet: { position: [number, number, number]; size: number };
+    planet: { position: [number, number, number]; size: number; type?: string; config?: PlanetDatabaseEntry };
     stations: BlueprintObject[];
     gates: BlueprintObject[];
     ships: BlueprintObject[];
-    asteroids: { count: number; range: number; center: [number, number, number] };
     playerStart?: [number, number, number];
-    background?: { type: 'starfield' | 'nebula'; texturePath?: string };
+    background?: { type: 'starfield' | 'nebula'; texturePath?: string; nebulaColor?: string; starDensity?: number };
+    ambientLight?: { intensity: number; color?: string };
 }
 
 /**
@@ -34,7 +36,6 @@ export const SEIZEWELL_BLUEPRINT: SeizewellLayout = {
     // with an actual solar radius so its apparent size matches reality.
     sun: { position: [115_200_000_000, 76_800_000_000, 57_600_000_000], size: 696_340_000, color: '#ffdfc4', intensity: 14.0 },
     planet: { position: [-453400, -170400, -8430000], size: 6371000 },
-    asteroids: { count: 520, range: 1400, center: [40, 40, -160] },
     playerStart: [0, 50, 900],
     stations: [
         { name: 'Teladi Trading Station', modelPath: '/models/00001.obj', position: [-40, -10, -20], scale: 32, rotationAxis: 'z', rotationSpeed: -0.08, collisions: true },

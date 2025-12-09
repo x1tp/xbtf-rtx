@@ -3,7 +3,6 @@ import type { SeizewellLayout } from './seizewell'
 export const FAMILY_CHIN_BLUEPRINT: SeizewellLayout = {
   sun: { position: [80000000000, 50000000000, 20000000000], size: 550000000, color: '#ffaa88', intensity: 1.0 },
   planet: { position: [3000000, -1000000, -14000000], size: 5300000 },
-  asteroids: { count: 100, range: 1200, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
     { name: 'Solar Power Plant (M)', modelPath: '/models/00275.obj', position: [200, 0, 300], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },

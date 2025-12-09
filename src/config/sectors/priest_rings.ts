@@ -3,7 +3,6 @@ import type { SeizewellLayout } from './seizewell'
 export const PRIEST_RINGS_BLUEPRINT: SeizewellLayout = {
   sun: { position: [-60000000000, 70000000000, 30000000000], size: 600000000, color: '#ffcc00', intensity: 1.2 },
   planet: { position: [-2500000, 1500000, 18000000], size: 5800000 },
-  asteroids: { count: 120, range: 1400, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
     { name: 'Solar Power Plant (M)', modelPath: '/models/00279.obj', position: [200, 0, 300], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },

@@ -3,7 +3,6 @@ import type { SeizewellLayout } from './seizewell'
 export const THREE_WORLDS_BLUEPRINT: SeizewellLayout = {
   sun: { position: [50000000000, 80000000000, 20000000000], size: 600000000, color: '#ffeecc', intensity: 1.1 },
   planet: { position: [2000000, 1000000, -15000000], size: 6000000 },
-  asteroids: { count: 80, range: 1500, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
     { name: 'Argon Equipment Dock', modelPath: '/models/00448.obj', position: [0, 0, 0], scale: 35, rotationAxis: 'y', rotationSpeed: 0.01, collisions: true },

@@ -3,7 +3,6 @@ import type { SeizewellLayout } from './seizewell'
 export const PRIEST_PITY_BLUEPRINT: SeizewellLayout = {
   sun: { position: [80000000000, 50000000000, 20000000000], size: 550000000, color: '#ffaa66', intensity: 1.0 },
   planet: { position: [3000000, -1000000, -14000000], size: 5200000 },
-  asteroids: { count: 180, range: 1500, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
     { name: 'Pirate Base', modelPath: '/models/00397.obj', position: [1000, -500, 1000], scale: 50, rotationAxis: 'y', rotationSpeed: 0.05, collisions: true }, // Placeholder

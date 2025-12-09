@@ -1,5 +1,6 @@
 import { UNIVERSE_SECTORS_XBTF } from './universe_xbtf'
 import type { SeizewellLayout, BlueprintObject } from './sectors/seizewell'
+import { PLANET_DATABASE } from './planetDatabase'
 
 // Boron
 import { KINGDOM_END_BLUEPRINT } from './sectors/kingdom_end'
@@ -71,15 +72,13 @@ export interface SectorConfig {
   sun: { position: [number, number, number]; size: number; color: string; intensity: number };
   planet: { position: [number, number, number]; size: number };
   station: { position: [number, number, number]; scale: number; modelPath: string; rotationSpeed: number; rotationAxis: 'x' | 'y' | 'z' };
-  asteroids: { count: number; range: number; center: [number, number, number] };
   background?: { type: 'starfield' | 'nebula'; texturePath?: string };
 }
 export const DEFAULT_SECTOR_CONFIG: SectorConfig = {
   // Approximate real-scale: 1 AU distance and real solar radius (meters)
   sun: { position: [149600000000, 20000000, 0], size: 696340000, color: '#ffddaa', intensity: 5.0 },
   planet: { position: [5097200, 318575, -6371500], size: 6371000 },
-  station: { position: [50, 0, -120], scale: 40, modelPath: '/models/00001.obj', rotationSpeed: -0.05, rotationAxis: 'z' },
-  asteroids: { count: 500, range: 400, center: [-250, 80, -900] }
+  station: { position: [50, 0, -120], scale: 40, modelPath: '/models/00001.obj', rotationSpeed: -0.05, rotationAxis: 'z' }
 };
 
 const MANUAL_SECTOR_LAYOUTS: Record<string, SeizewellLayout> = {
@@ -150,8 +149,38 @@ const MANUAL_SECTOR_LAYOUTS: Record<string, SeizewellLayout> = {
   xenon_sector_9: XENON_SECTOR_9_BLUEPRINT,
 }
 
+// --- Procedural Generation Utils ---
+class SeededRandom {
+  private seed: number;
+  constructor(seed: number) {
+    this.seed = seed;
+  }
+  // Simple LCG
+  next(): number {
+    this.seed = (this.seed * 1664525 + 1013904223) % 4294967296;
+    return this.seed / 4294967296;
+  }
+  range(min: number, max: number): number {
+    return min + this.next() * (max - min);
+  }
+  pick<T>(array: T[]): T {
+    return array[Math.floor(this.next() * array.length)];
+  }
+}
+
+// Ensure Seizewell remains fixed
+const FIXED_SECTORS = ['seizewell'];
+
 export const getSectorLayoutById = (id: string): SeizewellLayout => {
   const sector = UNIVERSE_SECTORS_XBTF.find((s) => s.id === id) || UNIVERSE_SECTORS_XBTF[0]
+
+  // Use a hash of the sector ID to seed the PRNG
+  let seed = 0;
+  for (let i = 0; i < sector.id.length; i++) {
+    seed = ((seed << 5) - seed) + sector.id.charCodeAt(i);
+    seed |= 0;
+  }
+  const rng = new SeededRandom(Math.abs(seed));
 
   const generatedGates = (sector?.neighbors || []).map((nm) => {
     const neighbor = UNIVERSE_SECTORS_XBTF.find((s) => s.name === nm)
@@ -204,26 +233,97 @@ export const getSectorLayoutById = (id: string): SeizewellLayout => {
   }).filter((g) => !!g) as BlueprintObject[]
 
   const manual = MANUAL_SECTOR_LAYOUTS[id as keyof typeof MANUAL_SECTOR_LAYOUTS]
+
+  // Base configuration (can be overridden by procedural generation below)
+  let layout: SeizewellLayout = {
+    gates: generatedGates,
+    stations: [
+      { name: 'Trading Station', position: DEFAULT_SECTOR_CONFIG.station.position, scale: DEFAULT_SECTOR_CONFIG.station.scale, modelPath: DEFAULT_SECTOR_CONFIG.station.modelPath },
+    ],
+    ships: [],
+    sun: { position: [149600000000, 20000000, 0], size: DEFAULT_SECTOR_CONFIG.sun.size, color: DEFAULT_SECTOR_CONFIG.sun.color, intensity: DEFAULT_SECTOR_CONFIG.sun.intensity },
+    planet: { position: [5097200, 318575, -6371500], size: DEFAULT_SECTOR_CONFIG.planet.size },
+    playerStart: [0, 50, 900],
+  };
+
+  // If manual layout exists, blindly copy it first
   if (manual) {
-    return {
-      ...manual,
-      // If manual layout has gates, use them. Otherwise use generated gates.
-      gates: (manual.gates && manual.gates.length > 0) ? manual.gates : generatedGates
+    layout = { ...layout, ...manual };
+    // If manual layout has gates, use them. Otherwise use generated gates.
+    if (manual.gates && manual.gates.length > 0) {
+      layout.gates = manual.gates;
     }
   }
-  const stations = [
-    { name: 'Trading Station', position: DEFAULT_SECTOR_CONFIG.station.position, scale: DEFAULT_SECTOR_CONFIG.station.scale, rotate: true, modelPath: DEFAULT_SECTOR_CONFIG.station.modelPath },
-  ]
-  const sunPosition = [115200000000, 76800000000, 57600000000] as [number, number, number]
-  const planetPosition = [-4534400, -1700400, -19838000] as [number, number, number]
-  const playerStart: [number, number, number] = [0, 50, 900]
-  return {
-    gates: generatedGates,
-    stations,
-    ships: [],
-    sun: { position: sunPosition, size: DEFAULT_SECTOR_CONFIG.sun.size, color: DEFAULT_SECTOR_CONFIG.sun.color, intensity: DEFAULT_SECTOR_CONFIG.sun.intensity },
-    planet: { position: planetPosition, size: DEFAULT_SECTOR_CONFIG.planet.size },
-    asteroids: { count: 520, range: 1400, center: [40, 40, -160] },
-    playerStart,
-  } as SeizewellLayout
+
+  // PROC GEN INJECTION
+  // If NOT Seizewell, we inject variations to override defaults (or simple manual copies)
+  if (!FIXED_SECTORS.includes(id)) {
+    // 1. Varied Sun
+    const sunColors = [
+      '#ffaa00', // Yellow (Default)
+      '#ffddaa', // Pale Yellow
+      '#ffecdb', // White-Yellow
+      '#ffffff', // White
+      '#aaddff', // Blue-White
+      '#88bbff', // Blue
+      '#ff8866', // Red-Orange
+      '#ff4422', // Red Giant
+    ];
+    const sunColor = rng.pick(sunColors);
+    const sunSizeMult = rng.range(0.8, 3.0);
+    // Place sun in random quadrant but far away
+    const sunDist = 149600000000; // 1 AU
+    const sunTheta = rng.range(0, Math.PI * 2);
+    const sunPhi = rng.range(-0.5, 0.5); // Keep it relatively near the ecliptic
+    const sunX = sunDist * Math.cos(sunTheta) * Math.cos(sunPhi);
+    const sunY = sunDist * Math.sin(sunPhi);
+    const sunZ = sunDist * Math.sin(sunTheta) * Math.cos(sunPhi);
+
+    layout.sun = {
+      ...layout.sun,
+      color: sunColor,
+      size: DEFAULT_SECTOR_CONFIG.sun.size * sunSizeMult,
+      position: [sunX, sunY, sunZ],
+      intensity: 1.5 + rng.range(0, 2.0)
+    };
+
+    // 2. Varied Planet
+    const planetTypes = ['terran', 'desert', 'ice', 'volcanic', 'barren', 'alien', 'gas_giant'];
+    const planetType = rng.pick(planetTypes);
+    const planetConfig = PLANET_DATABASE[planetType];
+
+    if (planetConfig) {
+      layout.planet = {
+        ...layout.planet,
+        // We attach the full config to the layout so Scene.tsx can use it
+        config: planetConfig,
+        size: planetConfig.size || layout.planet.size
+      };
+    }
+
+    // 3. Varied Background (Skybox)
+    // Only override if no background is set, OR if it's a generic starfield WITHOUT a specific texture
+    if (!layout.background || (layout.background.type === 'starfield' && !layout.background.texturePath)) {
+      const density = rng.range(0.1, 0.3);
+
+      // Randomly pick a skybox texture
+      // We include 'undefined' (default/none) as an option
+      const skyboxOptions = [
+        undefined,
+        '/materials/skybox/dense_stars.png',
+        '/materials/skybox/nebula_green.png',
+        '/materials/skybox/nebula_purple.png',
+        '/materials/skybox/nebula_red.png'
+      ];
+      const skybox = rng.pick(skyboxOptions);
+
+      layout.background = {
+        type: 'starfield',
+        starDensity: density,
+        texturePath: skybox
+      };
+    }
+  }
+
+  return layout;
 }

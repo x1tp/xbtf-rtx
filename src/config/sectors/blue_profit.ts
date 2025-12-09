@@ -3,7 +3,6 @@ import type { SeizewellLayout } from './seizewell'
 export const BLUE_PROFIT_BLUEPRINT: SeizewellLayout = {
   sun: { position: [90000000000, 40000000000, 10000000000], size: 500000000, color: '#ffdfc4', intensity: 1.1 },
   planet: { position: [3000000, -2000000, -12000000], size: 5000000 },
-  asteroids: { count: 120, range: 1100, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
     { name: 'Solar Power Plant (M)', modelPath: '/models/00285.obj', position: [200, 0, 200], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },

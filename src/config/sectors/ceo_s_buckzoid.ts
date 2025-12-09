@@ -3,7 +3,6 @@ import type { SeizewellLayout } from './seizewell'
 export const CEO_S_BUCKZOID_BLUEPRINT: SeizewellLayout = {
   sun: { position: [100000000000, 60000000000, 20000000000], size: 600000000, color: '#ffdfc4', intensity: 1.2 },
   planet: { position: [2500000, -1000000, -15000000], size: 5500000 },
-  asteroids: { count: 180, range: 1300, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
     { name: 'Teladi Equipment Dock', modelPath: '/models/00448.obj', position: [0, 0, 0], scale: 34, rotationAxis: 'z', rotationSpeed: -0.00, collisions: true },

@@ -3,7 +3,6 @@ import type { SeizewellLayout } from './seizewell'
 export const THURUKS_BEARD_BLUEPRINT: SeizewellLayout = {
   sun: { position: [100000000000, 70000000000, 30000000000], size: 600000000, color: '#ffaa88', intensity: 1.1 },
   planet: { position: [-2500000, 1000000, 18000000], size: 5600000 },
-  asteroids: { count: 120, range: 1300, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
     { name: 'Split Equipment Dock', modelPath: '/models/00448.obj', position: [0, 0, 0], scale: 34, rotationAxis: 'z', rotationSpeed: -0.00, collisions: true },

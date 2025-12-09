@@ -3,7 +3,6 @@ import type { SeizewellLayout } from './seizewell'
 export const CLOUDBASE_SOUTH_WEST_BLUEPRINT: SeizewellLayout = {
   sun: { position: [-80000000000, 50000000000, 30000000000], size: 500000000, color: '#ffeecc', intensity: 1.0 },
   planet: { position: [-2500000, 1000000, 18000000], size: 5000000 },
-  asteroids: { count: 90, range: 1300, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
     { name: 'Goner Temple', modelPath: '/models/00026.obj', position: [0, 100, 0], scale: 60, rotationAxis: 'y', rotationSpeed: 0.002, collisions: true },

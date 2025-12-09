@@ -233,7 +233,7 @@ export const NPCTrader: FC<NPCTraderProps> = ({
     const amt = typeof extra?.amount === 'number' ? extra.amount : 'n/a';
     const tgtSector = currentCommand?.targetSectorId || extra?.sectorIdOverride || fleet.destinationSectorId || 'n/a';
     const stepInfo = `${type} | pos=(${pos.map(v => v.toFixed(1)).join(',')}) | station=${station} | sector=${sectorId} -> ${tgtSector} | ware=${ware} | amt=${amt}`;
-    console.log(`[NPCTrader] ${fleet.name} ${stepInfo}`);
+    // console.log(`[NPCTrader] ${fleet.name} ${stepInfo}`);
 
     onReport(fleet.id, type, payload);
 
@@ -369,15 +369,13 @@ export const NPCTrader: FC<NPCTraderProps> = ({
     if (fleet.currentSectorId !== prevSectorIdRef.current) {
       prevSectorIdRef.current = fleet.currentSectorId;
       initializedRef.current = false;
-      // Only reset to idle if we were gone (in transit)
-      if (localState === 'gone') {
-        setLocalState('idle');
-      }
+      // Always reset to idle when sector changes to force re-evaluation of commands
+      setLocalState('idle');
       // Reset docking state to prevent teleportation to previous dock location
       holdDockRef.current = false;
       dockAnchorRef.current = null;
     }
-  }, [fleet.currentSectorId, localState]);
+  }, [fleet.currentSectorId]);
 
   // Process current command to determine what to do
   useEffect(() => {
@@ -741,9 +739,9 @@ export const NPCTrader: FC<NPCTraderProps> = ({
           ? gateRadius * 2.0 // Larger acceptance radius for capital ships to avoid collision struggles
           : gateRadius * 0.8;
         if (dist > enterPrepRadius) {
-          if (fleet.shipType === 'Albatross' && now % 2000 < 20) {
-            console.log(`[NPCTrader] Albatross flying-to-gate dist=${dist.toFixed(1)} vel=${velocityRef.current.length().toFixed(1)} enterPrep=${enterPrepRadius.toFixed(1)}`)
-          }
+          // if (fleet.shipType === 'Albatross' && now % 2000 < 20) {
+          //   console.log(`[NPCTrader] Albatross flying-to-gate dist=${dist.toFixed(1)} vel=${velocityRef.current.length().toFixed(1)} enterPrep=${enterPrepRadius.toFixed(1)}`)
+          // }
 
           // Calculate desired direction
           tmpDir.copy(waypoint || gatePos).sub(ship.position).normalize();

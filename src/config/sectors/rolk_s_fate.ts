@@ -3,7 +3,6 @@ import type { SeizewellLayout } from './seizewell'
 export const ROLK_S_FATE_BLUEPRINT: SeizewellLayout = {
   sun: { position: [120000000000, 80000000000, 60000000000], size: 700000000, color: '#ddffff', intensity: 10.0 },
   planet: { position: [-5000000, 3000000, 20000000], size: 6500000 },
-  asteroids: { count: 220, range: 1300, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
     { name: 'Boron Equipment Dock', modelPath: '/models/00448.obj', position: [0, 0, 0], scale: 34, rotationAxis: 'z', rotationSpeed: -0.00, collisions: true },

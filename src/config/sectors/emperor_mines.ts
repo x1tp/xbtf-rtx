@@ -3,7 +3,6 @@ import type { SeizewellLayout } from './seizewell'
 export const EMPEROR_MINES_BLUEPRINT: SeizewellLayout = {
   sun: { position: [50000000000, 60000000000, 20000000000], size: 550000000, color: '#ffcc00', intensity: 1.1 },
   planet: { position: [2000000, 1000000, -15000000], size: 5500000 },
-  asteroids: { count: 200, range: 1600, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
     { name: 'Solar Power Plant (M)', modelPath: '/models/00279.obj', position: [200, 0, 200], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },

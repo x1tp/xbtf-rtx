@@ -3,7 +3,6 @@ import type { SeizewellLayout } from './seizewell'
 export const QUEENS_SPACE_BLUEPRINT: SeizewellLayout = {
   sun: { position: [110000000000, 60000000000, 30000000000], size: 600000000, color: '#ddffff', intensity: 9.5 },
   planet: { position: [-4000000, 2000000, 18000000], size: 6000000 },
-  asteroids: { count: 180, range: 1100, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
     { name: 'Solar Power Plant (M)', modelPath: '/models/00281.obj', position: [100, 50, 200], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },

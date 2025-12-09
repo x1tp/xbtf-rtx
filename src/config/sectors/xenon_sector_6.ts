@@ -3,7 +3,6 @@ import type { SeizewellLayout } from './seizewell'
 export const XENON_SECTOR_6_BLUEPRINT: SeizewellLayout = {
   sun: { position: [70000000000, 70000000000, 0], size: 600000000, color: '#aa4400', intensity: 1.0 },
   planet: { position: [-5000000, 1000000, -22000000], size: 6300000 },
-  asteroids: { count: 260, range: 2600, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
     { name: 'Xenon Station', modelPath: '/models/00120.obj', position: [2000, 0, -2000], scale: 45, rotationAxis: 'y', rotationSpeed: 0.02, collisions: true },

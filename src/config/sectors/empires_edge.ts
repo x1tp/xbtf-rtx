@@ -3,7 +3,6 @@ import type { SeizewellLayout } from './seizewell'
 export const EMPIRES_EDGE_BLUEPRINT: SeizewellLayout = {
   sun: { position: [0, 80000000000, 0], size: 750000000, color: '#ffcc33', intensity: 1.2 },
   planet: { position: [0, -3000000, 25000000], size: 6500000 },
-  asteroids: { count: 120, range: 2000, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
     { name: 'Solar Power Plant (M)', modelPath: '/models/00279.obj', position: [-2000, 0, 2000], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },

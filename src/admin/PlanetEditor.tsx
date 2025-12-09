@@ -19,8 +19,7 @@ export const PlanetEditor: React.FC = () => {
       return {
         sun: { ...DEFAULT_SECTOR_CONFIG.sun, ...(parsed.sun || {}) },
         planet: { ...DEFAULT_SECTOR_CONFIG.planet, ...(parsed.planet || {}) },
-        station: { ...DEFAULT_SECTOR_CONFIG.station, ...(parsed.station || {}) },
-        asteroids: { ...DEFAULT_SECTOR_CONFIG.asteroids, ...(parsed.asteroids || {}) }
+        station: { ...DEFAULT_SECTOR_CONFIG.station, ...(parsed.station || {}) }
       };
     } catch {
       return DEFAULT_SECTOR_CONFIG;
@@ -54,8 +53,7 @@ export const PlanetEditor: React.FC = () => {
     const cfg = {
       sun: { position: [sunX, sunY, sunZ], size: DEFAULT_SECTOR_CONFIG.sun.size, color: DEFAULT_SECTOR_CONFIG.sun.color, intensity: DEFAULT_SECTOR_CONFIG.sun.intensity },
       planet: { position: [positionX, positionY, positionZ], size },
-      station: DEFAULT_SECTOR_CONFIG.station,
-      asteroids: DEFAULT_SECTOR_CONFIG.asteroids
+      station: DEFAULT_SECTOR_CONFIG.station
     };
     if (typeof window !== 'undefined') window.localStorage.setItem('sector:config', JSON.stringify(cfg));
   };
@@ -79,28 +77,11 @@ export const PlanetEditor: React.FC = () => {
       const targets: THREE.Object3D[] = [];
       const s = scene.getObjectByName('Station'); if (s) targets.push(s);
       const p = scene.getObjectByName('PlanetGroup'); if ((includePlanet || recenterKey === 'planet') && p) targets.push(p);
-      const a = scene.getObjectByName('AsteroidField') as unknown as (InstancedMesh & { userData: { positions?: THREE.Vector3[]; scales?: number[] } }) | null;
       const bbox = new Box3();
       let haveAny = false;
       for (const obj of targets) {
         const b = new Box3().setFromObject(obj);
         if (!haveAny) { bbox.copy(b); haveAny = true; } else { bbox.union(b); }
-      }
-      if (a && a.userData && a.userData.positions && a.userData.scales && a.userData.positions.length > 0) {
-        let minX = Infinity, minY = Infinity, minZ = Infinity;
-        let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
-        for (let i = 0; i < a.userData.positions.length; i++) {
-          const v = a.userData.positions[i];
-          const r = (a.userData.scales[i] || 0);
-          if (v.x - r < minX) minX = v.x - r;
-          if (v.y - r < minY) minY = v.y - r;
-          if (v.z - r < minZ) minZ = v.z - r;
-          if (v.x + r > maxX) maxX = v.x + r;
-          if (v.y + r > maxY) maxY = v.y + r;
-          if (v.z + r > maxZ) maxZ = v.z + r;
-        }
-        const ab = new Box3(new Vector3(minX, minY, minZ), new Vector3(maxX, maxY, maxZ));
-        if (!haveAny) { bbox.copy(ab); haveAny = true; } else { bbox.union(ab); }
       }
       if (!haveAny || recenterKey === 'planet') {
         const cx = center[0], cy = center[1], cz = center[2];
@@ -162,28 +143,11 @@ export const PlanetEditor: React.FC = () => {
       const scene = state.scene;
       const s = scene.getObjectByName('Station');
       const p = scene.getObjectByName('PlanetGroup');
-      const a = scene.getObjectByName('AsteroidField') as unknown as (InstancedMesh & { userData: { positions?: THREE.Vector3[]; scales?: number[] } }) | null;
-      if (!s && !a && !(includePlanet && p)) return;
+      if (!s && !(includePlanet && p)) return;
       const bbox = new Box3();
       let haveAny = false;
       if (s) { bbox.setFromObject(s); haveAny = true; }
       if (includePlanet && p) { const pb = new Box3().setFromObject(p); if (!haveAny) { bbox.copy(pb); haveAny = true; } else { bbox.union(pb); } }
-      if (a && a.userData && a.userData.positions && a.userData.scales && a.userData.positions.length > 0) {
-        let minX = Infinity, minY = Infinity, minZ = Infinity;
-        let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
-        for (let i = 0; i < a.userData.positions.length; i++) {
-          const v = a.userData.positions[i];
-          const r = (a.userData.scales[i] || 0);
-          if (v.x - r < minX) minX = v.x - r;
-          if (v.y - r < minY) minY = v.y - r;
-          if (v.z - r < minZ) minZ = v.z - r;
-          if (v.x + r > maxX) maxX = v.x + r;
-          if (v.y + r > maxY) maxY = v.y + r;
-          if (v.z + r > maxZ) maxZ = v.z + r;
-        }
-        const ab = new Box3(new Vector3(minX, minY, minZ), new Vector3(maxX, maxY, maxZ));
-        if (!haveAny) { bbox.copy(ab); haveAny = true; } else { bbox.union(ab); }
-      }
       if (!haveAny) return;
       let centerVec = bbox.getCenter(new Vector3());
       const sizeVec = bbox.getSize(new Vector3());
@@ -268,7 +232,6 @@ export const PlanetEditor: React.FC = () => {
       const occluders: THREE.Object3D[] = [];
       const p = scene.getObjectByName('PlanetGroup'); if (p) occluders.push(p);
       const st = scene.getObjectByName('Station'); if (st) occluders.push(st);
-      const a = scene.getObjectByName('AsteroidField'); if (a) occluders.push(a);
       const hits = ray.intersectObjects(occluders, true);
       const visible = hits.length === 0;
       u.uSunVisible.value = visible ? 1 : 0;
@@ -409,7 +372,6 @@ export const PlanetEditor: React.FC = () => {
             atmosphereEnabled={rimMode !== 'hide'}
             cloudsParams={{ enabled: cloudsEnabled, opacity: cloudOpacity, alphaTest: cloudAlphaTest }}
           />
-          <Asteroids count={500} range={400} />
           {showGrid && (
             <Grid
               position={[0, 0, 0]}
@@ -473,7 +435,7 @@ export const PlanetEditor: React.FC = () => {
           Include Planet in Fit
         </label>
         <div style={{ gridColumn: '1 / span 2', display: 'flex', gap: 8 }}>
-          <button onClick={() => { setFitReq('stations'); }} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Fit Station/Asteroids</button>
+          <button onClick={() => { setFitReq('stations'); }} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Fit Stations</button>
           <button onClick={() => { setFitReq('planet'); }} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff' }}>Fit Planet</button>
         </div>
         <div style={{ gridColumn: '1 / span 2', display: 'flex', gap: 8 }}>
@@ -499,152 +461,4 @@ export const PlanetEditor: React.FC = () => {
   );
 };
 
-interface AsteroidsProps { count: number; range: number }
-const Asteroids: React.FC<AsteroidsProps> = ({ count, range }) => {
-  const meshRef = useRef<InstancedMesh>(null);
-  const positionsRef = useRef<THREE.Vector3[]>([]);
-  const velocitiesRef = useRef<THREE.Vector3[]>([]);
-  const scalesRef = useRef<number[]>([]);
-  const bodiesRef = useRef<RAPIERType.RigidBody[]>([]);
-  type AsteroidUserData = { positions: THREE.Vector3[]; velocities: THREE.Vector3[]; scales: number[] };
-  const mobileThreshold = 10.0;
-  const [particles] = useState(() => {
-    const temp: { position: [number, number, number]; scale: number }[] = [];
-    for (let i = 0; i < count; i++) {
-      const x = (Math.random() - 0.5) * range;
-      const y = (Math.random() - 0.5) * range;
-      const z = (Math.random() - 0.5) * range;
-      const scale = 0.8 + Math.random() * 4.2;
-      temp.push({ position: [x, y, z], scale });
-    }
-    return temp;
-  });
-  useEffect(() => {
-    let cancelled = false;
-    if (!meshRef.current) return;
-    positionsRef.current = particles.map((p) => new THREE.Vector3(p.position[0], p.position[1], p.position[2]));
-    velocitiesRef.current = new Array(particles.length).fill(0).map(() => new THREE.Vector3());
-    scalesRef.current = particles.map((p) => p.scale);
-    const dummy = new THREE.Object3D();
-    for (let i = 0; i < particles.length; i++) {
-      const pos = positionsRef.current[i];
-      const s = scalesRef.current[i];
-      dummy.position.copy(pos);
-      dummy.scale.set(s, s, s);
-      dummy.rotation.set(0, 0, 0);
-      dummy.updateMatrix();
-      meshRef.current!.setMatrixAt(i, dummy.matrix);
-    }
-    meshRef.current.instanceMatrix.needsUpdate = true;
-    meshRef.current.frustumCulled = false;
-    const ud = meshRef.current.userData as AsteroidUserData;
-    ud.positions = positionsRef.current;
-    ud.velocities = velocitiesRef.current;
-    ud.scales = scalesRef.current;
-    (async () => {
-      const RAPIER = await ensureRapier();
-      if (cancelled) return;
-      const world = await getWorld();
-      if (cancelled) return;
-      const bodies: RAPIERType.RigidBody[] = [];
-      const randVec = (scale: number) => ({
-        x: (Math.random() - 0.5) * 3.2 * scale,
-        y: (Math.random() - 0.5) * 1.2 * scale,
-        z: (Math.random() - 0.5) * 3.2 * scale
-      });
-      for (let i = 0; i < positionsRef.current.length; i++) {
-        if (cancelled) break;
-        const pos = positionsRef.current[i];
-        const s = scalesRef.current[i];
-        const isMobile = s <= mobileThreshold;
-        const rbDesc = isMobile
-          ? RAPIER.RigidBodyDesc.dynamic()
-              .setTranslation(pos.x, pos.y, pos.z)
-              .setLinearDamping(0.0)
-              .setAngularDamping(0.005)
-              .setCcdEnabled(true)
-              .setCanSleep(false)
-          : RAPIER.RigidBodyDesc.fixed()
-              .setTranslation(pos.x, pos.y, pos.z);
-        const body = world.createRigidBody(rbDesc);
-        const collDesc = RAPIER.ColliderDesc.ball(s)
-          .setRestitution(isMobile ? 0.4 : 0.0)
-          .setFriction(isMobile ? 0.35 : 0.8);
-        if (isMobile && 'setDensity' in collDesc) {
-          (collDesc as unknown as { setDensity: (d: number) => unknown }).setDensity(0.1);
-        }
-        world.createCollider(collDesc, body);
-        if (isMobile && 'setAngvel' in body) {
-          (body as unknown as { setAngvel: (v: { x: number; y: number; z: number }, wake: boolean) => void })
-            .setAngvel({ x: (Math.random() - 0.5) * 0.1, y: (Math.random() - 0.5) * 0.1, z: (Math.random() - 0.5) * 0.1 }, true);
-        }
-        if (isMobile && 'setLinvel' in body) {
-          (body as unknown as { setLinvel: (v: { x: number; y: number; z: number }, wake: boolean) => void })
-            .setLinvel(randVec(1.0), true);
-        }
-        bodies.push(body);
-      }
-      if (cancelled) {
-        bodies.forEach(b => world.removeRigidBody(b));
-        return;
-      }
-      bodiesRef.current = bodies;
-    })();
-    return () => {
-      cancelled = true;
-      if (bodiesRef.current.length > 0) {
-        const w = getWorldSync();
-        if (w) {
-          bodiesRef.current.forEach((b: RAPIERType.RigidBody) => w.removeRigidBody(b));
-        }
-        bodiesRef.current = [];
-      }
-    };
-  }, [particles]);
-  useFrame(() => {
-    const mesh = meshRef.current;
-    if (!mesh) return;
-    const dummy = new THREE.Object3D();
-    const bodies = bodiesRef.current || [];
-    for (let i = 0; i < bodies.length; i++) {
-      const body = bodies[i];
-      const t = body.translation();
-      const r = body.rotation();
-      positionsRef.current[i].set(t.x, t.y, t.z);
-      const s = scalesRef.current[i];
-      dummy.position.set(t.x, t.y, t.z);
-      dummy.scale.set(s, s, s);
-      dummy.quaternion.set(r.x, r.y, r.z, r.w);
-      dummy.updateMatrix();
-      mesh.setMatrixAt(i, dummy.matrix);
-    }
-    mesh.instanceMatrix.needsUpdate = true;
-  });
-  const matRef = useRef<THREE.MeshStandardMaterial | null>(null);
-  useEffect(() => {
-    const loader = new TextureLoader();
-    const paths = [
-      '/materials/asteroid/baseColor.png',
-      '/materials/asteroid/roughness.png',
-      '/materials/asteroid/metallic.png',
-      '/materials/asteroid/normal.png'
-    ];
-    Promise.all(paths.map((p) => loader.loadAsync(p).catch(() => null))).then(([map, rough, metal, normal]) => {
-      if (!matRef.current) return;
-      const aniso = 4;
-      if (map) { const t = map as Texture; t.colorSpace = SRGBColorSpace; t.wrapS = RepeatWrapping; t.wrapT = RepeatWrapping; t.anisotropy = aniso; matRef.current.map = t; }
-      if (rough) { const t = rough as Texture; t.colorSpace = LinearSRGBColorSpace; t.wrapS = RepeatWrapping; t.wrapT = RepeatWrapping; t.anisotropy = aniso; matRef.current.roughnessMap = t; }
-      if (metal) { const t = metal as Texture; t.colorSpace = LinearSRGBColorSpace; t.wrapS = RepeatWrapping; t.wrapT = RepeatWrapping; t.anisotropy = aniso; matRef.current.metalnessMap = t; }
-      if (normal) { const t = normal as Texture; t.colorSpace = LinearSRGBColorSpace; t.wrapS = RepeatWrapping; t.wrapT = RepeatWrapping; t.anisotropy = aniso; matRef.current.normalMap = t; }
-      matRef.current.roughness = 0.9;
-      matRef.current.metalness = 0.02;
-      matRef.current.needsUpdate = true;
-    });
-  }, []);
-  return (
-    <instancedMesh ref={meshRef} name="AsteroidField" args={[undefined, undefined, count]} castShadow receiveShadow>
-      <dodecahedronGeometry args={[1, 0]} />
-      <meshStandardMaterial ref={matRef} color="#554433" roughness={0.9} />
-    </instancedMesh>
-  );
-};
+

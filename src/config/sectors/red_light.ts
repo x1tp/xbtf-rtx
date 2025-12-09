@@ -3,7 +3,6 @@ import type { SeizewellLayout } from './seizewell'
 export const RED_LIGHT_BLUEPRINT: SeizewellLayout = {
   sun: { position: [-60000000000, 50000000000, -30000000000], size: 550000000, color: '#ffaaaa', intensity: 1.1 },
   planet: { position: [-2000000, 1000000, -15000000], size: 5500000 },
-  asteroids: { count: 110, range: 1300, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
     { name: 'Argon Equipment Dock', modelPath: '/models/00448.obj', position: [0, 0, 0], scale: 35, rotationAxis: 'y', rotationSpeed: 0.01, collisions: true },

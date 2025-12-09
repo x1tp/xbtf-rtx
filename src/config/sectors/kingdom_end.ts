@@ -3,7 +3,6 @@ import type { SeizewellLayout } from './seizewell'
 export const KINGDOM_END_BLUEPRINT: SeizewellLayout = {
   sun: { position: [115200000000, 76800000000, 57600000000], size: 696340000, color: '#ddffff', intensity: 10.0 },
   planet: { position: [4534400, 1700400, -19838000], size: 6371000 },
-  asteroids: { count: 200, range: 1200, center: [0, 0, 0] },
   playerStart: [0, 50, 0],
   stations: [
     { name: 'Boron Shipyard', modelPath: '/models/00444.obj', position: [100, -50, 200], scale: 38, rotationAxis: 'z', rotationSpeed: -0.00, collisions: true },

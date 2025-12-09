@@ -3,7 +3,6 @@ import type { SeizewellLayout } from './seizewell'
 export const HERRON_S_NEBULA_BLUEPRINT: SeizewellLayout = {
   sun: { position: [90000000000, 50000000000, 30000000000], size: 600000000, color: '#ffddcc', intensity: 1.0 },
   planet: { position: [2500000, -1000000, -18000000], size: 5800000 },
-  asteroids: { count: 120, range: 1600, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
     { name: 'Argon Trading Station', modelPath: '/models/00186.obj', position: [0, 0, 0], scale: 35, rotationAxis: 'y', rotationSpeed: 0.02, collisions: true },

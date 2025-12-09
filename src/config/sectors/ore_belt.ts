@@ -3,7 +3,6 @@ import type { SeizewellLayout } from './seizewell'
 export const ORE_BELT_BLUEPRINT: SeizewellLayout = {
   sun: { position: [90000000000, 70000000000, -20000000000], size: 600000000, color: '#ffccaa', intensity: 1.0 },
   planet: { position: [2000000, -1500000, -12000000], size: 5500000 },
-  asteroids: { count: 400, range: 2500, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
     { name: 'Pirate Base', modelPath: '/models/00397.obj', position: [1000, 500, -2000], scale: 50, rotationAxis: 'y', rotationSpeed: 0.05, collisions: true }, // Placeholder

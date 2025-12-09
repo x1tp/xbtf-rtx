@@ -3,7 +3,6 @@ import type { SeizewellLayout } from './seizewell'
 export const PRESIDENT_S_END_BLUEPRINT: SeizewellLayout = {
   sun: { position: [70000000000, 60000000000, 20000000000], size: 550000000, color: '#ffccaa', intensity: 1.0 },
   planet: { position: [3000000, 2000000, -15000000], size: 5200000 },
-  asteroids: { count: 120, range: 1400, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
     { name: 'Solar Power Plant (M)', modelPath: '/models/00184.obj', position: [200, 0, 300], scale: 40, rotationAxis: 'y', rotationSpeed: 0.00, collisions: true },

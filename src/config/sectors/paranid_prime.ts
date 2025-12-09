@@ -3,7 +3,6 @@ import type { SeizewellLayout } from './seizewell'
 export const PARANID_PRIME_BLUEPRINT: SeizewellLayout = {
   sun: { position: [0, 90000000000, 0], size: 700000000, color: '#ffcc00', intensity: 1.3 },
   planet: { position: [0, -2000000, 20000000], size: 6000000 },
-  asteroids: { count: 150, range: 1800, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
     { name: 'Paranid Shipyard', modelPath: '/models/00444.obj', position: [0, 0, 500], scale: 38, rotationAxis: 'z', rotationSpeed: -0.00, collisions: true },

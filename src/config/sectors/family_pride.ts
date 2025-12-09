@@ -3,7 +3,6 @@ import type { SeizewellLayout } from './seizewell'
 export const FAMILY_PRIDE_BLUEPRINT: SeizewellLayout = {
   sun: { position: [100000000000, 80000000000, 40000000000], size: 700000000, color: '#ffaa88', intensity: 1.2 },
   planet: { position: [-3000000, 2000000, 20000000], size: 6500000 },
-  asteroids: { count: 180, range: 1600, center: [0, 0, 0] },
   playerStart: [0, 0, 0],
   stations: [
     { name: 'Split Shipyard', modelPath: '/models/00444.obj', position: [0, 0, 500], scale: 38, rotationAxis: 'z', rotationSpeed: -0.00, collisions: true },
