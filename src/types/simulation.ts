@@ -74,6 +74,7 @@ export type ShipCommandType =
   | 'wait'            // Hold position
   | 'trade-buy'       // Travel to station, dock, and buy ware
   | 'trade-sell'      // Travel to station, dock, and sell ware
+  | 'store-cargo'     // Store cargo at corp/rental storage (for cancelled orders)
   | 'move-to-sector'  // Travel to a specific sector (multi-hop)
 
 export interface ShipCommand {
@@ -96,6 +97,7 @@ export type ShipReportType =
   | 'arrived-at-gate'
   | 'entered-sector'
   | 'position-update'
+  | 'cargo-stored'    // Cargo stored at corp/rental storage
   | 'queue-complete'
 
 export interface ShipReport {

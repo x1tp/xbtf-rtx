@@ -123,7 +123,50 @@ export class FleetSimulator {
     }
 
     private getSectorNavData(sectorId: string): SectorNavData | null {
-        if (this.navDataCache.has(sectorId)) return this.navDataCache.get(sectorId)!;
+        const economyStations = useGameStore.getState().stations;
+        const cached = this.navDataCache.get(sectorId);
+
+        // If we already built nav data, ensure station IDs from the economy are mapped.
+        if (cached) {
+            let needsUpdate = false;
+            let stations = cached.stationPositions;
+            let obstacles = cached.obstacles;
+
+            for (const st of economyStations.filter(s => s.sectorId === sectorId)) {
+                const existingPos = stations.get(st.id) || stations.get(st.name);
+                // If the cache was built before stations were synced, we might only have the name key.
+                if (existingPos && !stations.has(st.id)) {
+                    if (!needsUpdate) {
+                        stations = new Map(stations);
+                        obstacles = [...obstacles];
+                    }
+                    stations.set(st.id, existingPos);
+                    needsUpdate = true;
+                } else if (!existingPos && st.position) {
+                    if (!needsUpdate) {
+                        stations = new Map(stations);
+                        obstacles = [...obstacles];
+                    }
+                    stations.set(st.id, st.position);
+                    stations.set(st.name, st.position);
+                    obstacles.push({
+                        id: `station-${st.name}`,
+                        center: new Vector3(st.position[0], st.position[1], st.position[2]),
+                        radius: 120,
+                        label: st.name
+                    });
+                    needsUpdate = true;
+                }
+            }
+
+            if (needsUpdate) {
+                const updated = { ...cached, stationPositions: stations, obstacles };
+                this.navDataCache.set(sectorId, updated);
+                return updated;
+            }
+
+            return cached;
+        }
 
         if (this.navBuildsThisFrame >= this.MAX_NAV_BUILDS_PER_FRAME) return null;
         this.navBuildsThisFrame++;
@@ -152,7 +195,6 @@ export class FleetSimulator {
         }
 
         // Add dynamic stations from store
-        const economyStations = useGameStore.getState().stations;
         for (const ec of economyStations.filter((s) => s.sectorId === sectorId)) {
             const layoutPos = layoutByName.get(ec.name);
             if (layoutPos) {
@@ -242,8 +284,14 @@ export class FleetSimulator {
             // Stay "in-transit" if there are more commands or an active destination
             const queue = fleet.commandQueue || [];
             const hasNext = queue.length > state.currentCommandIndex + 1;
-            positionUpdate.state = (hasNext || fleet.destinationSectorId) ? 'in-transit' : 'idle';
-            positionUpdate.targetStationId = undefined;
+            if (type === 'entered-sector') {
+                // Upon sector arrival, keep the fleet marked in-transit if there are remaining commands
+                positionUpdate.state = (hasNext || fleet.destinationSectorId) ? 'in-transit' : 'idle';
+                positionUpdate.destinationSectorId = fleet.destinationSectorId;
+            } else {
+                positionUpdate.state = (hasNext || fleet.destinationSectorId) ? 'in-transit' : 'idle';
+                positionUpdate.targetStationId = undefined;
+            }
         } else if (type === 'arrived-at-gate') {
             positionUpdate.state = 'in-transit';
         }
@@ -404,10 +452,36 @@ export class FleetSimulator {
                     }
                 }
                 break;
+            case 'store-cargo':
+                // Store all cargo at the docked station (for cancelled orders)
+                if (state.localState === 'docked') {
+                    state.localState = 'unloading';
+                    state.dockStationId = command.targetStationId ?? state.dockStationId;
+                    this.syncState(fleet, { state: 'unloading' });
+                    state.actionTimer = 0;
+                } else if (state.localState === 'unloading') {
+                    state.actionTimer += 16;
+                    if (state.actionTimer > 2000) {
+                        // Report all cargo types being stored
+                        const cargoKeys = Object.keys(fleet.cargo);
+                        for (const wareId of cargoKeys) {
+                            const amount = fleet.cargo[wareId];
+                            if (amount > 0) {
+                                this.report(fleet, state, 'cargo-stored', {
+                                    amount,
+                                    wareId,
+                                    stationId: state.dockStationId
+                                });
+                            }
+                        }
+                        this.advanceCommand(fleet, state, true);
+                    }
+                }
+                break;
             case 'goto-gate':
             case 'use-gate':
             case 'move-to-sector':
-                if (state.localState === 'idle') {
+                if (state.localState === 'idle' || state.localState === 'in-transit') {
                     if (command.targetSectorId) {
                         state.localState = command.type === 'use-gate' ? 'entering-gate' : 'flying-to-gate';
                         this.buildPathToGate(fleet, state, nav, command.targetSectorId, now);
