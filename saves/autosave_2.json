@@ -1,0 +1,2844 @@
+{
+  "wares": [
+    {
+      "id": "energy_cells",
+      "name": "Energy Cells",
+      "category": "primary",
+      "basePrice": 16,
+      "volume": 1
+    },
+    {
+      "id": "crystals",
+      "name": "Crystals",
+      "category": "intermediate",
+      "basePrice": 1684,
+      "volume": 1
+    },
+    {
+      "id": "sun_oil",
+      "name": "Sunrise Flowers Oil",
+      "category": "food",
+      "basePrice": 156,
+      "volume": 1
+    },
+    {
+      "id": "sunrise_flowers",
+      "name": "Sunrise Flowers",
+      "category": "food",
+      "basePrice": 54,
+      "volume": 1
+    },
+    {
+      "id": "teladianium",
+      "name": "Teladianium",
+      "category": "intermediate",
+      "basePrice": 120,
+      "volume": 1
+    },
+    {
+      "id": "ore",
+      "name": "Ore",
+      "category": "primary",
+      "basePrice": 58,
+      "volume": 1
+    },
+    {
+      "id": "space_weed",
+      "name": "Space Weed",
+      "category": "food",
+      "basePrice": 420,
+      "volume": 1
+    },
+    {
+      "id": "space_fuel",
+      "name": "Space Fuel",
+      "category": "end",
+      "basePrice": 200,
+      "volume": 1
+    },
+    {
+      "id": "silicon_wafers",
+      "name": "Silicon Wafers",
+      "category": "primary",
+      "basePrice": 504,
+      "volume": 18
+    },
+    {
+      "id": "ire_laser",
+      "name": "IRE Laser",
+      "category": "end",
+      "basePrice": 2980,
+      "volume": 5
+    },
+    {
+      "id": "plankton",
+      "name": "Plankton",
+      "category": "food",
+      "basePrice": 40,
+      "volume": 1
+    },
+    {
+      "id": "bogas",
+      "name": "BoGas",
+      "category": "food",
+      "basePrice": 50,
+      "volume": 1
+    },
+    {
+      "id": "bofu",
+      "name": "BoFu",
+      "category": "food",
+      "basePrice": 90,
+      "volume": 1
+    },
+    {
+      "id": "wheat",
+      "name": "Wheat",
+      "category": "food",
+      "basePrice": 60,
+      "volume": 1
+    },
+    {
+      "id": "cahoonas",
+      "name": "Meatsteak Cahoonas",
+      "category": "food",
+      "basePrice": 110,
+      "volume": 1
+    },
+    {
+      "id": "scruffin_fruit",
+      "name": "Scruffin Fruit",
+      "category": "food",
+      "basePrice": 60,
+      "volume": 1
+    },
+    {
+      "id": "rastar_oil",
+      "name": "Rastar Oil",
+      "category": "food",
+      "basePrice": 140,
+      "volume": 1
+    },
+    {
+      "id": "quantum_tubes",
+      "name": "Quantum Tubes",
+      "category": "intermediate",
+      "basePrice": 1800,
+      "volume": 2
+    },
+    {
+      "id": "microchips",
+      "name": "Microchips",
+      "category": "intermediate",
+      "basePrice": 1684,
+      "volume": 1
+    },
+    {
+      "id": "computer_components",
+      "name": "Computer Components",
+      "category": "intermediate",
+      "basePrice": 1200,
+      "volume": 1
+    },
+    {
+      "id": "hept_laser",
+      "name": "HEPT Laser",
+      "category": "end",
+      "basePrice": 120000,
+      "volume": 8
+    },
+    {
+      "id": "pac_laser",
+      "name": "PAC Laser",
+      "category": "end",
+      "basePrice": 40000,
+      "volume": 6
+    },
+    {
+      "id": "ship_parts",
+      "name": "Ship Parts",
+      "category": "end",
+      "basePrice": 800,
+      "volume": 4
+    },
+    {
+      "id": "trade_goods",
+      "name": "Trade Goods",
+      "category": "end",
+      "basePrice": 200,
+      "volume": 1
+    }
+  ],
+  "recipes": [
+    {
+      "id": "spp_teladi",
+      "productId": "energy_cells",
+      "inputs": [
+        {
+          "wareId": "crystals",
+          "amount": 1
+        }
+      ],
+      "cycleTimeSec": 60,
+      "batchSize": 120,
+      "productStorageCap": 6000
+    },
+    {
+      "id": "sun_oil_refinery",
+      "productId": "sun_oil",
+      "inputs": [
+        {
+          "wareId": "sunrise_flowers",
+          "amount": 4
+        },
+        {
+          "wareId": "energy_cells",
+          "amount": 8
+        }
+      ],
+      "cycleTimeSec": 90,
+      "batchSize": 6,
+      "productStorageCap": 2000
+    },
+    {
+      "id": "flower_farm",
+      "productId": "sunrise_flowers",
+      "inputs": [
+        {
+          "wareId": "energy_cells",
+          "amount": 10
+        }
+      ],
+      "cycleTimeSec": 80,
+      "batchSize": 20,
+      "productStorageCap": 4000
+    },
+    {
+      "id": "teladianium_foundry",
+      "productId": "teladianium",
+      "inputs": [
+        {
+          "wareId": "ore",
+          "amount": 6
+        },
+        {
+          "wareId": "energy_cells",
+          "amount": 20
+        }
+      ],
+      "cycleTimeSec": 120,
+      "batchSize": 8,
+      "productStorageCap": 2000
+    },
+    {
+      "id": "ore_mine",
+      "productId": "ore",
+      "inputs": [
+        {
+          "wareId": "energy_cells",
+          "amount": 20
+        }
+      ],
+      "cycleTimeSec": 90,
+      "batchSize": 8,
+      "productStorageCap": 1200
+    },
+    {
+      "id": "crystal_fab",
+      "productId": "crystals",
+      "inputs": [
+        {
+          "wareId": "silicon_wafers",
+          "amount": 4
+        },
+        {
+          "wareId": "sun_oil",
+          "amount": 8
+        },
+        {
+          "wareId": "energy_cells",
+          "amount": 80
+        }
+      ],
+      "cycleTimeSec": 120,
+      "batchSize": 4,
+      "productStorageCap": 1000
+    },
+    {
+      "id": "silicon_mine",
+      "productId": "silicon_wafers",
+      "inputs": [
+        {
+          "wareId": "energy_cells",
+          "amount": 24
+        }
+      ],
+      "cycleTimeSec": 90,
+      "batchSize": 1,
+      "productStorageCap": 200
+    },
+    {
+      "id": "bliss_place",
+      "productId": "space_weed",
+      "inputs": [
+        {
+          "wareId": "sunrise_flowers",
+          "amount": 8
+        },
+        {
+          "wareId": "energy_cells",
+          "amount": 15
+        }
+      ],
+      "cycleTimeSec": 150,
+      "batchSize": 10,
+      "productStorageCap": 1500
+    },
+    {
+      "id": "dream_farm",
+      "productId": "space_fuel",
+      "inputs": [
+        {
+          "wareId": "space_weed",
+          "amount": 4
+        },
+        {
+          "wareId": "energy_cells",
+          "amount": 12
+        }
+      ],
+      "cycleTimeSec": 100,
+      "batchSize": 8,
+      "productStorageCap": 2000
+    },
+    {
+      "id": "ire_forge",
+      "productId": "ire_laser",
+      "inputs": [
+        {
+          "wareId": "teladianium",
+          "amount": 2
+        },
+        {
+          "wareId": "energy_cells",
+          "amount": 40
+        }
+      ],
+      "cycleTimeSec": 180,
+      "batchSize": 1,
+      "productStorageCap": 50
+    },
+    {
+      "id": "hept_forge",
+      "productId": "hept_laser",
+      "inputs": [
+        {
+          "wareId": "teladianium",
+          "amount": 6
+        },
+        {
+          "wareId": "energy_cells",
+          "amount": 120
+        }
+      ],
+      "cycleTimeSec": 200,
+      "batchSize": 1,
+      "productStorageCap": 20
+    },
+    {
+      "id": "pac_forge",
+      "productId": "pac_laser",
+      "inputs": [
+        {
+          "wareId": "ore",
+          "amount": 6
+        },
+        {
+          "wareId": "energy_cells",
+          "amount": 80
+        }
+      ],
+      "cycleTimeSec": 180,
+      "batchSize": 1,
+      "productStorageCap": 20
+    },
+    {
+      "id": "plankton_farm",
+      "productId": "plankton",
+      "inputs": [
+        {
+          "wareId": "energy_cells",
+          "amount": 8
+        }
+      ],
+      "cycleTimeSec": 80,
+      "batchSize": 40,
+      "productStorageCap": 800
+    },
+    {
+      "id": "bogas_plant",
+      "productId": "bogas",
+      "inputs": [
+        {
+          "wareId": "plankton",
+          "amount": 20
+        },
+        {
+          "wareId": "energy_cells",
+          "amount": 10
+        }
+      ],
+      "cycleTimeSec": 90,
+      "batchSize": 30,
+      "productStorageCap": 600
+    },
+    {
+      "id": "bofu_lab",
+      "productId": "bofu",
+      "inputs": [
+        {
+          "wareId": "bogas",
+          "amount": 20
+        },
+        {
+          "wareId": "energy_cells",
+          "amount": 12
+        }
+      ],
+      "cycleTimeSec": 100,
+      "batchSize": 30,
+      "productStorageCap": 600
+    },
+    {
+      "id": "argon_farm",
+      "productId": "wheat",
+      "inputs": [
+        {
+          "wareId": "energy_cells",
+          "amount": 10
+        }
+      ],
+      "cycleTimeSec": 80,
+      "batchSize": 30,
+      "productStorageCap": 800
+    },
+    {
+      "id": "cahoona_bakery",
+      "productId": "cahoonas",
+      "inputs": [
+        {
+          "wareId": "wheat",
+          "amount": 20
+        },
+        {
+          "wareId": "energy_cells",
+          "amount": 10
+        }
+      ],
+      "cycleTimeSec": 90,
+      "batchSize": 30,
+      "productStorageCap": 600
+    },
+    {
+      "id": "scruffin_farm",
+      "productId": "scruffin_fruit",
+      "inputs": [
+        {
+          "wareId": "energy_cells",
+          "amount": 10
+        }
+      ],
+      "cycleTimeSec": 80,
+      "batchSize": 30,
+      "productStorageCap": 800
+    },
+    {
+      "id": "rastar_refinery",
+      "productId": "rastar_oil",
+      "inputs": [
+        {
+          "wareId": "scruffin_fruit",
+          "amount": 20
+        },
+        {
+          "wareId": "energy_cells",
+          "amount": 15
+        }
+      ],
+      "cycleTimeSec": 100,
+      "batchSize": 30,
+      "productStorageCap": 600
+    },
+    {
+      "id": "quantum_tube_fab",
+      "productId": "quantum_tubes",
+      "inputs": [
+        {
+          "wareId": "silicon_wafers",
+          "amount": 4
+        },
+        {
+          "wareId": "teladianium",
+          "amount": 2
+        },
+        {
+          "wareId": "energy_cells",
+          "amount": 40
+        }
+      ],
+      "cycleTimeSec": 140,
+      "batchSize": 4,
+      "productStorageCap": 400
+    },
+    {
+      "id": "chip_plant",
+      "productId": "microchips",
+      "inputs": [
+        {
+          "wareId": "silicon_wafers",
+          "amount": 4
+        },
+        {
+          "wareId": "quantum_tubes",
+          "amount": 1
+        },
+        {
+          "wareId": "energy_cells",
+          "amount": 30
+        }
+      ],
+      "cycleTimeSec": 160,
+      "batchSize": 2,
+      "productStorageCap": 200
+    },
+    {
+      "id": "computer_plant",
+      "productId": "computer_components",
+      "inputs": [
+        {
+          "wareId": "microchips",
+          "amount": 2
+        },
+        {
+          "wareId": "silicon_wafers",
+          "amount": 2
+        },
+        {
+          "wareId": "energy_cells",
+          "amount": 30
+        }
+      ],
+      "cycleTimeSec": 150,
+      "batchSize": 4,
+      "productStorageCap": 400
+    },
+    {
+      "id": "logistics_hub",
+      "productId": "trade_goods",
+      "inputs": [],
+      "cycleTimeSec": 120,
+      "batchSize": 5,
+      "productStorageCap": 500
+    },
+    {
+      "id": "shipyard",
+      "productId": "ship_parts",
+      "inputs": [
+        {
+          "wareId": "teladianium",
+          "amount": 20
+        },
+        {
+          "wareId": "ore",
+          "amount": 20
+        },
+        {
+          "wareId": "energy_cells",
+          "amount": 100
+        }
+      ],
+      "cycleTimeSec": 240,
+      "batchSize": 10,
+      "productStorageCap": 500
+    }
+  ],
+  "stations": [
+    {
+      "id": "sz_spp_b",
+      "name": "Solar Power Plant (b)",
+      "recipeId": "spp_teladi",
+      "sectorId": "seizewell",
+      "inventory": {
+        "energy_cells": 2780,
+        "crystals": 0
+      },
+      "reorderLevel": {
+        "crystals": 10
+      },
+      "reserveLevel": {
+        "energy_cells": 200
+      },
+      "productionProgress": 0
+    },
+    {
+      "id": "sz_spp_d",
+      "name": "Solar Power Plant (delta)",
+      "recipeId": "spp_teladi",
+      "sectorId": "seizewell",
+      "inventory": {
+        "energy_cells": 2020,
+        "crystals": 0
+      },
+      "reorderLevel": {
+        "crystals": 10
+      },
+      "reserveLevel": {
+        "energy_cells": 200
+      },
+      "productionProgress": 0
+    },
+    {
+      "id": "sz_oil",
+      "name": "Sun Oil Refinery (beta)",
+      "recipeId": "sun_oil_refinery",
+      "sectorId": "seizewell",
+      "inventory": {
+        "sun_oil": 140,
+        "sunrise_flowers": 0,
+        "energy_cells": 100
+      },
+      "reorderLevel": {
+        "sunrise_flowers": 20,
+        "energy_cells": 50
+      },
+      "reserveLevel": {
+        "sun_oil": 100
+      },
+      "productionProgress": 0
+    },
+    {
+      "id": "sz_flower_b",
+      "name": "Flower Farm (beta)",
+      "recipeId": "flower_farm",
+      "sectorId": "seizewell",
+      "inventory": {
+        "sunrise_flowers": 260,
+        "energy_cells": 0
+      },
+      "reorderLevel": {
+        "energy_cells": 60
+      },
+      "reserveLevel": {
+        "sunrise_flowers": 150
+      },
+      "productionProgress": 0
+    },
+    {
+      "id": "sz_flower_g",
+      "name": "Flower Farm (gamma)",
+      "recipeId": "flower_farm",
+      "sectorId": "seizewell",
+      "inventory": {
+        "sunrise_flowers": 220,
+        "energy_cells": 0
+      },
+      "reorderLevel": {
+        "energy_cells": 60
+      },
+      "reserveLevel": {
+        "sunrise_flowers": 150
+      },
+      "productionProgress": 0
+    },
+    {
+      "id": "sz_flower_d",
+      "name": "Flower Farm (delta)",
+      "recipeId": "flower_farm",
+      "sectorId": "seizewell",
+      "inventory": {
+        "sunrise_flowers": 260,
+        "energy_cells": 0
+      },
+      "reorderLevel": {
+        "energy_cells": 60
+      },
+      "reserveLevel": {
+        "sunrise_flowers": 150
+      },
+      "productionProgress": 0
+    },
+    {
+      "id": "sz_ire",
+      "name": "Beta I.R.E. Laser Forge (alpha)",
+      "recipeId": "ire_forge",
+      "sectorId": "seizewell",
+      "inventory": {
+        "ire_laser": 7,
+        "teladianium": 0,
+        "energy_cells": 0
+      },
+      "reorderLevel": {
+        "teladianium": 8,
+        "energy_cells": 100
+      },
+      "reserveLevel": {
+        "ire_laser": 5
+      },
+      "productionProgress": 0
+    },
+    {
+      "id": "tg_bliss",
+      "name": "Bliss Place (M)",
+      "recipeId": "bliss_place",
+      "sectorId": "teladi_gain",
+      "inventory": {
+        "space_weed": 100,
+        "sunrise_flowers": 4,
+        "energy_cells": 15
+      },
+      "reorderLevel": {
+        "sunrise_flowers": 40,
+        "energy_cells": 80
+      },
+      "reserveLevel": {
+        "space_weed": 60
+      },
+      "productionProgress": 0
+    },
+    {
+      "id": "tg_oil",
+      "name": "Sun Oil Refinery (M)",
+      "recipeId": "sun_oil_refinery",
+      "sectorId": "teladi_gain",
+      "inventory": {
+        "sun_oil": 82,
+        "sunrise_flowers": 2,
+        "energy_cells": 24
+      },
+      "reorderLevel": {
+        "sunrise_flowers": 20,
+        "energy_cells": 50
+      },
+      "reserveLevel": {
+        "sun_oil": 80
+      },
+      "productionProgress": 0
+    },
+    {
+      "id": "tg_flower",
+      "name": "Flower Farm (M)",
+      "recipeId": "flower_farm",
+      "sectorId": "teladi_gain",
+      "inventory": {
+        "sunrise_flowers": 350,
+        "energy_cells": 0
+      },
+      "reorderLevel": {
+        "energy_cells": 60
+      },
+      "reserveLevel": {
+        "sunrise_flowers": 200
+      },
+      "productionProgress": 0
+    },
+    {
+      "id": "ps_spp",
+      "name": "Solar Power Plant (M)",
+      "recipeId": "spp_teladi",
+      "sectorId": "profit_share",
+      "inventory": {
+        "energy_cells": 3420,
+        "crystals": 0
+      },
+      "reorderLevel": {
+        "crystals": 12
+      },
+      "reserveLevel": {
+        "energy_cells": 250
+      },
+      "productionProgress": 0
+    },
+    {
+      "id": "ps_foundry",
+      "name": "Teladianium Foundry (L)",
+      "recipeId": "teladianium_foundry",
+      "sectorId": "profit_share",
+      "inventory": {
+        "teladianium": 92,
+        "ore": 8,
+        "energy_cells": 10
+      },
+      "reorderLevel": {
+        "ore": 30,
+        "energy_cells": 100
+      },
+      "reserveLevel": {
+        "teladianium": 60
+      },
+      "productionProgress": 0
+    },
+    {
+      "id": "gp_dream",
+      "name": "Dream Farm (M)",
+      "recipeId": "dream_farm",
+      "sectorId": "greater_profit",
+      "inventory": {
+        "space_fuel": 76,
+        "space_weed": 2,
+        "energy_cells": 16
+      },
+      "reorderLevel": {
+        "space_weed": 20,
+        "energy_cells": 60
+      },
+      "reserveLevel": {
+        "space_fuel": 40
+      },
+      "productionProgress": 0
+    },
+    {
+      "id": "gp_bliss",
+      "name": "Bliss Place (L)",
+      "recipeId": "bliss_place",
+      "sectorId": "greater_profit",
+      "inventory": {
+        "space_weed": 150,
+        "sunrise_flowers": 12,
+        "energy_cells": 0
+      },
+      "reorderLevel": {
+        "sunrise_flowers": 50,
+        "energy_cells": 100
+      },
+      "reserveLevel": {
+        "space_weed": 80
+      },
+      "productionProgress": 0
+    },
+    {
+      "id": "gp_crystal",
+      "name": "Crystal Fab (M)",
+      "recipeId": "crystal_fab",
+      "sectorId": "greater_profit",
+      "inventory": {
+        "crystals": 36,
+        "silicon_wafers": 24,
+        "sun_oil": 28,
+        "energy_cells": 0
+      },
+      "reorderLevel": {
+        "silicon_wafers": 20,
+        "sun_oil": 30,
+        "energy_cells": 100
+      },
+      "reserveLevel": {
+        "crystals": 50
+      },
+      "productionProgress": 0
+    },
+    {
+      "id": "cp_silicon",
+      "name": "Silicon Mine (M)",
+      "recipeId": "silicon_mine",
+      "sectorId": "company_pride",
+      "inventory": {
+        "silicon_wafers": 14,
+        "energy_cells": 4
+      },
+      "reorderLevel": {
+        "energy_cells": 50
+      },
+      "reserveLevel": {
+        "silicon_wafers": 20
+      },
+      "productionProgress": 0
+    }
+  ],
+  "sectorPrices": {
+    "seizewell": {
+      "crystals": 3368,
+      "energy_cells": 32,
+      "sunrise_flowers": 93.60000000000001,
+      "sun_oil": 218.39999999999998,
+      "teladianium": 240,
+      "ire_laser": 4172
+    },
+    "teladi_gain": {
+      "sunrise_flowers": 94.5,
+      "energy_cells": 32,
+      "space_weed": 699.9999999999999,
+      "sun_oil": 159.89999999999998
+    },
+    "profit_share": {
+      "crystals": 3368,
+      "energy_cells": 30.4,
+      "ore": 100.53333333333333,
+      "teladianium": 184
+    },
+    "greater_profit": {
+      "space_weed": 787.5,
+      "energy_cells": 32,
+      "space_fuel": 380,
+      "sunrise_flowers": 95.04,
+      "silicon_wafers": 403.20000000000005,
+      "sun_oil": 166.4,
+      "crystals": 1212.48
+    },
+    "company_pride": {
+      "energy_cells": 30.72,
+      "silicon_wafers": 352.79999999999995
+    }
+  },
+  "timeScale": 10,
+  "acc": 10,
+  "elapsedTimeSec": 3600,
+  "corporations": [
+    {
+      "id": "teladi_company",
+      "name": "Teladi Company",
+      "race": "teladi",
+      "type": "state",
+      "stationIds": [
+        "ps_foundry"
+      ],
+      "fleetIds": [
+        "fleet_dz40dzsqe",
+        "fleet_b64in07kh",
+        "fleet_lwng20wos",
+        "fleet_5y1inncmt",
+        "fleet_xs3b8u4f7",
+        "fleet_nqgokjunx",
+        "tl_teladi_company_drfwsycvu"
+      ],
+      "credits": 4338896,
+      "netWorth": 50000000,
+      "aggressiveness": 0.4,
+      "expansionBudget": 500000,
+      "riskTolerance": 0.3,
+      "lifetimeProfit": 0,
+      "lifetimeTrades": 0,
+      "aiState": {
+        "lastExpansionCheck": 1765375668693,
+        "currentGoal": "expand",
+        "pendingConstructions": [
+          {
+            "id": "l3di2l9or",
+            "stationType": "teladianium_foundry",
+            "targetSectorId": "ceo_s_buckzoid",
+            "status": "in-transit",
+            "createdAt": 1765375239194,
+            "builderShipId": "tl_teladi_company_drfwsycvu"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sunward_consortium",
+      "name": "Sunward Consortium",
+      "race": "teladi",
+      "type": "guild",
+      "stationIds": [
+        "sz_spp_b",
+        "ps_spp",
+        "gp_crystal",
+        "cp_silicon"
+      ],
+      "fleetIds": [
+        "fleet_ccwsz3rlv",
+        "fleet_k561npss3"
+      ],
+      "credits": 800000,
+      "netWorth": 4000000,
+      "aggressiveness": 0.5,
+      "expansionBudget": 100000,
+      "riskTolerance": 0.4,
+      "lifetimeProfit": 0,
+      "lifetimeTrades": 0,
+      "aiState": {
+        "lastExpansionCheck": 1765375668693,
+        "currentGoal": "expand",
+        "pendingConstructions": []
+      }
+    },
+    {
+      "id": "family_zhikkt",
+      "name": "Family Zhi'kkt",
+      "race": "teladi",
+      "type": "family",
+      "stationIds": [
+        "sz_spp_d",
+        "sz_flower_b",
+        "tg_flower"
+      ],
+      "fleetIds": [
+        "fleet_3svc3pbqx"
+      ],
+      "credits": 300792,
+      "netWorth": 1500000,
+      "aggressiveness": 0.6,
+      "expansionBudget": 50000,
+      "riskTolerance": 0.5,
+      "lifetimeProfit": 792,
+      "lifetimeTrades": 1,
+      "aiState": {
+        "lastExpansionCheck": 1765375668693,
+        "currentGoal": "expand",
+        "pendingConstructions": []
+      }
+    },
+    {
+      "id": "family_tekra",
+      "name": "Family Tek'ra",
+      "race": "teladi",
+      "type": "family",
+      "stationIds": [
+        "sz_oil",
+        "tg_oil"
+      ],
+      "fleetIds": [
+        "fleet_xhr52yc5f"
+      ],
+      "credits": 400000,
+      "netWorth": 2000000,
+      "aggressiveness": 0.55,
+      "expansionBudget": 60000,
+      "riskTolerance": 0.45,
+      "lifetimeProfit": 0,
+      "lifetimeTrades": 2,
+      "aiState": {
+        "lastExpansionCheck": 1765375668693,
+        "currentGoal": "expand",
+        "pendingConstructions": []
+      }
+    },
+    {
+      "id": "crimson_commerce",
+      "name": "Crimson Commerce Guild",
+      "race": "teladi",
+      "type": "guild",
+      "stationIds": [
+        "sz_ire"
+      ],
+      "fleetIds": [
+        "fleet_p3nzx7hef",
+        "fleet_6k5231qyt"
+      ],
+      "credits": 1200000,
+      "netWorth": 6000000,
+      "aggressiveness": 0.7,
+      "expansionBudget": 200000,
+      "riskTolerance": 0.6,
+      "lifetimeProfit": 0,
+      "lifetimeTrades": 0,
+      "aiState": {
+        "lastExpansionCheck": 1765375668693,
+        "currentGoal": "expand",
+        "pendingConstructions": []
+      }
+    },
+    {
+      "id": "profit_guild",
+      "name": "Profit Guild",
+      "race": "teladi",
+      "type": "guild",
+      "stationIds": [
+        "tg_bliss",
+        "gp_dream",
+        "gp_bliss"
+      ],
+      "fleetIds": [
+        "fleet_9rae9g96s",
+        "fleet_eals45i0r"
+      ],
+      "credits": 600000,
+      "netWorth": 3000000,
+      "aggressiveness": 0.65,
+      "expansionBudget": 80000,
+      "riskTolerance": 0.55,
+      "lifetimeProfit": 0,
+      "lifetimeTrades": 0,
+      "aiState": {
+        "lastExpansionCheck": 1765375668693,
+        "currentGoal": "expand",
+        "pendingConstructions": []
+      }
+    }
+  ],
+  "fleets": [
+    {
+      "id": "fleet_dz40dzsqe",
+      "name": "Vulture Teladi-1",
+      "shipType": "Vulture",
+      "modelPath": "/models/00007.obj",
+      "race": "teladi",
+      "capacity": 2800,
+      "speed": 1,
+      "homeSectorId": "seizewell",
+      "ownerId": "teladi_company",
+      "ownerType": "state",
+      "behavior": "corp-logistics",
+      "autonomy": 0.3,
+      "profitShare": 0.1,
+      "currentSectorId": "spaceweed_drift",
+      "position": [
+        0,
+        0,
+        -148000
+      ],
+      "state": "idle",
+      "stateStartTime": 1765375316406,
+      "cargo": {
+        "energy_cells": 60
+      },
+      "credits": 9136,
+      "commandQueue": [
+        {
+          "type": "goto-station",
+          "targetStationId": "ps_spp",
+          "targetSectorId": "profit_share",
+          "id": "ku49hvfal",
+          "createdAt": 1765375216041
+        },
+        {
+          "type": "dock",
+          "targetStationId": "ps_spp",
+          "id": "vktwjfmij",
+          "createdAt": 1765375216041
+        },
+        {
+          "type": "load-cargo",
+          "targetStationId": "ps_spp",
+          "wareId": "energy_cells",
+          "amount": 60,
+          "id": "4j6x0b8jb",
+          "createdAt": 1765375216041
+        },
+        {
+          "type": "undock",
+          "targetStationId": "ps_spp",
+          "id": "pr60cy5b5",
+          "createdAt": 1765375216041
+        },
+        {
+          "type": "goto-station",
+          "targetStationId": "gp_crystal",
+          "targetSectorId": "greater_profit",
+          "id": "ymf47bgqc",
+          "createdAt": 1765375216041
+        },
+        {
+          "type": "dock",
+          "targetStationId": "gp_crystal",
+          "id": "w5l9t9lr8",
+          "createdAt": 1765375216041
+        },
+        {
+          "type": "unload-cargo",
+          "targetStationId": "gp_crystal",
+          "wareId": "energy_cells",
+          "amount": 60,
+          "id": "r2kzjfjga",
+          "createdAt": 1765375216041
+        },
+        {
+          "type": "undock",
+          "targetStationId": "gp_crystal",
+          "id": "l38wcobgw",
+          "createdAt": 1765375216041
+        }
+      ],
+      "totalProfit": 0,
+      "tripsCompleted": 0,
+      "currentOrder": {
+        "id": "gnithqs4i",
+        "buyStationId": "ps_spp",
+        "buyStationName": "Solar Power Plant (M)",
+        "buySectorId": "profit_share",
+        "buyWareId": "energy_cells",
+        "buyWareName": "Energy Cells",
+        "buyQty": 60,
+        "buyPrice": 14.4,
+        "sellStationId": "gp_crystal",
+        "sellStationName": "Crystal Fab (M)",
+        "sellSectorId": "greater_profit",
+        "sellWareId": "energy_cells",
+        "sellWareName": "Energy Cells",
+        "sellQty": 60,
+        "sellPrice": 25.6,
+        "expectedProfit": 672.0000000000001,
+        "createdAt": 1765375216041
+      }
+    },
+    {
+      "id": "fleet_b64in07kh",
+      "name": "Vulture Teladi-2",
+      "shipType": "Vulture",
+      "modelPath": "/models/00007.obj",
+      "race": "teladi",
+      "capacity": 2800,
+      "speed": 1,
+      "homeSectorId": "profit_share",
+      "ownerId": "teladi_company",
+      "ownerType": "state",
+      "behavior": "corp-logistics",
+      "autonomy": 0.3,
+      "profitShare": 0.1,
+      "currentSectorId": "greater_profit",
+      "position": [
+        0,
+        0,
+        -118000
+      ],
+      "state": "idle",
+      "stateStartTime": 1765375320796,
+      "cargo": {
+        "energy_cells": 60
+      },
+      "credits": 9520,
+      "commandQueue": [
+        {
+          "type": "goto-station",
+          "targetStationId": "sz_spp_d",
+          "targetSectorId": "seizewell",
+          "id": "3y7o0rgoz",
+          "createdAt": 1765375216041
+        },
+        {
+          "type": "dock",
+          "targetStationId": "sz_spp_d",
+          "id": "ootganj09",
+          "createdAt": 1765375216041
+        },
+        {
+          "type": "load-cargo",
+          "targetStationId": "sz_spp_d",
+          "wareId": "energy_cells",
+          "amount": 60,
+          "id": "kfj9s2ybh",
+          "createdAt": 1765375216041
+        },
+        {
+          "type": "undock",
+          "targetStationId": "sz_spp_d",
+          "id": "ydamcik56",
+          "createdAt": 1765375216041
+        },
+        {
+          "type": "goto-station",
+          "targetStationId": "gp_crystal",
+          "targetSectorId": "greater_profit",
+          "id": "1zl0bhxhj",
+          "createdAt": 1765375216041
+        },
+        {
+          "type": "dock",
+          "targetStationId": "gp_crystal",
+          "id": "4mkeuh41u",
+          "createdAt": 1765375216041
+        },
+        {
+          "type": "unload-cargo",
+          "targetStationId": "gp_crystal",
+          "wareId": "energy_cells",
+          "amount": 60,
+          "id": "76mcnn6ev",
+          "createdAt": 1765375216041
+        },
+        {
+          "type": "undock",
+          "targetStationId": "gp_crystal",
+          "id": "1gnw779yt",
+          "createdAt": 1765375216041
+        }
+      ],
+      "totalProfit": 0,
+      "tripsCompleted": 0,
+      "currentOrder": {
+        "id": "vb1b9ccd4",
+        "buyStationId": "sz_spp_d",
+        "buyStationName": "Solar Power Plant (delta)",
+        "buySectorId": "seizewell",
+        "buyWareId": "energy_cells",
+        "buyWareName": "Energy Cells",
+        "buyQty": 60,
+        "buyPrice": 8,
+        "sellStationId": "gp_crystal",
+        "sellStationName": "Crystal Fab (M)",
+        "sellSectorId": "greater_profit",
+        "sellWareId": "energy_cells",
+        "sellWareName": "Energy Cells",
+        "sellQty": 60,
+        "sellPrice": 25.6,
+        "expectedProfit": 1056,
+        "createdAt": 1765375216041
+      }
+    },
+    {
+      "id": "fleet_lwng20wos",
+      "name": "Albatross Teladi-3",
+      "shipType": "Albatross",
+      "modelPath": "/models/00187.obj",
+      "race": "teladi",
+      "capacity": 8000,
+      "speed": 0.7,
+      "homeSectorId": "seizewell",
+      "ownerId": "teladi_company",
+      "ownerType": "state",
+      "behavior": "freelance",
+      "autonomy": 0.8,
+      "profitShare": 0.2,
+      "currentSectorId": "seizewell",
+      "position": [
+        2045.791739628955,
+        -85.02094717034745,
+        -2941.2157714896116
+      ],
+      "state": "in-transit",
+      "stateStartTime": 1765375216041,
+      "cargo": {},
+      "credits": 10000,
+      "commandQueue": [
+        {
+          "type": "goto-station",
+          "targetStationId": "ps_spp",
+          "targetSectorId": "profit_share",
+          "id": "z7txbgmx0",
+          "createdAt": 1765375216041
+        },
+        {
+          "type": "dock",
+          "targetStationId": "ps_spp",
+          "id": "jxz3qocei",
+          "createdAt": 1765375216041
+        },
+        {
+          "type": "load-cargo",
+          "targetStationId": "ps_spp",
+          "wareId": "energy_cells",
+          "amount": 60,
+          "id": "ui4tidk49",
+          "createdAt": 1765375216041
+        },
+        {
+          "type": "undock",
+          "targetStationId": "ps_spp",
+          "id": "zodwr7fbg",
+          "createdAt": 1765375216041
+        },
+        {
+          "type": "goto-station",
+          "targetStationId": "gp_crystal",
+          "targetSectorId": "greater_profit",
+          "id": "hyly1e27v",
+          "createdAt": 1765375216041
+        },
+        {
+          "type": "dock",
+          "targetStationId": "gp_crystal",
+          "id": "ao5mafcad",
+          "createdAt": 1765375216041
+        },
+        {
+          "type": "unload-cargo",
+          "targetStationId": "gp_crystal",
+          "wareId": "energy_cells",
+          "amount": 60,
+          "id": "hbmz1uxap",
+          "createdAt": 1765375216041
+        },
+        {
+          "type": "undock",
+          "targetStationId": "gp_crystal",
+          "id": "puvssy9w6",
+          "createdAt": 1765375216041
+        }
+      ],
+      "totalProfit": 0,
+      "tripsCompleted": 0,
+      "currentOrder": {
+        "id": "8xs0np8ta",
+        "buyStationId": "ps_spp",
+        "buyStationName": "Solar Power Plant (M)",
+        "buySectorId": "profit_share",
+        "buyWareId": "energy_cells",
+        "buyWareName": "Energy Cells",
+        "buyQty": 60,
+        "buyPrice": 14.4,
+        "sellStationId": "gp_crystal",
+        "sellStationName": "Crystal Fab (M)",
+        "sellSectorId": "greater_profit",
+        "sellWareId": "energy_cells",
+        "sellWareName": "Energy Cells",
+        "sellQty": 60,
+        "sellPrice": 25.6,
+        "expectedProfit": 672.0000000000001,
+        "createdAt": 1765375216041
+      }
+    },
+    {
+      "id": "fleet_ccwsz3rlv",
+      "name": "Vulture Sunward-4",
+      "shipType": "Vulture",
+      "modelPath": "/models/00007.obj",
+      "race": "teladi",
+      "capacity": 2800,
+      "speed": 1,
+      "homeSectorId": "seizewell",
+      "ownerId": "sunward_consortium",
+      "ownerType": "guild",
+      "homeStationId": "sz_spp_b",
+      "behavior": "station-supply",
+      "autonomy": 0.2,
+      "profitShare": 0.15,
+      "currentSectorId": "seizewell",
+      "position": [
+        3635.0922670846567,
+        229.45534652213647,
+        -2881.462847827775
+      ],
+      "state": "idle",
+      "stateStartTime": 1765375168885,
+      "cargo": {},
+      "credits": 10000,
+      "commandQueue": [],
+      "totalProfit": 0,
+      "tripsCompleted": 0
+    },
+    {
+      "id": "fleet_k561npss3",
+      "name": "Vulture Sunward-5",
+      "shipType": "Vulture",
+      "modelPath": "/models/00007.obj",
+      "race": "teladi",
+      "capacity": 2800,
+      "speed": 1,
+      "homeSectorId": "profit_share",
+      "ownerId": "sunward_consortium",
+      "ownerType": "guild",
+      "homeStationId": "ps_spp",
+      "behavior": "station-distribute",
+      "autonomy": 0.3,
+      "profitShare": 0.15,
+      "currentSectorId": "spaceweed_drift",
+      "position": [
+        0,
+        0,
+        -148000
+      ],
+      "state": "idle",
+      "stateStartTime": 1765375223052,
+      "cargo": {
+        "energy_cells": 120
+      },
+      "credits": 8272,
+      "commandQueue": [
+        {
+          "type": "goto-station",
+          "targetStationId": "ps_spp",
+          "targetSectorId": "profit_share",
+          "id": "8347xbt6y",
+          "createdAt": 1765375216041
+        },
+        {
+          "type": "dock",
+          "targetStationId": "ps_spp",
+          "id": "q23xaadnn",
+          "createdAt": 1765375216041
+        },
+        {
+          "type": "load-cargo",
+          "targetStationId": "ps_spp",
+          "wareId": "energy_cells",
+          "amount": 60,
+          "id": "o0q3fbpkn",
+          "createdAt": 1765375216041
+        },
+        {
+          "type": "undock",
+          "targetStationId": "ps_spp",
+          "id": "5nj7ra0km",
+          "createdAt": 1765375216041
+        },
+        {
+          "type": "goto-station",
+          "targetStationId": "gp_crystal",
+          "targetSectorId": "greater_profit",
+          "id": "s9uool993",
+          "createdAt": 1765375216041
+        },
+        {
+          "type": "dock",
+          "targetStationId": "gp_crystal",
+          "id": "lu0hfmaf2",
+          "createdAt": 1765375216041
+        },
+        {
+          "type": "unload-cargo",
+          "targetStationId": "gp_crystal",
+          "wareId": "energy_cells",
+          "amount": 60,
+          "id": "xyis4ecap",
+          "createdAt": 1765375216041
+        },
+        {
+          "type": "undock",
+          "targetStationId": "gp_crystal",
+          "id": "ymffnu7tt",
+          "createdAt": 1765375216041
+        }
+      ],
+      "totalProfit": 0,
+      "tripsCompleted": 0,
+      "currentOrder": {
+        "id": "mktd7n5ey",
+        "buyStationId": "ps_spp",
+        "buyStationName": "Solar Power Plant (M)",
+        "buySectorId": "profit_share",
+        "buyWareId": "energy_cells",
+        "buyWareName": "Energy Cells",
+        "buyQty": 60,
+        "buyPrice": 14.4,
+        "sellStationId": "gp_crystal",
+        "sellStationName": "Crystal Fab (M)",
+        "sellSectorId": "greater_profit",
+        "sellWareId": "energy_cells",
+        "sellWareName": "Energy Cells",
+        "sellQty": 60,
+        "sellPrice": 25.6,
+        "expectedProfit": 153.5999999999999,
+        "createdAt": 1765375216041
+      }
+    },
+    {
+      "id": "fleet_3svc3pbqx",
+      "name": "Vulture Family-6",
+      "shipType": "Vulture",
+      "modelPath": "/models/00007.obj",
+      "race": "teladi",
+      "capacity": 2800,
+      "speed": 1,
+      "homeSectorId": "seizewell",
+      "ownerId": "family_zhikkt",
+      "ownerType": "family",
+      "homeStationId": "sz_spp_d",
+      "behavior": "station-distribute",
+      "autonomy": 0.4,
+      "profitShare": 0.25,
+      "currentSectorId": "seizewell",
+      "position": [
+        0,
+        0,
+        88000
+      ],
+      "state": "in-transit",
+      "stateStartTime": 1765375438558,
+      "cargo": {
+        "energy_cells": 0
+      },
+      "credits": 12496,
+      "commandQueue": [
+        {
+          "type": "goto-station",
+          "targetStationId": "sz_spp_d",
+          "targetSectorId": "seizewell",
+          "id": "wvbdlycrr",
+          "createdAt": 1765375438558
+        },
+        {
+          "type": "dock",
+          "targetStationId": "sz_spp_d",
+          "id": "zzop0il04",
+          "createdAt": 1765375438558
+        },
+        {
+          "type": "load-cargo",
+          "targetStationId": "sz_spp_d",
+          "wareId": "energy_cells",
+          "amount": 100,
+          "id": "sw42c0nyc",
+          "createdAt": 1765375438558
+        },
+        {
+          "type": "undock",
+          "targetStationId": "sz_spp_d",
+          "id": "c6zdya0qg",
+          "createdAt": 1765375438558
+        },
+        {
+          "type": "goto-station",
+          "targetStationId": "sz_ire",
+          "targetSectorId": "seizewell",
+          "id": "fhylzabb6",
+          "createdAt": 1765375438558
+        },
+        {
+          "type": "dock",
+          "targetStationId": "sz_ire",
+          "id": "lihiewscd",
+          "createdAt": 1765375438558
+        },
+        {
+          "type": "unload-cargo",
+          "targetStationId": "sz_ire",
+          "wareId": "energy_cells",
+          "amount": 100,
+          "id": "tx6lry1dh",
+          "createdAt": 1765375438558
+        },
+        {
+          "type": "undock",
+          "targetStationId": "sz_ire",
+          "id": "049yieoxq",
+          "createdAt": 1765375438558
+        }
+      ],
+      "totalProfit": 1056,
+      "tripsCompleted": 1,
+      "currentOrder": {
+        "id": "amy77mt2w",
+        "buyStationId": "sz_spp_d",
+        "buyStationName": "Solar Power Plant (delta)",
+        "buySectorId": "seizewell",
+        "buyWareId": "energy_cells",
+        "buyWareName": "Energy Cells",
+        "buyQty": 100,
+        "buyPrice": 32,
+        "sellStationId": "sz_ire",
+        "sellStationName": "Beta I.R.E. Laser Forge (alpha)",
+        "sellSectorId": "seizewell",
+        "sellWareId": "energy_cells",
+        "sellWareName": "Energy Cells",
+        "sellQty": 100,
+        "sellPrice": 32,
+        "expectedProfit": 319.99999999999994,
+        "createdAt": 1765375438558
+      }
+    },
+    {
+      "id": "fleet_xhr52yc5f",
+      "name": "Vulture Family-7",
+      "shipType": "Vulture",
+      "modelPath": "/models/00007.obj",
+      "race": "teladi",
+      "capacity": 2800,
+      "speed": 1,
+      "homeSectorId": "seizewell",
+      "ownerId": "family_tekra",
+      "ownerType": "family",
+      "homeStationId": "sz_oil",
+      "behavior": "station-supply",
+      "autonomy": 0.3,
+      "profitShare": 0.2,
+      "currentSectorId": "sz_flower_g",
+      "position": [
+        1.6646637574860539,
+        0.0055284415825047825,
+        89993.05665102242
+      ],
+      "state": "in-transit",
+      "stateStartTime": 1765375548620,
+      "cargo": {
+        "sunrise_flowers": 0
+      },
+      "credits": 9539.199999999999,
+      "commandQueue": [
+        {
+          "type": "goto-station",
+          "targetStationId": "sz_flower_b",
+          "targetSectorId": "seizewell",
+          "id": "n1u33bhz5",
+          "createdAt": 1765375548621
+        },
+        {
+          "type": "dock",
+          "targetStationId": "sz_flower_b",
+          "id": "zrufvi807",
+          "createdAt": 1765375548621
+        },
+        {
+          "type": "load-cargo",
+          "targetStationId": "sz_flower_b",
+          "wareId": "sunrise_flowers",
+          "amount": 20,
+          "id": "q82uro9wa",
+          "createdAt": 1765375548621
+        },
+        {
+          "type": "undock",
+          "targetStationId": "sz_flower_b",
+          "id": "wzom09ejd",
+          "createdAt": 1765375548621
+        },
+        {
+          "type": "goto-station",
+          "targetStationId": "sz_oil",
+          "targetSectorId": "seizewell",
+          "id": "cafp4kvbt",
+          "createdAt": 1765375548621
+        },
+        {
+          "type": "dock",
+          "targetStationId": "sz_oil",
+          "id": "omm709fls",
+          "createdAt": 1765375548621
+        },
+        {
+          "type": "unload-cargo",
+          "targetStationId": "sz_oil",
+          "wareId": "sunrise_flowers",
+          "amount": 20,
+          "id": "g4a24apa7",
+          "createdAt": 1765375548621
+        },
+        {
+          "type": "undock",
+          "targetStationId": "sz_oil",
+          "id": "22mkul03o",
+          "createdAt": 1765375548621
+        }
+      ],
+      "totalProfit": 0,
+      "tripsCompleted": 2,
+      "currentOrder": {
+        "id": "n5tilacqr",
+        "buyStationId": "sz_flower_b",
+        "buyStationName": "Flower Farm (beta)",
+        "buySectorId": "seizewell",
+        "buyWareId": "sunrise_flowers",
+        "buyWareName": "Sunrise Flowers",
+        "buyQty": 20,
+        "buyPrice": 93.60000000000001,
+        "sellStationId": "sz_oil",
+        "sellStationName": "Sun Oil Refinery (beta)",
+        "sellSectorId": "seizewell",
+        "sellWareId": "sunrise_flowers",
+        "sellWareName": "Sunrise Flowers",
+        "sellQty": 20,
+        "sellPrice": 93.60000000000001,
+        "expectedProfit": 187.20000000000027,
+        "createdAt": 1765375548620
+      },
+      "destinationSectorId": "greater_profit"
+    },
+    {
+      "id": "fleet_p3nzx7hef",
+      "name": "Vulture Crimson-8",
+      "shipType": "Vulture",
+      "modelPath": "/models/00007.obj",
+      "race": "teladi",
+      "capacity": 2800,
+      "speed": 1,
+      "homeSectorId": "seizewell",
+      "ownerId": "crimson_commerce",
+      "ownerType": "guild",
+      "homeStationId": "sz_ire",
+      "behavior": "station-supply",
+      "autonomy": 0.2,
+      "profitShare": 0.1,
+      "currentSectorId": "profit_share",
+      "position": [
+        82848.50045745165,
+        -24.53070018818542,
+        539.6764496903171
+      ],
+      "state": "idle",
+      "stateStartTime": 1765375363577,
+      "cargo": {
+        "teladianium": 4
+      },
+      "credits": 9424,
+      "commandQueue": [
+        {
+          "type": "goto-station",
+          "targetStationId": "ps_foundry",
+          "targetSectorId": "profit_share",
+          "id": "p2awuqgzw",
+          "createdAt": 1765375246253
+        },
+        {
+          "type": "dock",
+          "targetStationId": "ps_foundry",
+          "id": "ofjlap5sc",
+          "createdAt": 1765375246253
+        },
+        {
+          "type": "load-cargo",
+          "targetStationId": "ps_foundry",
+          "wareId": "teladianium",
+          "amount": 4,
+          "id": "mp13mj79i",
+          "createdAt": 1765375246253
+        },
+        {
+          "type": "undock",
+          "targetStationId": "ps_foundry",
+          "id": "9wudo0m8j",
+          "createdAt": 1765375246253
+        },
+        {
+          "type": "goto-station",
+          "targetStationId": "sz_ire",
+          "targetSectorId": "seizewell",
+          "id": "osz4r8iez",
+          "createdAt": 1765375246253
+        },
+        {
+          "type": "dock",
+          "targetStationId": "sz_ire",
+          "id": "d573tioqv",
+          "createdAt": 1765375246253
+        },
+        {
+          "type": "unload-cargo",
+          "targetStationId": "sz_ire",
+          "wareId": "teladianium",
+          "amount": 4,
+          "id": "vd6d6sxfb",
+          "createdAt": 1765375246253
+        },
+        {
+          "type": "undock",
+          "targetStationId": "sz_ire",
+          "id": "guxprnnrq",
+          "createdAt": 1765375246253
+        }
+      ],
+      "totalProfit": 0,
+      "tripsCompleted": 0,
+      "currentOrder": {
+        "id": "5vqogm7p1",
+        "buyStationId": "ps_foundry",
+        "buyStationName": "Teladianium Foundry (L)",
+        "buySectorId": "profit_share",
+        "buyWareId": "teladianium",
+        "buyWareName": "Teladianium",
+        "buyQty": 4,
+        "buyPrice": 144,
+        "sellStationId": "sz_ire",
+        "sellStationName": "Beta I.R.E. Laser Forge (alpha)",
+        "sellSectorId": "seizewell",
+        "sellWareId": "teladianium",
+        "sellWareName": "Teladianium",
+        "sellQty": 4,
+        "sellPrice": 180,
+        "expectedProfit": 57.60000000000002,
+        "createdAt": 1765375246253
+      }
+    },
+    {
+      "id": "fleet_6k5231qyt",
+      "name": "Vulture Crimson-9",
+      "shipType": "Vulture",
+      "modelPath": "/models/00007.obj",
+      "race": "teladi",
+      "capacity": 2800,
+      "speed": 1.1,
+      "homeSectorId": "seizewell",
+      "ownerId": "crimson_commerce",
+      "ownerType": "guild",
+      "behavior": "freelance",
+      "autonomy": 0.9,
+      "profitShare": 0.3,
+      "currentSectorId": "seizewell",
+      "position": [
+        1725.0171046942455,
+        -285.03136934076076,
+        918.8186385290944
+      ],
+      "state": "in-transit",
+      "stateStartTime": 1765375216041,
+      "cargo": {},
+      "credits": 10000,
+      "commandQueue": [
+        {
+          "type": "goto-station",
+          "targetStationId": "ps_spp",
+          "targetSectorId": "profit_share",
+          "id": "t7kdtwp3e",
+          "createdAt": 1765375216042
+        },
+        {
+          "type": "dock",
+          "targetStationId": "ps_spp",
+          "id": "czflidiov",
+          "createdAt": 1765375216042
+        },
+        {
+          "type": "load-cargo",
+          "targetStationId": "ps_spp",
+          "wareId": "energy_cells",
+          "amount": 60,
+          "id": "6zm6bk2qu",
+          "createdAt": 1765375216042
+        },
+        {
+          "type": "undock",
+          "targetStationId": "ps_spp",
+          "id": "x8u8yfqjs",
+          "createdAt": 1765375216042
+        },
+        {
+          "type": "goto-station",
+          "targetStationId": "gp_crystal",
+          "targetSectorId": "greater_profit",
+          "id": "7vxvmh11w",
+          "createdAt": 1765375216042
+        },
+        {
+          "type": "dock",
+          "targetStationId": "gp_crystal",
+          "id": "ksqs46klz",
+          "createdAt": 1765375216042
+        },
+        {
+          "type": "unload-cargo",
+          "targetStationId": "gp_crystal",
+          "wareId": "energy_cells",
+          "amount": 60,
+          "id": "yck6l9dc1",
+          "createdAt": 1765375216042
+        },
+        {
+          "type": "undock",
+          "targetStationId": "gp_crystal",
+          "id": "4udlci01v",
+          "createdAt": 1765375216042
+        }
+      ],
+      "totalProfit": 0,
+      "tripsCompleted": 0,
+      "currentOrder": {
+        "id": "o755ug19v",
+        "buyStationId": "ps_spp",
+        "buyStationName": "Solar Power Plant (M)",
+        "buySectorId": "profit_share",
+        "buyWareId": "energy_cells",
+        "buyWareName": "Energy Cells",
+        "buyQty": 60,
+        "buyPrice": 14.4,
+        "sellStationId": "gp_crystal",
+        "sellStationName": "Crystal Fab (M)",
+        "sellSectorId": "greater_profit",
+        "sellWareId": "energy_cells",
+        "sellWareName": "Energy Cells",
+        "sellQty": 60,
+        "sellPrice": 25.6,
+        "expectedProfit": 672.0000000000001,
+        "createdAt": 1765375216041
+      }
+    },
+    {
+      "id": "fleet_9rae9g96s",
+      "name": "Vulture Profit-10",
+      "shipType": "Vulture",
+      "modelPath": "/models/00007.obj",
+      "race": "teladi",
+      "capacity": 2800,
+      "speed": 1,
+      "homeSectorId": "teladi_gain",
+      "ownerId": "profit_guild",
+      "ownerType": "guild",
+      "behavior": "guild-assigned",
+      "autonomy": 0.5,
+      "profitShare": 0.2,
+      "currentSectorId": "teladi_gain",
+      "position": [
+        3045.2081913707334,
+        -36.66623859867721,
+        709.7997949412811
+      ],
+      "state": "in-transit",
+      "stateStartTime": 1765375216041,
+      "cargo": {},
+      "credits": 10000,
+      "commandQueue": [
+        {
+          "type": "goto-station",
+          "targetStationId": "ps_spp",
+          "targetSectorId": "profit_share",
+          "id": "xo22r8qil",
+          "createdAt": 1765375216042
+        },
+        {
+          "type": "dock",
+          "targetStationId": "ps_spp",
+          "id": "utiu9ziqk",
+          "createdAt": 1765375216042
+        },
+        {
+          "type": "load-cargo",
+          "targetStationId": "ps_spp",
+          "wareId": "energy_cells",
+          "amount": 60,
+          "id": "acj8rnh1c",
+          "createdAt": 1765375216042
+        },
+        {
+          "type": "undock",
+          "targetStationId": "ps_spp",
+          "id": "xnah9z0qu",
+          "createdAt": 1765375216042
+        },
+        {
+          "type": "goto-station",
+          "targetStationId": "gp_crystal",
+          "targetSectorId": "greater_profit",
+          "id": "c0ez9jtpr",
+          "createdAt": 1765375216042
+        },
+        {
+          "type": "dock",
+          "targetStationId": "gp_crystal",
+          "id": "6aim0v1cy",
+          "createdAt": 1765375216042
+        },
+        {
+          "type": "unload-cargo",
+          "targetStationId": "gp_crystal",
+          "wareId": "energy_cells",
+          "amount": 60,
+          "id": "fr4jlbh04",
+          "createdAt": 1765375216042
+        },
+        {
+          "type": "undock",
+          "targetStationId": "gp_crystal",
+          "id": "kyarqj5ch",
+          "createdAt": 1765375216042
+        }
+      ],
+      "totalProfit": 0,
+      "tripsCompleted": 0,
+      "currentOrder": {
+        "id": "e95fe2bit",
+        "buyStationId": "ps_spp",
+        "buyStationName": "Solar Power Plant (M)",
+        "buySectorId": "profit_share",
+        "buyWareId": "energy_cells",
+        "buyWareName": "Energy Cells",
+        "buyQty": 60,
+        "buyPrice": 14.4,
+        "sellStationId": "gp_crystal",
+        "sellStationName": "Crystal Fab (M)",
+        "sellSectorId": "greater_profit",
+        "sellWareId": "energy_cells",
+        "sellWareName": "Energy Cells",
+        "sellQty": 60,
+        "sellPrice": 25.6,
+        "expectedProfit": 672.0000000000001,
+        "createdAt": 1765375216041
+      }
+    },
+    {
+      "id": "fleet_eals45i0r",
+      "name": "Vulture Profit-11",
+      "shipType": "Vulture",
+      "modelPath": "/models/00007.obj",
+      "race": "teladi",
+      "capacity": 2800,
+      "speed": 1,
+      "homeSectorId": "greater_profit",
+      "ownerId": "profit_guild",
+      "ownerType": "guild",
+      "homeStationId": "gp_dream",
+      "behavior": "station-supply",
+      "autonomy": 0.3,
+      "profitShare": 0.15,
+      "currentSectorId": "teladi_gain",
+      "position": [
+        0,
+        0,
+        148000
+      ],
+      "state": "in-transit",
+      "stateStartTime": 1765375255337,
+      "cargo": {},
+      "credits": 10000,
+      "commandQueue": [
+        {
+          "type": "goto-station",
+          "targetStationId": "tg_bliss",
+          "targetSectorId": "teladi_gain",
+          "id": "jrhbghgn4",
+          "createdAt": 1765375255337
+        },
+        {
+          "type": "dock",
+          "targetStationId": "tg_bliss",
+          "id": "74k22lgeb",
+          "createdAt": 1765375255337
+        },
+        {
+          "type": "load-cargo",
+          "targetStationId": "tg_bliss",
+          "wareId": "space_weed",
+          "amount": 10,
+          "id": "26i1aajt9",
+          "createdAt": 1765375255337
+        },
+        {
+          "type": "undock",
+          "targetStationId": "tg_bliss",
+          "id": "1v607tv3f",
+          "createdAt": 1765375255337
+        },
+        {
+          "type": "goto-station",
+          "targetStationId": "gp_dream",
+          "targetSectorId": "greater_profit",
+          "id": "2d2ydprro",
+          "createdAt": 1765375255337
+        },
+        {
+          "type": "dock",
+          "targetStationId": "gp_dream",
+          "id": "jspfao6sf",
+          "createdAt": 1765375255337
+        },
+        {
+          "type": "unload-cargo",
+          "targetStationId": "gp_dream",
+          "wareId": "space_weed",
+          "amount": 10,
+          "id": "2d92nlf61",
+          "createdAt": 1765375255337
+        },
+        {
+          "type": "undock",
+          "targetStationId": "gp_dream",
+          "id": "devjnc01z",
+          "createdAt": 1765375255337
+        }
+      ],
+      "totalProfit": 0,
+      "tripsCompleted": 0,
+      "currentOrder": {
+        "id": "yygcobzi1",
+        "buyStationId": "tg_bliss",
+        "buyStationName": "Bliss Place (M)",
+        "buySectorId": "teladi_gain",
+        "buyWareId": "space_weed",
+        "buyWareName": "Space Weed",
+        "buyQty": 10,
+        "buyPrice": 490.00000000000006,
+        "sellStationId": "gp_dream",
+        "sellStationName": "Dream Farm (M)",
+        "sellSectorId": "greater_profit",
+        "sellWareId": "space_weed",
+        "sellWareName": "Space Weed",
+        "sellQty": 10,
+        "sellPrice": 472.5,
+        "expectedProfit": 490.00000000000057,
+        "createdAt": 1765375255337
+      }
+    },
+    {
+      "id": "fleet_i858t9oa4",
+      "name": "Vulture Independent-12",
+      "shipType": "Vulture",
+      "modelPath": "/models/00007.obj",
+      "race": "teladi",
+      "capacity": 2800,
+      "speed": 1.05,
+      "homeSectorId": "seizewell",
+      "ownerId": null,
+      "ownerType": "independent",
+      "behavior": "freelance",
+      "autonomy": 1,
+      "profitShare": 1,
+      "currentSectorId": "seizewell",
+      "position": [
+        0,
+        0,
+        88000
+      ],
+      "state": "in-transit",
+      "stateStartTime": 1765375439558,
+      "cargo": {
+        "energy_cells": 0
+      },
+      "credits": 52496,
+      "commandQueue": [
+        {
+          "type": "goto-station",
+          "targetStationId": "tg_bliss",
+          "targetSectorId": "teladi_gain",
+          "id": "lweeg5d10",
+          "createdAt": 1765375439559
+        },
+        {
+          "type": "dock",
+          "targetStationId": "tg_bliss",
+          "id": "55912xstx",
+          "createdAt": 1765375439559
+        },
+        {
+          "type": "load-cargo",
+          "targetStationId": "tg_bliss",
+          "wareId": "space_weed",
+          "amount": 18,
+          "id": "8h3jo99wc",
+          "createdAt": 1765375439559
+        },
+        {
+          "type": "undock",
+          "targetStationId": "tg_bliss",
+          "id": "6czdcooeq",
+          "createdAt": 1765375439559
+        },
+        {
+          "type": "goto-station",
+          "targetStationId": "gp_dream",
+          "targetSectorId": "greater_profit",
+          "id": "ow9qmnsfz",
+          "createdAt": 1765375439559
+        },
+        {
+          "type": "dock",
+          "targetStationId": "gp_dream",
+          "id": "0wh5zqtpl",
+          "createdAt": 1765375439559
+        },
+        {
+          "type": "unload-cargo",
+          "targetStationId": "gp_dream",
+          "wareId": "space_weed",
+          "amount": 18,
+          "id": "6i90xi0ov",
+          "createdAt": 1765375439559
+        },
+        {
+          "type": "undock",
+          "targetStationId": "gp_dream",
+          "id": "1bvfeirzb",
+          "createdAt": 1765375439559
+        }
+      ],
+      "totalProfit": 1056,
+      "tripsCompleted": 1,
+      "currentOrder": {
+        "id": "rycsxoxcr",
+        "buyStationId": "tg_bliss",
+        "buyStationName": "Bliss Place (M)",
+        "buySectorId": "teladi_gain",
+        "buyWareId": "space_weed",
+        "buyWareName": "Space Weed",
+        "buyQty": 18,
+        "buyPrice": 699.9999999999999,
+        "sellStationId": "gp_dream",
+        "sellStationName": "Dream Farm (M)",
+        "sellSectorId": "greater_profit",
+        "sellWareId": "space_weed",
+        "sellWareName": "Space Weed",
+        "sellQty": 18,
+        "sellPrice": 787.5,
+        "expectedProfit": 1575.000000000002,
+        "createdAt": 1765375439558
+      }
+    },
+    {
+      "id": "fleet_edgpcnnvl",
+      "name": "Vulture Independent-13",
+      "shipType": "Vulture",
+      "modelPath": "/models/00007.obj",
+      "race": "teladi",
+      "capacity": 2800,
+      "speed": 0.95,
+      "homeSectorId": "profit_share",
+      "ownerId": null,
+      "ownerType": "independent",
+      "behavior": "freelance",
+      "autonomy": 1,
+      "profitShare": 1,
+      "currentSectorId": "profit_share",
+      "position": [
+        -2911.3398044105434,
+        293.07508894732223,
+        -1067.0752449772021
+      ],
+      "state": "in-transit",
+      "stateStartTime": 1765375216041,
+      "cargo": {},
+      "credits": 50000,
+      "commandQueue": [
+        {
+          "type": "goto-station",
+          "targetStationId": "sz_spp_d",
+          "targetSectorId": "seizewell",
+          "id": "47qh0xrns",
+          "createdAt": 1765375216042
+        },
+        {
+          "type": "dock",
+          "targetStationId": "sz_spp_d",
+          "id": "5r2qzmxeo",
+          "createdAt": 1765375216042
+        },
+        {
+          "type": "load-cargo",
+          "targetStationId": "sz_spp_d",
+          "wareId": "energy_cells",
+          "amount": 60,
+          "id": "woeoyn2fw",
+          "createdAt": 1765375216042
+        },
+        {
+          "type": "undock",
+          "targetStationId": "sz_spp_d",
+          "id": "qblimkp9u",
+          "createdAt": 1765375216042
+        },
+        {
+          "type": "goto-station",
+          "targetStationId": "gp_crystal",
+          "targetSectorId": "greater_profit",
+          "id": "yg6kqonw2",
+          "createdAt": 1765375216042
+        },
+        {
+          "type": "dock",
+          "targetStationId": "gp_crystal",
+          "id": "j3coh87zf",
+          "createdAt": 1765375216042
+        },
+        {
+          "type": "unload-cargo",
+          "targetStationId": "gp_crystal",
+          "wareId": "energy_cells",
+          "amount": 60,
+          "id": "qpb7xrwlf",
+          "createdAt": 1765375216042
+        },
+        {
+          "type": "undock",
+          "targetStationId": "gp_crystal",
+          "id": "4j2arwzxd",
+          "createdAt": 1765375216042
+        }
+      ],
+      "totalProfit": 0,
+      "tripsCompleted": 0,
+      "currentOrder": {
+        "id": "piupxc0b1",
+        "buyStationId": "sz_spp_d",
+        "buyStationName": "Solar Power Plant (delta)",
+        "buySectorId": "seizewell",
+        "buyWareId": "energy_cells",
+        "buyWareName": "Energy Cells",
+        "buyQty": 60,
+        "buyPrice": 8,
+        "sellStationId": "gp_crystal",
+        "sellStationName": "Crystal Fab (M)",
+        "sellSectorId": "greater_profit",
+        "sellWareId": "energy_cells",
+        "sellWareName": "Energy Cells",
+        "sellQty": 60,
+        "sellPrice": 25.6,
+        "expectedProfit": 1056,
+        "createdAt": 1765375216041
+      }
+    },
+    {
+      "id": "fleet_fm1obl043",
+      "name": "Vulture Independent-14",
+      "shipType": "Vulture",
+      "modelPath": "/models/00007.obj",
+      "race": "teladi",
+      "capacity": 2800,
+      "speed": 1,
+      "homeSectorId": "teladi_gain",
+      "ownerId": null,
+      "ownerType": "independent",
+      "behavior": "freelance",
+      "autonomy": 1,
+      "profitShare": 1,
+      "currentSectorId": "teladi_gain",
+      "position": [
+        3406.817316481142,
+        174.56833957136638,
+        -2737.4938639992497
+      ],
+      "state": "in-transit",
+      "stateStartTime": 1765375216041,
+      "cargo": {},
+      "credits": 50000,
+      "commandQueue": [
+        {
+          "type": "goto-station",
+          "targetStationId": "sz_spp_b",
+          "targetSectorId": "seizewell",
+          "id": "xr6sbt7lv",
+          "createdAt": 1765375216042
+        },
+        {
+          "type": "dock",
+          "targetStationId": "sz_spp_b",
+          "id": "90lpy69xo",
+          "createdAt": 1765375216042
+        },
+        {
+          "type": "load-cargo",
+          "targetStationId": "sz_spp_b",
+          "wareId": "energy_cells",
+          "amount": 60,
+          "id": "fhs7p9oqn",
+          "createdAt": 1765375216042
+        },
+        {
+          "type": "undock",
+          "targetStationId": "sz_spp_b",
+          "id": "jp0mx1ruw",
+          "createdAt": 1765375216042
+        },
+        {
+          "type": "goto-station",
+          "targetStationId": "gp_crystal",
+          "targetSectorId": "greater_profit",
+          "id": "mhmbcc1hf",
+          "createdAt": 1765375216042
+        },
+        {
+          "type": "dock",
+          "targetStationId": "gp_crystal",
+          "id": "fbgjl0124",
+          "createdAt": 1765375216042
+        },
+        {
+          "type": "unload-cargo",
+          "targetStationId": "gp_crystal",
+          "wareId": "energy_cells",
+          "amount": 60,
+          "id": "hpx5z78j3",
+          "createdAt": 1765375216042
+        },
+        {
+          "type": "undock",
+          "targetStationId": "gp_crystal",
+          "id": "levtxjfpi",
+          "createdAt": 1765375216042
+        }
+      ],
+      "totalProfit": 0,
+      "tripsCompleted": 0,
+      "currentOrder": {
+        "id": "wd3gd9uw7",
+        "buyStationId": "sz_spp_b",
+        "buyStationName": "Solar Power Plant (b)",
+        "buySectorId": "seizewell",
+        "buyWareId": "energy_cells",
+        "buyWareName": "Energy Cells",
+        "buyQty": 60,
+        "buyPrice": 8,
+        "sellStationId": "gp_crystal",
+        "sellStationName": "Crystal Fab (M)",
+        "sellSectorId": "greater_profit",
+        "sellWareId": "energy_cells",
+        "sellWareName": "Energy Cells",
+        "sellQty": 60,
+        "sellPrice": 25.6,
+        "expectedProfit": 1056,
+        "createdAt": 1765375216041
+      }
+    },
+    {
+      "id": "fleet_5y1inncmt",
+      "name": "Phoenix Teladi-15",
+      "shipType": "Phoenix",
+      "modelPath": "/models/00140.obj",
+      "race": "teladi",
+      "capacity": 5000,
+      "speed": 0.6,
+      "homeSectorId": "seizewell",
+      "ownerId": "teladi_company",
+      "ownerType": "state",
+      "behavior": "patrol",
+      "autonomy": 0.9,
+      "profitShare": 0,
+      "currentSectorId": "seizewell",
+      "position": [
+        -4199.999999999996,
+        2e-323,
+        1200.000000000001
+      ],
+      "state": "docking",
+      "stateStartTime": 1765375379524,
+      "cargo": {},
+      "credits": 10000,
+      "commandQueue": [
+        {
+          "type": "goto-station",
+          "targetStationId": "sz_flower_b",
+          "targetSectorId": "seizewell",
+          "id": "ooqq41i2w",
+          "createdAt": 1765375379524
+        },
+        {
+          "type": "dock",
+          "targetStationId": "sz_flower_b",
+          "id": "99k1uy4ch",
+          "createdAt": 1765375379524
+        },
+        {
+          "type": "undock",
+          "targetStationId": "sz_flower_b",
+          "id": "65kr1ei53",
+          "createdAt": 1765375379524
+        }
+      ],
+      "totalProfit": 0,
+      "tripsCompleted": 0,
+      "targetStationId": "sz_flower_b"
+    },
+    {
+      "id": "fleet_xs3b8u4f7",
+      "name": "Albatross Teladi-16",
+      "shipType": "Albatross",
+      "modelPath": "/models/00187.obj",
+      "race": "teladi",
+      "capacity": 50000,
+      "speed": 0.4,
+      "homeSectorId": "seizewell",
+      "ownerId": "teladi_company",
+      "ownerType": "state",
+      "behavior": "construction",
+      "autonomy": 0.8,
+      "profitShare": 0.5,
+      "currentSectorId": "seizewell",
+      "position": [
+        29845.60682924785,
+        362.16772989259516,
+        10623.149949491986
+      ],
+      "state": "in-transit",
+      "stateStartTime": 1765375682700,
+      "cargo": {},
+      "credits": 10000,
+      "commandQueue": [
+        {
+          "type": "goto-station",
+          "targetStationId": "sz_oil",
+          "targetSectorId": "seizewell",
+          "id": "2m25jlbab",
+          "createdAt": 1765375682701
+        },
+        {
+          "type": "dock",
+          "targetStationId": "sz_oil",
+          "id": "69t3y5aus",
+          "createdAt": 1765375682701
+        },
+        {
+          "type": "undock",
+          "targetStationId": "sz_oil",
+          "id": "fbjwoof76",
+          "createdAt": 1765375682701
+        }
+      ],
+      "totalProfit": 0,
+      "tripsCompleted": 0,
+      "targetStationId": "sz_oil"
+    },
+    {
+      "id": "fleet_nqgokjunx",
+      "name": "Osprey Teladi-17",
+      "shipType": "Osprey",
+      "modelPath": "/models/00141.obj",
+      "race": "teladi",
+      "capacity": 1500,
+      "speed": 0.8,
+      "homeSectorId": "teladi_gain",
+      "ownerId": "teladi_company",
+      "ownerType": "state",
+      "behavior": "patrol",
+      "autonomy": 0.9,
+      "profitShare": 0,
+      "currentSectorId": "tg_bliss",
+      "position": [
+        -148000,
+        0,
+        0
+      ],
+      "state": "idle",
+      "stateStartTime": 1765375196864,
+      "cargo": {},
+      "credits": 10000,
+      "commandQueue": [
+        {
+          "type": "goto-gate",
+          "targetSectorId": "family_whi",
+          "id": "qucxcr4fd",
+          "createdAt": 1765375196866
+        },
+        {
+          "type": "use-gate",
+          "targetSectorId": "family_whi",
+          "id": "glu7ew8e5",
+          "createdAt": 1765375196866
+        }
+      ],
+      "totalProfit": 0,
+      "tripsCompleted": 0,
+      "targetStationId": "tg_bliss"
+    },
+    {
+      "id": "tl_teladi_company_drfwsycvu",
+      "name": "Teladi Company Supply Mammoth 7ouk",
+      "shipType": "Albatross",
+      "modelPath": "/models/00187.obj",
+      "race": "teladi",
+      "capacity": 50000,
+      "speed": 0.5,
+      "homeSectorId": "seizewell",
+      "ownerId": "teladi_company",
+      "ownerType": "state",
+      "behavior": "construction",
+      "autonomy": 0,
+      "profitShare": 0,
+      "currentSectorId": "teladi_gain",
+      "position": [
+        -53918.28143574535,
+        0,
+        -50189.83160959654
+      ],
+      "state": "in-transit",
+      "stateStartTime": 1765375339501,
+      "cargo": {},
+      "credits": 0,
+      "commandQueue": [
+        {
+          "type": "goto-gate",
+          "targetSectorId": "ceo_s_buckzoid",
+          "id": "8nm11p5do",
+          "createdAt": 1765375339501
+        },
+        {
+          "type": "use-gate",
+          "targetSectorId": "ceo_s_buckzoid",
+          "id": "rmgalra54",
+          "createdAt": 1765375339501
+        }
+      ],
+      "totalProfit": 0,
+      "tripsCompleted": 0,
+      "destinationSectorId": "ceo_s_buckzoid"
+    },
+    {
+      "id": "fleet_8m2bosqnt",
+      "name": "Independent m51p",
+      "shipType": "Vulture",
+      "modelPath": "/models/00007.obj",
+      "race": "teladi",
+      "capacity": 2800,
+      "speed": 0.9080858671388825,
+      "homeSectorId": "profit_share",
+      "ownerId": null,
+      "ownerType": "independent",
+      "behavior": "freelance",
+      "autonomy": 1,
+      "profitShare": 1,
+      "currentSectorId": "ceo_s_buckzoid",
+      "position": [
+        0,
+        0,
+        148000
+      ],
+      "state": "in-transit",
+      "stateStartTime": 1765375485583,
+      "cargo": {},
+      "credits": 30000,
+      "commandQueue": [
+        {
+          "type": "goto-station",
+          "targetStationId": "tg_bliss",
+          "targetSectorId": "teladi_gain",
+          "id": "lpx9m7nwg",
+          "createdAt": 1765375485584
+        },
+        {
+          "type": "dock",
+          "targetStationId": "tg_bliss",
+          "id": "0ysfpd8db",
+          "createdAt": 1765375485584
+        },
+        {
+          "type": "load-cargo",
+          "targetStationId": "tg_bliss",
+          "wareId": "space_weed",
+          "amount": 18,
+          "id": "wdswzeuyl",
+          "createdAt": 1765375485584
+        },
+        {
+          "type": "undock",
+          "targetStationId": "tg_bliss",
+          "id": "qithk3b35",
+          "createdAt": 1765375485584
+        },
+        {
+          "type": "goto-station",
+          "targetStationId": "gp_dream",
+          "targetSectorId": "greater_profit",
+          "id": "mbjrx9wv1",
+          "createdAt": 1765375485584
+        },
+        {
+          "type": "dock",
+          "targetStationId": "gp_dream",
+          "id": "55jq84r6j",
+          "createdAt": 1765375485584
+        },
+        {
+          "type": "unload-cargo",
+          "targetStationId": "gp_dream",
+          "wareId": "space_weed",
+          "amount": 18,
+          "id": "pfo8h69gh",
+          "createdAt": 1765375485584
+        },
+        {
+          "type": "undock",
+          "targetStationId": "gp_dream",
+          "id": "8r3txpa6a",
+          "createdAt": 1765375485584
+        }
+      ],
+      "totalProfit": 0,
+      "tripsCompleted": 0,
+      "currentOrder": {
+        "id": "v2zy8vol7",
+        "buyStationId": "tg_bliss",
+        "buyStationName": "Bliss Place (M)",
+        "buySectorId": "teladi_gain",
+        "buyWareId": "space_weed",
+        "buyWareName": "Space Weed",
+        "buyQty": 18,
+        "buyPrice": 699.9999999999999,
+        "sellStationId": "gp_dream",
+        "sellStationName": "Dream Farm (M)",
+        "sellSectorId": "greater_profit",
+        "sellWareId": "space_weed",
+        "sellWareName": "Space Weed",
+        "sellQty": 18,
+        "sellPrice": 787.5,
+        "expectedProfit": 1575.000000000002,
+        "createdAt": 1765375485583
+      }
+    }
+  ],
+  "tradeLog": [
+    {
+      "id": "uglgsk8ro",
+      "timestamp": 1765375538614,
+      "fleetId": "fleet_xhr52yc5f",
+      "fleetName": "Vulture Family-7",
+      "wareId": "sunrise_flowers",
+      "wareName": "Sunrise Flowers",
+      "quantity": 12,
+      "buyPrice": 0,
+      "sellPrice": 108,
+      "profit": 1296,
+      "buySectorId": "sz_flower_g",
+      "sellSectorId": "greater_profit",
+      "buyStationName": "unknown",
+      "sellStationName": "Bliss Place (L)"
+    },
+    {
+      "id": "saky428zr",
+      "timestamp": 1765375438558,
+      "fleetId": "fleet_i858t9oa4",
+      "fleetName": "Vulture Independent-12",
+      "wareId": "energy_cells",
+      "wareName": "Energy Cells",
+      "quantity": 60,
+      "buyPrice": 0,
+      "sellPrice": 32,
+      "profit": 1920,
+      "buySectorId": "seizewell",
+      "sellSectorId": "seizewell",
+      "buyStationName": "unknown",
+      "sellStationName": "Sun Oil Refinery (beta)"
+    },
+    {
+      "id": "ywd0ceu7f",
+      "timestamp": 1765375437557,
+      "fleetId": "fleet_3svc3pbqx",
+      "fleetName": "Vulture Family-6",
+      "wareId": "energy_cells",
+      "wareName": "Energy Cells",
+      "quantity": 60,
+      "buyPrice": 0,
+      "sellPrice": 32,
+      "profit": 1920,
+      "buySectorId": "seizewell",
+      "sellSectorId": "seizewell",
+      "buyStationName": "unknown",
+      "sellStationName": "Sun Oil Refinery (beta)"
+    },
+    {
+      "id": "277rq17r8",
+      "timestamp": 1765375344943,
+      "fleetId": "fleet_xhr52yc5f",
+      "fleetName": "Vulture Family-7",
+      "wareId": "sunrise_flowers",
+      "wareName": "Sunrise Flowers",
+      "quantity": 12,
+      "buyPrice": 93.60000000000001,
+      "sellPrice": 93.60000000000001,
+      "profit": 0,
+      "buySectorId": "seizewell",
+      "sellSectorId": "seizewell",
+      "buyStationName": "Flower Farm (gamma)",
+      "sellStationName": "Sun Oil Refinery (beta)"
+    },
+    {
+      "id": "bc2m7eutv",
+      "timestamp": 1765375318064,
+      "fleetId": "fleet_i858t9oa4",
+      "fleetName": "Vulture Independent-12",
+      "wareId": "energy_cells",
+      "wareName": "Energy Cells",
+      "quantity": 60,
+      "buyPrice": 8,
+      "sellPrice": 25.6,
+      "profit": 1056,
+      "buySectorId": "seizewell",
+      "sellSectorId": "greater_profit",
+      "buyStationName": "Solar Power Plant (b)",
+      "sellStationName": "Crystal Fab (M)"
+    },
+    {
+      "id": "69dj5d8rd",
+      "timestamp": 1765375317050,
+      "fleetId": "fleet_3svc3pbqx",
+      "fleetName": "Vulture Family-6",
+      "wareId": "energy_cells",
+      "wareName": "Energy Cells",
+      "quantity": 60,
+      "buyPrice": 8,
+      "sellPrice": 25.6,
+      "profit": 1056,
+      "buySectorId": "seizewell",
+      "sellSectorId": "greater_profit",
+      "buyStationName": "Solar Power Plant (delta)",
+      "sellStationName": "Crystal Fab (M)"
+    },
+    {
+      "id": "8kx4vdxgm",
+      "timestamp": 1765375299987,
+      "fleetId": "fleet_xhr52yc5f",
+      "fleetName": "Vulture Family-7",
+      "wareId": "sunrise_flowers",
+      "wareName": "Sunrise Flowers",
+      "quantity": 8,
+      "buyPrice": 79.2,
+      "sellPrice": 79.2,
+      "profit": 0,
+      "buySectorId": "seizewell",
+      "sellSectorId": "seizewell",
+      "buyStationName": "Flower Farm (gamma)",
+      "sellStationName": "Sun Oil Refinery (beta)"
+    }
+  ],
+  "lastTickTime": 1765375690705,
+  "lastTraderSpawnCheck": 1765375485583
+}

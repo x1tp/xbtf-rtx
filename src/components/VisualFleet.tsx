@@ -1,10 +1,13 @@
 import type { FC } from 'react';
-import { useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Group, Vector3, Quaternion } from 'three';
+import { Box3, Group, Vector3, Quaternion } from 'three';
 import { ShipModel } from './ShipModel';
 import type { NPCFleet } from '../types/simulation';
 import { FleetSimulator } from '../simulation/FleetSimulator';
+import { ensureRapier, getWorld, getWorldSync } from '../physics/RapierWorld';
+import type RAPIERType from '@dimforge/rapier3d-compat';
+import { getShipStats } from '../config/ships';
 
 interface VisualFleetProps {
     fleet: NPCFleet;
@@ -16,6 +19,107 @@ const UP = new Vector3(0, 0, 1);
 
 export const VisualFleet: FC<VisualFleetProps> = ({ fleet }) => {
     const groupRef = useRef<Group | null>(null);
+    const bodyRef = useRef<RAPIERType.RigidBody | null>(null);
+    const colliderRef = useRef<RAPIERType.Collider | null>(null);
+    const halfExtentsRef = useRef(new Vector3(12, 6, 24));
+    const [navRadius, setNavRadius] = useState(26);
+
+    const colliderRadius = useMemo(() => {
+        const stats = getShipStats(fleet.modelPath || fleet.name);
+        const map: Record<string, number> = {
+            'M5': 8,
+            'M4': 10,
+            'M3': 12,
+            'TS': 18,
+            'TP': 18,
+            'M6': 22,
+            'TL': 45,
+            'M2': 55,
+            'M1': 65,
+            'GO': 14,
+            'UNKNOWN': 16
+        };
+        return map[stats.class] ?? 16;
+    }, [fleet.modelPath, fleet.name]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const cleanup = () => {
+            const w = getWorldSync();
+            if (w && bodyRef.current) {
+                try {
+                    if (w.bodies.contains(bodyRef.current.handle)) {
+                        w.removeRigidBody(bodyRef.current);
+                    }
+                } catch (err) {
+                    console.warn('[VisualFleet] cleanup failed:', err);
+                }
+            }
+            bodyRef.current = null;
+            colliderRef.current = null;
+        };
+
+        const computeBounds = () => {
+            if (!groupRef.current) return null;
+            const box = new Box3().setFromObject(groupRef.current);
+            const size = box.getSize(new Vector3());
+            if (!isFinite(size.x) || !isFinite(size.y) || !isFinite(size.z)) return null;
+            if (size.lengthSq() < 1e-3) return null;
+            return size;
+        };
+
+        const initPhysics = async () => {
+            try {
+                const RAPIER = await ensureRapier();
+                if (cancelled) return;
+                const world = await getWorld();
+                if (cancelled) return;
+
+                const size = computeBounds();
+                if (size) {
+                    const he = size.clone().multiplyScalar(0.5);
+                    he.set(
+                        Math.max(2, he.x),
+                        Math.max(2, he.y),
+                        Math.max(4, he.z),
+                    );
+                    halfExtentsRef.current.copy(he);
+                    setNavRadius(Math.max(he.length() * 0.9, colliderRadius * 1.4));
+                } else {
+                    const r = colliderRadius;
+                    halfExtentsRef.current.set(r, r, r);
+                    setNavRadius(r * 1.6);
+                }
+                const he = halfExtentsRef.current;
+
+                const bodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased()
+                    .setTranslation(fleet.position[0], fleet.position[1], fleet.position[2]);
+                const body = world.createRigidBody(bodyDesc);
+                const collDesc = RAPIER.ColliderDesc.cuboid(he.x, he.y, he.z)
+                    .setFriction(0.6)
+                    .setRestitution(0.05);
+                const collider = world.createCollider(collDesc, body);
+
+                if (cancelled) {
+                    world.removeRigidBody(body);
+                    return;
+                }
+
+                bodyRef.current = body;
+                colliderRef.current = collider;
+            } catch (err) {
+                console.warn('[VisualFleet] physics init failed:', err);
+            }
+        };
+
+        initPhysics();
+        return () => {
+            cancelled = true;
+            cleanup();
+        };
+    }, [fleet.id, colliderRadius]);
+
     // We use a ref to track the last seen fleet ID to handle pooling/swapping if needed, 
     // though generally key={fleet.id} prevents this.
 
@@ -62,6 +166,13 @@ export const VisualFleet: FC<VisualFleetProps> = ({ fleet }) => {
 
             // For now, let's assume fleet.position is updated.
             groupRef.current.position.set(fleet.position[0], fleet.position[1], fleet.position[2]);
+            if (bodyRef.current) {
+                bodyRef.current.setNextKinematicTranslation({
+                    x: fleet.position[0],
+                    y: fleet.position[1],
+                    z: fleet.position[2],
+                });
+            }
 
             // Orientation
             if (vel.lengthSq() > 1) {
@@ -75,12 +186,19 @@ export const VisualFleet: FC<VisualFleetProps> = ({ fleet }) => {
             // Or render based on fleet prop if sim is missing (static?)
             if (!simState) {
                 groupRef.current.position.set(fleet.position[0], fleet.position[1], fleet.position[2]);
+                if (bodyRef.current) {
+                    bodyRef.current.setNextKinematicTranslation({
+                        x: fleet.position[0],
+                        y: fleet.position[1],
+                        z: fleet.position[2],
+                    });
+                }
             }
         }
     });
 
     return (
-        <group ref={groupRef}>
+        <group ref={groupRef} userData={{ navRadius }}>
             <group rotation={[0, Math.PI, 0]}>
                 <ShipModel
                     modelPath={fleet.modelPath}
