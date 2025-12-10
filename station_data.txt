@@ -1,0 +1,782 @@
+Solar Power Plant (b)
+seizewell
+Energy Cells
+Energy Cells
+500
+Crystals
+20
+Solar Power Plant (delta)
+seizewell
+Energy Cells
+Energy Cells
+400
+Crystals
+15
+Sun Oil Refinery (beta)
+seizewell
+Sunrise Flowers Oil
+Sunrise Flowers Oil
+50
+Sunrise Flowers
+40
+Energy Cells
+100
+Flower Farm (beta)
+seizewell
+Sunrise Flowers
+Sunrise Flowers
+100
+Energy Cells
+80
+Flower Farm (gamma)
+seizewell
+Sunrise Flowers
+Sunrise Flowers
+120
+Energy Cells
+70
+Flower Farm (delta)
+seizewell
+Sunrise Flowers
+Sunrise Flowers
+80
+Energy Cells
+90
+Beta I.R.E. Laser Forge (alpha)
+seizewell
+IRE Laser
+IRE Laser
+2
+Teladianium
+10
+Energy Cells
+200
+Bliss Place (M)
+teladi_gain
+Space Weed
+Space Weed
+30
+Sunrise Flowers
+60
+Energy Cells
+120
+Sun Oil Refinery (M)
+teladi_gain
+Sunrise Flowers Oil
+Sunrise Flowers Oil
+40
+Sunrise Flowers
+30
+Energy Cells
+80
+Flower Farm (M)
+teladi_gain
+Sunrise Flowers
+Sunrise Flowers
+150
+Energy Cells
+100
+Solar Power Plant (M)
+profit_share
+Energy Cells
+Energy Cells
+600
+Crystals
+25
+Teladianium Foundry (L)
+profit_share
+Teladianium
+Teladianium
+40
+Ore
+50
+Energy Cells
+150
+Dream Farm (M)
+greater_profit
+Space Fuel
+Space Fuel
+20
+Space Weed
+30
+Energy Cells
+100
+Bliss Place (L)
+greater_profit
+Space Weed
+Space Weed
+50
+Sunrise Flowers
+80
+Energy Cells
+150
+Crystal Fab (M)
+greater_profit
+Crystals
+Crystals
+20
+Silicon Wafers
+40
+Sunrise Flowers Oil
+60
+Energy Cells
+200
+Silicon Mine (M)
+company_pride
+Silicon Wafers
+Silicon Wafers
+10
+Energy Cells
+100
+Boron Shipyard
+kingdom_end
+Ship Parts
+empty
+Boron Equipment Dock
+kingdom_end
+Trade Goods
+empty
+Boron Trading Station
+kingdom_end
+Trade Goods
+empty
+Solar Power Plant (M)
+kingdom_end
+Energy Cells
+empty
+BoGas Factory (M)
+kingdom_end
+BoGas
+empty
+Crystal Fab (M)
+kingdom_end
+Crystals
+empty
+Solar Power Plant (M)
+rolk_s_drift
+Energy Cells
+empty
+BoFu Chemical Lab (M)
+rolk_s_drift
+BoFu
+empty
+Plankton Farm (M)
+rolk_s_drift
+Plankton
+empty
+Solar Power Plant (M)
+queens_space
+Energy Cells
+empty
+BoGas Factory (M)
+queens_space
+BoGas
+empty
+Stott Mixery (M)
+queens_space
+Trade Goods
+empty
+Solar Power Plant (M)
+menelaus_frontier
+Energy Cells
+empty
+BoFu Chemical Lab (M)
+menelaus_frontier
+BoFu
+empty
+Teladi Equipment Dock
+ceo_s_buckzoid
+Trade Goods
+empty
+Solar Power Plant (M)
+ceo_s_buckzoid
+Energy Cells
+empty
+Sun Oil Refinery (M)
+ceo_s_buckzoid
+Sunrise Flowers Oil
+empty
+Teladianium Foundry (M)
+ceo_s_buckzoid
+Teladianium
+empty
+Teladi Trading Station
+teladi_gain
+Trade Goods
+empty
+Bliss Place (M)
+teladi_gain
+Space Weed
+empty
+Sun Oil Refinery (M)
+teladi_gain
+Sunrise Flowers Oil
+empty
+Flower Farm (M)
+teladi_gain
+Sunrise Flowers
+empty
+Split Equipment Dock
+family_whi
+Trade Goods
+empty
+25MW Shield Prod. Facility (M)
+family_whi
+HEPT Laser
+empty
+Argon Equipment Dock
+three_worlds
+Trade Goods
+empty
+Solar Power Plant (M)
+three_worlds
+Energy Cells
+empty
+Cahoona Bakery (M)
+three_worlds
+Meatsteak Cahoonas
+empty
+Weapon Component Factory (M)
+three_worlds
+Trade Goods
+empty
+Solar Power Plant (M)
+power_circle
+Energy Cells
+empty
+Cattle Ranch (M)
+power_circle
+Wheat
+empty
+Shield Plant (1MW)
+power_circle
+HEPT Laser
+empty
+Argon Equipment Dock
+antigone_memorial
+Trade Goods
+empty
+Solar Power Plant (M)
+antigone_memorial
+Energy Cells
+empty
+Cattle Ranch (M)
+antigone_memorial
+Wheat
+empty
+Ore Mine (M)
+antigone_memorial
+Ore
+empty
+Boron Equipment Dock
+rolk_s_fate
+Trade Goods
+empty
+Solar Power Plant (M)
+rolk_s_fate
+Energy Cells
+empty
+Stott Mixery (M)
+rolk_s_fate
+Trade Goods
+empty
+Crystal Fab (M)
+rolk_s_fate
+Crystals
+empty
+Teladi Trading Station
+profit_share
+Trade Goods
+empty
+Solar Power Plant (M)
+profit_share
+Energy Cells
+empty
+Teladianium Foundry (L)
+profit_share
+Teladianium
+empty
+Teladi Trading Station
+seizewell
+Trade Goods
+empty
+Teladi Shipyard (a)
+seizewell
+Ship Parts
+empty
+Teladi Space Equipment Dock
+seizewell
+Trade Goods
+empty
+Solar Power Plant (b)
+seizewell
+Energy Cells
+empty
+Solar Power Plant (delta)
+seizewell
+Energy Cells
+empty
+Sun Oil Refinery (beta)
+seizewell
+Sunrise Flowers Oil
+empty
+Beta I.R.E. Laser Forge (alpha)
+seizewell
+IRE Laser
+empty
+Flower Farm (beta)
+seizewell
+Sunrise Flowers
+empty
+Flower Farm (gamma)
+seizewell
+Sunrise Flowers
+empty
+Flower Farm (delta)
+seizewell
+Sunrise Flowers
+empty
+Solar Power Plant (M)
+family_zein
+Energy Cells
+empty
+Massom Mill (M)
+family_zein
+Trade Goods
+empty
+Scruffin Farm (M)
+family_zein
+Scruffin Fruit
+empty
+Solar Power Plant (M)
+cloudbase_north_west
+Energy Cells
+empty
+Wheat Farm (M)
+cloudbase_north_west
+Wheat
+empty
+Crystal Fab (M)
+cloudbase_north_west
+Crystals
+empty
+Gamma HEPT Forge
+cloudbase_north_west
+Trade Goods
+empty
+Argon Trading Station
+herron_s_nebula
+Trade Goods
+empty
+Solar Power Plant (M)
+herron_s_nebula
+Energy Cells
+empty
+Space Fuel Distillery (L)
+herron_s_nebula
+Trade Goods
+empty
+Solar Power Plant (M)
+the_hole
+Energy Cells
+empty
+Cattle Ranch (M)
+the_hole
+Wheat
+empty
+Cahoona Bakery (M)
+the_hole
+Meatsteak Cahoonas
+empty
+Pirate Base
+atreus_clouds
+Trade Goods
+empty
+Solar Power Plant (M)
+atreus_clouds
+Energy Cells
+empty
+Plankton Farm (M)
+atreus_clouds
+Plankton
+empty
+Solar Power Plant (M)
+spaceweed_drift
+Energy Cells
+empty
+Bliss Place (L)
+spaceweed_drift
+Space Weed
+empty
+Teladi Trading Station
+greater_profit
+Trade Goods
+empty
+Dream Farm (M)
+greater_profit
+Space Fuel
+empty
+Bliss Place (L)
+greater_profit
+Space Weed
+empty
+Crystal Fab (M)
+greater_profit
+Crystals
+empty
+Solar Power Plant (M)
+thuruks_pride
+Energy Cells
+empty
+Rastar Refinery (M)
+thuruks_pride
+Rastar Oil
+empty
+Split Shipyard
+family_pride
+Ship Parts
+empty
+Split Equipment Dock
+family_pride
+Trade Goods
+empty
+Split Trading Station
+family_pride
+Trade Goods
+empty
+Solar Power Plant (M)
+family_pride
+Energy Cells
+empty
+Chelt Aquarium (M)
+family_pride
+Trade Goods
+empty
+Rastar Refinery (M)
+family_pride
+Rastar Oil
+empty
+Solar Power Plant (M)
+ringo_moon
+Energy Cells
+empty
+Cattle Ranch (M)
+ringo_moon
+Wheat
+empty
+Cahoona Bakery (M)
+ringo_moon
+Meatsteak Cahoonas
+empty
+Argon Shipyard
+argon_prime
+Ship Parts
+empty
+Argon Equipment Dock
+argon_prime
+Trade Goods
+empty
+Free Argon Trading Station
+argon_prime
+Trade Goods
+empty
+Solar Power Plant (M)
+argon_prime
+Energy Cells
+empty
+Cattle Ranch (M)
+argon_prime
+Wheat
+empty
+Wheat Farm (M)
+argon_prime
+Wheat
+empty
+Crystal Fab (M)
+argon_prime
+Crystals
+empty
+Solar Power Plant (XL)
+the_wall
+Energy Cells
+empty
+Solar Power Plant (L)
+the_wall
+Energy Cells
+empty
+Solar Power Plant (M)
+the_wall
+Energy Cells
+empty
+Xenon Solar Power Plant
+xenon_sector_1
+Energy Cells
+empty
+Xenon Solar Power Plant
+xenon_sector_2
+Energy Cells
+empty
+Solar Power Plant (M)
+blue_profit
+Energy Cells
+empty
+Flower Farm (M)
+blue_profit
+Sunrise Flowers
+empty
+Sun Oil Refinery (M)
+blue_profit
+Sunrise Flowers Oil
+empty
+Solar Power Plant (M)
+chins_fire
+Energy Cells
+empty
+Chelt Aquarium (M)
+chins_fire
+Trade Goods
+empty
+Pirate Base
+chins_clouds
+Trade Goods
+empty
+Solar Power Plant (M)
+chins_clouds
+Energy Cells
+empty
+Scruffin Farm (M)
+chins_clouds
+Scruffin Fruit
+empty
+Argon Equipment Dock
+red_light
+Trade Goods
+empty
+Solar Power Plant (M)
+red_light
+Energy Cells
+empty
+Crystal Fab (M)
+red_light
+Crystals
+empty
+Microchip Plant (M)
+red_light
+Microchips
+empty
+TerraCorp HQ
+home_of_light
+Trade Goods
+empty
+Argon Trading Station
+home_of_light
+Trade Goods
+empty
+Quantum Tube Fab (M)
+home_of_light
+Quantum Tubes
+empty
+Solar Power Plant (M)
+president_s_end
+Energy Cells
+empty
+Cahoona Bakery (M)
+president_s_end
+Meatsteak Cahoonas
+empty
+Wheat Farm (M)
+president_s_end
+Wheat
+empty
+Xenon Station
+xenon_sector_3
+Trade Goods
+empty
+Xenon Station
+xenon_sector_4
+Trade Goods
+empty
+Solar Power Plant (M)
+ceo_s_sprite
+Energy Cells
+empty
+Quantum Tube Fab (M)
+ceo_s_sprite
+Quantum Tubes
+empty
+Solar Power Plant (M)
+family_chin
+Energy Cells
+empty
+Massom Mill (M)
+family_chin
+Trade Goods
+empty
+Goner Temple
+cloudbase_south_west
+Trade Goods
+empty
+Argon Equipment Dock
+cloudbase_south_west
+Trade Goods
+empty
+Solar Power Plant (M)
+cloudbase_south_west
+Energy Cells
+empty
+Pirate Base
+ore_belt
+Trade Goods
+empty
+Solar Power Plant (M)
+ore_belt
+Energy Cells
+empty
+Ore Mine (L)
+ore_belt
+Ore
+empty
+Silicon Mine (L)
+ore_belt
+Silicon Wafers
+empty
+Solar Power Plant (M)
+cloudbase_south_east
+Energy Cells
+empty
+Crystal Fab (M)
+cloudbase_south_east
+Crystals
+empty
+Xenon Station
+xenon_sector_5
+Trade Goods
+empty
+Xenon Station
+xenon_sector_6
+Trade Goods
+empty
+Earth Jumpgate (Inactive)
+xenon_sector_6
+Trade Goods
+empty
+Teladi Trading Station
+company_pride
+Trade Goods
+empty
+Silicon Mine (M)
+company_pride
+Silicon Wafers
+empty
+Split Equipment Dock
+thuruks_beard
+Trade Goods
+empty
+Solar Power Plant (M)
+thuruks_beard
+Energy Cells
+empty
+Rastar Refinery (M)
+thuruks_beard
+Rastar Oil
+empty
+Solar Power Plant (M)
+emperor_mines
+Energy Cells
+empty
+Ore Mine (M)
+emperor_mines
+Ore
+empty
+Soyfarm (M)
+emperor_mines
+Trade Goods
+empty
+Paranid Shipyard
+paranid_prime
+Ship Parts
+empty
+Paranid Equipment Dock
+paranid_prime
+Trade Goods
+empty
+Paranid Trading Station
+paranid_prime
+Trade Goods
+empty
+Hornet Missile Factory (M)
+paranid_prime
+Trade Goods
+empty
+25MW Shield Fab (M)
+paranid_prime
+HEPT Laser
+empty
+Solar Power Plant (M)
+priest_rings
+Energy Cells
+empty
+Soyery (M)
+priest_rings
+Trade Goods
+empty
+Crystal Fab (M)
+priest_rings
+Crystals
+empty
+Pirate Base
+priest_pity
+Trade Goods
+empty
+Solar Power Plant (M)
+priest_pity
+Energy Cells
+empty
+Snail Ranch (M)
+priest_pity
+Trade Goods
+empty
+Xenon Station
+xenon_sector_7
+Trade Goods
+empty
+Xenon Station
+xenon_sector_8
+Trade Goods
+empty
+Xenon M0 Mothership
+xenon_sector_9
+Trade Goods
+empty
+Xenon Station
+xenon_sector_9
+Trade Goods
+empty
+Solar Power Plant (M)
+empires_edge
+Energy Cells
+empty
+Soyfarm (M)
+empires_edge
+Trade Goods
+empty
+Solar Power Plant (M)
+dukes_domain
+Energy Cells
+empty
+Soyery (M)
+dukes_domain
+Trade Goods
+empty
+Paranid Equipment Dock
+emperors_ridge
+Trade Goods
+empty
+Solar Power Plant (M)
+emperors_ridge
+Energy Cells
+empty
+Majaglit Factory (M)
+emperors_ridge
+Trade Goods
+empty

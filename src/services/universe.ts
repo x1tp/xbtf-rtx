@@ -1,6 +1,6 @@
 import {
   INITIAL_FLEETS,
-  TELADI_CORPORATIONS,
+  INITIAL_CORPORATIONS,
   STATION_OWNERSHIP,
   type Corporation,
   type FleetSpawnConfig,
@@ -34,7 +34,11 @@ const seedStationInventory = (stations: Station[], recipes: Recipe[]) => {
   const recipeMap = new Map<string, Recipe>(recipes.map((r) => [r.id, r]))
   stations.forEach((st) => {
     const recipe = recipeMap.get(st.recipeId)
-    if (!recipe) return
+    if (!recipe) {
+      // Minimal bootstrap for stations with unknown recipes so they're not empty
+      st.inventory['energy_cells'] = st.inventory['energy_cells'] || 200
+      return
+    }
     // Seed some finished goods
     const productStock = Math.round(recipe.productStorageCap * 0.4) || recipe.batchSize
     st.inventory[recipe.productId] = productStock
@@ -43,6 +47,42 @@ const seedStationInventory = (stations: Station[], recipes: Recipe[]) => {
       const seedAmt = Math.max(inp.amount * 3, 50)
       st.inventory[inp.wareId] = seedAmt
     })
+  })
+}
+
+// Ensure stations that arrived without seeding get a bootstrap stock so production can start
+const bootstrapStationInventory = (st: Station, recipeMap: Map<string, Recipe>) => {
+  const recipe = recipeMap.get(st.recipeId)
+  if (!recipe) return
+
+  const hasProduct = (st.inventory[recipe.productId] || 0) > 0
+  const hasInputs = recipe.inputs.every((inp) => (st.inventory[inp.wareId] || 0) > 0)
+
+  if (!hasProduct) {
+    const productStock = Math.round(recipe.productStorageCap * 0.4) || recipe.batchSize
+    st.inventory[recipe.productId] = Math.max(st.inventory[recipe.productId] || 0, productStock)
+  }
+  if (!hasInputs) {
+    recipe.inputs.forEach((inp) => {
+      const seedAmt = Math.max(inp.amount * 3, 50)
+      st.inventory[inp.wareId] = Math.max(st.inventory[inp.wareId] || 0, seedAmt)
+    })
+  }
+}
+
+const assignStationOwnership = (stations: Station[], corporations: Corporation[]) => {
+  stations.forEach((st) => {
+    if (!st.ownerId && st.sectorId.startsWith('xenon')) {
+      st.ownerId = 'xenon_collective'
+    }
+  })
+
+  stations.forEach((st) => {
+    if (!st.ownerId) return
+    const corp = corporations.find((c) => c.id === st.ownerId)
+    if (corp && !corp.stationIds.includes(st.id)) {
+      corp.stationIds = [...corp.stationIds, st.id]
+    }
   })
 }
 
@@ -87,6 +127,11 @@ const DEFAULT_WARES: Ware[] = [
   { id: 'nostrop_oil', name: 'Nostrop Oil', category: 'food', basePrice: 120, volume: 2 },
   { id: 'ire_laser', name: 'Beta I.R.E. Laser', category: 'end', basePrice: 220000, volume: 12 },
   { id: 'spaceweed', name: 'Spaceweed', category: 'end', basePrice: 3200, volume: 1 },
+  { id: 'bogas', name: 'BoGas', category: 'food', basePrice: 50, volume: 1 },
+  { id: 'bofu', name: 'BoFu', category: 'food', basePrice: 120, volume: 1 },
+  { id: 'crystals', name: 'Crystals', category: 'intermediate', basePrice: 1684, volume: 1 },
+  { id: 'trade_goods', name: 'Trade Goods', category: 'end', basePrice: 600, volume: 1 },
+  { id: 'ship_parts', name: 'Ship Parts', category: 'end', basePrice: 22000, volume: 5 },
 ]
 
 const DEFAULT_RECIPES: Recipe[] = [
@@ -98,6 +143,11 @@ const DEFAULT_RECIPES: Recipe[] = [
   { id: 'teladianium_foundry', productId: 'teladianium', inputs: [{ wareId: 'ore', amount: 120 }, { wareId: 'energy_cells', amount: 120 }], cycleTimeSec: 150, batchSize: 160, productStorageCap: 1600 },
   { id: 'ire_forge', productId: 'ire_laser', inputs: [{ wareId: 'nostrop_oil', amount: 120 }, { wareId: 'ore', amount: 60 }, { wareId: 'silicon', amount: 30 }, { wareId: 'energy_cells', amount: 240 }], cycleTimeSec: 240, batchSize: 2, productStorageCap: 6 },
   { id: 'spaceweed_cycle', productId: 'spaceweed', inputs: [{ wareId: 'sunflowers', amount: 140 }, { wareId: 'energy_cells', amount: 120 }], cycleTimeSec: 200, batchSize: 60, productStorageCap: 600 },
+  { id: 'bogas_plant', productId: 'bogas', inputs: [{ wareId: 'energy_cells', amount: 80 }], cycleTimeSec: 90, batchSize: 220, productStorageCap: 1800 },
+  { id: 'bofu_lab', productId: 'bofu', inputs: [{ wareId: 'bogas', amount: 160 }, { wareId: 'energy_cells', amount: 80 }], cycleTimeSec: 120, batchSize: 180, productStorageCap: 1600 },
+  { id: 'crystal_fab', productId: 'crystals', inputs: [{ wareId: 'silicon', amount: 80 }, { wareId: 'energy_cells', amount: 150 }], cycleTimeSec: 150, batchSize: 40, productStorageCap: 600 },
+  { id: 'logistics_hub', productId: 'trade_goods', inputs: [{ wareId: 'energy_cells', amount: 120 }], cycleTimeSec: 110, batchSize: 120, productStorageCap: 1200 },
+  { id: 'shipyard', productId: 'ship_parts', inputs: [{ wareId: 'trade_goods', amount: 80 }, { wareId: 'energy_cells', amount: 200 }], cycleTimeSec: 200, batchSize: 40, productStorageCap: 400 },
 ]
 
 const DEFAULT_STATIONS: Station[] = [
@@ -117,6 +167,22 @@ const DEFAULT_STATIONS: Station[] = [
   { id: 'ps_silicon', name: 'Profit Share Silicon Mine', recipeId: 'mine_silicon', sectorId: 'profit_share', position: [-3000, -200, 0], modelPath: '/models/00114.obj', inventory: {}, reorderLevel: {}, reserveLevel: {} },
   { id: 'gp_dream', name: 'Greater Profit Dream Farm', recipeId: 'spaceweed_cycle', sectorId: 'greater_profit', position: [2000, 0, 0], modelPath: '/models/00282.obj', inventory: {}, reorderLevel: {}, reserveLevel: {} },
   { id: 'gp_bliss', name: 'Greater Profit Bliss Place', recipeId: 'spaceweed_cycle', sectorId: 'greater_profit', position: [-2000, 0, 0], modelPath: '/models/00282.obj', inventory: {}, reorderLevel: {}, reserveLevel: {} },
+
+  // Argon core
+  { id: 'ap_spp_alpha', name: 'Argon Prime SPP', recipeId: 'spp_cycle', sectorId: 'argon_prime', position: [1200, 80, -1600], modelPath: '/models/00184.obj', inventory: {}, reorderLevel: {}, reserveLevel: {} },
+  { id: 'ob_ore_mine', name: 'Ore Belt Mine', recipeId: 'mine_ore', sectorId: 'ore_belt', position: [-1800, -300, 900], modelPath: '/models/00114.obj', inventory: {}, reorderLevel: {}, reserveLevel: {} },
+
+  // Boron frontier
+  { id: 'ke_spp_alpha', name: 'Kingdom End SPP', recipeId: 'spp_cycle', sectorId: 'kingdom_end', position: [800, 60, 1400], modelPath: '/models/00281.obj', inventory: {}, reorderLevel: {}, reserveLevel: {} },
+  { id: 'rd_silicon_mine', name: 'Rolk\'s Drift Silicon Mine', recipeId: 'mine_silicon', sectorId: 'rolk_s_drift', position: [-1400, -260, -900], modelPath: '/models/00114.obj', inventory: {}, reorderLevel: {}, reserveLevel: {} },
+
+  // Split holdings
+  { id: 'tp_spp_alpha', name: 'Thuruk\'s Pride SPP', recipeId: 'spp_cycle', sectorId: 'thuruks_pride', position: [1600, 40, 1100], modelPath: '/models/00275.obj', inventory: {}, reorderLevel: {}, reserveLevel: {} },
+  { id: 'fw_ore_mine', name: 'Family Whi Ore Mine', recipeId: 'mine_ore', sectorId: 'family_whi', position: [-900, -220, 1700], modelPath: '/models/00114.obj', inventory: {}, reorderLevel: {}, reserveLevel: {} },
+
+  // Paranid space
+  { id: 'pp_spp_alpha', name: 'Paranid Prime SPP', recipeId: 'spp_cycle', sectorId: 'paranid_prime', position: [900, 90, -900], modelPath: '/models/00279.obj', inventory: {}, reorderLevel: {}, reserveLevel: {} },
+  { id: 'pr_silicon_mine', name: 'Priest Rings Silicon Mine', recipeId: 'mine_silicon', sectorId: 'priest_rings', position: [-1200, -240, -1400], modelPath: '/models/00114.obj', inventory: {}, reorderLevel: {}, reserveLevel: {} },
 ]
 
 const DEFAULT_SECTOR_PRICES: Record<string, Record<string, number>> = {
@@ -140,7 +206,7 @@ function spawnFleet(cfg: FleetSpawnConfig, index: number, corporations: Corporat
     name: `${cfg.ownerId ?? 'independent'}_${index}`,
     shipType: cfg.shipType,
     modelPath: cfg.modelPath,
-    race: owner?.race ?? 'teladi',
+    race: cfg.race ?? owner?.race ?? 'teladi',
     capacity: cfg.capacity,
     speed: cfg.speed,
     homeSectorId: cfg.homeSectorId,
@@ -163,7 +229,7 @@ function spawnFleet(cfg: FleetSpawnConfig, index: number, corporations: Corporat
 }
 
 function createInitialState(): UniverseState {
-  const corporations = TELADI_CORPORATIONS.map((c) => ({
+  const corporations = INITIAL_CORPORATIONS.map((c) => ({
     ...c,
     stationIds: [...c.stationIds],
     fleetIds: [...c.fleetIds],
@@ -177,7 +243,12 @@ function createInitialState(): UniverseState {
     if (corp && !corp.stationIds.includes(stationId)) {
       corp.stationIds = [...corp.stationIds, stationId]
     }
+    const st = DEFAULT_STATIONS.find(s => s.id === stationId)
+    if (st) st.ownerId = ownerId
   })
+
+  // Fallback: assign Xenon-owned sectors' stations to Xenon Collective and sync lists
+  assignStationOwnership(DEFAULT_STATIONS, corporations)
 
   // Seed station inventories/resources
   seedStationInventory(DEFAULT_STATIONS, DEFAULT_RECIPES)
@@ -204,6 +275,7 @@ const productionStep = (stations: Station[], recipes: Recipe[], deltaSec: number
   stations.forEach((st) => {
     const recipe = recipeMap.get(st.recipeId)
     if (!recipe) return
+    bootstrapStationInventory(st, recipeMap)
     st.productionProgress = (st.productionProgress || 0) + deltaSec
     while (st.productionProgress >= recipe.cycleTimeSec) {
       const canProduce = recipe.inputs.every((inp) => (st.inventory[inp.wareId] || 0) >= inp.amount)

@@ -310,7 +310,8 @@ export interface TradeRoute {
 // Teladi Corporations (Initial Setup)
 // ============================================================================
 
-export const TELADI_CORPORATIONS: Corporation[] = [
+export const INITIAL_CORPORATIONS: Corporation[] = [
+  // Teladi
   {
     id: 'teladi_company',
     name: 'Teladi Company',
@@ -407,6 +408,210 @@ export const TELADI_CORPORATIONS: Corporation[] = [
     lifetimeTrades: 0,
     aiState: { lastExpansionCheck: 0, currentGoal: 'expand', pendingConstructions: [] },
   },
+
+  // Argon
+  {
+    id: 'argon_fleet_command',
+    name: 'Argon Federal Logistics',
+    race: 'argon',
+    type: 'state',
+    stationIds: [],
+    fleetIds: [],
+    credits: 1_800_000,
+    netWorth: 9_000_000,
+    aggressiveness: 0.45,
+    expansionBudget: 220_000,
+    riskTolerance: 0.35,
+    lifetimeProfit: 0,
+    lifetimeTrades: 0,
+    aiState: { lastExpansionCheck: 0, currentGoal: 'expand', pendingConstructions: [] },
+  },
+  {
+    id: 'argon_commerce_guild',
+    name: 'Argon Commerce Guild',
+    race: 'argon',
+    type: 'guild',
+    stationIds: [],
+    fleetIds: [],
+    credits: 700_000,
+    netWorth: 3_500_000,
+    aggressiveness: 0.55,
+    expansionBudget: 120_000,
+    riskTolerance: 0.45,
+    lifetimeProfit: 0,
+    lifetimeTrades: 0,
+    aiState: { lastExpansionCheck: 0, currentGoal: 'stabilize', pendingConstructions: [] },
+  },
+  {
+    id: 'cahoona_supply',
+    name: 'Cahoona Supply Ltd',
+    race: 'argon',
+    type: 'corporation',
+    stationIds: [],
+    fleetIds: [],
+    credits: 500_000,
+    netWorth: 2_000_000,
+    aggressiveness: 0.5,
+    expansionBudget: 90_000,
+    riskTolerance: 0.4,
+    lifetimeProfit: 0,
+    lifetimeTrades: 0,
+    aiState: { lastExpansionCheck: 0, currentGoal: 'expand', pendingConstructions: [] },
+  },
+
+  // Boron
+  {
+    id: 'royal_boron_logistics',
+    name: 'Royal Boron Logistics',
+    race: 'boron',
+    type: 'state',
+    stationIds: [],
+    fleetIds: [],
+    credits: 1_200_000,
+    netWorth: 6_000_000,
+    aggressiveness: 0.3,
+    expansionBudget: 150_000,
+    riskTolerance: 0.35,
+    lifetimeProfit: 0,
+    lifetimeTrades: 0,
+    aiState: { lastExpansionCheck: 0, currentGoal: 'stabilize', pendingConstructions: [] },
+  },
+  {
+    id: 'queens_merchants',
+    name: "Queen's Merchants Guild",
+    race: 'boron',
+    type: 'guild',
+    stationIds: [],
+    fleetIds: [],
+    credits: 650_000,
+    netWorth: 2_500_000,
+    aggressiveness: 0.35,
+    expansionBudget: 80_000,
+    riskTolerance: 0.5,
+    lifetimeProfit: 0,
+    lifetimeTrades: 0,
+    aiState: { lastExpansionCheck: 0, currentGoal: 'expand', pendingConstructions: [] },
+  },
+
+  // Split
+  {
+    id: 'family_whi_couriers',
+    name: 'Family Whi Couriers',
+    race: 'split',
+    type: 'family',
+    stationIds: [],
+    fleetIds: [],
+    credits: 750_000,
+    netWorth: 3_000_000,
+    aggressiveness: 0.65,
+    expansionBudget: 100_000,
+    riskTolerance: 0.6,
+    lifetimeProfit: 0,
+    lifetimeTrades: 0,
+    aiState: { lastExpansionCheck: 0, currentGoal: 'expand', pendingConstructions: [] },
+  },
+  {
+    id: 'thuruk_exports',
+    name: "Thuruk's Pride Exports",
+    race: 'split',
+    type: 'family',
+    stationIds: [],
+    fleetIds: [],
+    credits: 650_000,
+    netWorth: 2_700_000,
+    aggressiveness: 0.7,
+    expansionBudget: 90_000,
+    riskTolerance: 0.55,
+    lifetimeProfit: 0,
+    lifetimeTrades: 0,
+    aiState: { lastExpansionCheck: 0, currentGoal: 'war', pendingConstructions: [] },
+  },
+
+  // Paranid
+  {
+    id: 'holy_light_provisioners',
+    name: 'Holy Light Provisioners',
+    race: 'paranid',
+    type: 'state',
+    stationIds: [],
+    fleetIds: [],
+    credits: 1_000_000,
+    netWorth: 5_000_000,
+    aggressiveness: 0.5,
+    expansionBudget: 140_000,
+    riskTolerance: 0.5,
+    lifetimeProfit: 0,
+    lifetimeTrades: 0,
+    aiState: { lastExpansionCheck: 0, currentGoal: 'stabilize', pendingConstructions: [] },
+  },
+  {
+    id: 'trinity_enclave',
+    name: 'Trinity Enclave Combine',
+    race: 'paranid',
+    type: 'corporation',
+    stationIds: [],
+    fleetIds: [],
+    credits: 750_000,
+    netWorth: 3_000_000,
+    aggressiveness: 0.55,
+    expansionBudget: 110_000,
+    riskTolerance: 0.45,
+    lifetimeProfit: 0,
+    lifetimeTrades: 0,
+    aiState: { lastExpansionCheck: 0, currentGoal: 'expand', pendingConstructions: [] },
+  },
+
+  // Pirates
+  {
+    id: 'pirate_clans',
+    name: 'Pirate Clans',
+    race: 'pirate',
+    type: 'guild',
+    stationIds: [],
+    fleetIds: [],
+    credits: 450_000,
+    netWorth: 1_800_000,
+    aggressiveness: 0.8,
+    expansionBudget: 80_000,
+    riskTolerance: 0.9,
+    lifetimeProfit: 0,
+    lifetimeTrades: 0,
+    aiState: { lastExpansionCheck: 0, currentGoal: 'war', pendingConstructions: [] },
+  },
+  {
+    id: 'black_marketeers',
+    name: 'Black Marketeers',
+    race: 'pirate',
+    type: 'independent',
+    stationIds: [],
+    fleetIds: [],
+    credits: 320_000,
+    netWorth: 1_100_000,
+    aggressiveness: 0.75,
+    expansionBudget: 60_000,
+    riskTolerance: 0.95,
+    lifetimeProfit: 0,
+    lifetimeTrades: 0,
+    aiState: { lastExpansionCheck: 0, currentGoal: 'expand', pendingConstructions: [] },
+  },
+
+  // Xenon
+  {
+    id: 'xenon_collective',
+    name: 'Xenon Collective',
+    race: 'xenon',
+    type: 'state',
+    stationIds: [],
+    fleetIds: [],
+    credits: 2_000_000,
+    netWorth: 6_000_000,
+    aggressiveness: 0.9,
+    expansionBudget: 150_000,
+    riskTolerance: 1.0,
+    lifetimeProfit: 0,
+    lifetimeTrades: 0,
+    aiState: { lastExpansionCheck: 0, currentGoal: 'war', pendingConstructions: [] },
+  },
 ]
 
 // Station to Corporation mapping for initial setup
@@ -432,6 +637,26 @@ export const STATION_OWNERSHIP: Record<string, string> = {
   // Greater Profit
   'gp_dream': 'profit_guild',
   'gp_bliss': 'profit_guild',
+
+  // Argon space
+  'ap_spp_alpha': 'argon_fleet_command',
+  'ob_ore_mine': 'cahoona_supply',
+
+  // Boron space
+  'ke_spp_alpha': 'royal_boron_logistics',
+  'rd_silicon_mine': 'queens_merchants',
+
+  // Split domains
+  'tp_spp_alpha': 'thuruk_exports',
+  'fw_ore_mine': 'family_whi_couriers',
+
+  // Paranid core
+  'pp_spp_alpha': 'holy_light_provisioners',
+  'pr_silicon_mine': 'trinity_enclave',
+
+  // Xenon (assign any Xenon infrastructure when present)
+  'xn_spp_alpha': 'xenon_collective',
+  'xn_hub_alpha': 'xenon_collective',
 }
 
 // ============================================================================
@@ -443,6 +668,7 @@ export interface FleetSpawnConfig {
   ownerType: OwnershipType
   behavior: FleetBehavior
   homeStationId?: string
+  race?: RaceType
   shipType: string
   modelPath: string
   capacity: number
@@ -454,32 +680,67 @@ export interface FleetSpawnConfig {
 
 export const INITIAL_FLEETS: FleetSpawnConfig[] = [
   // Teladi Company - corporate logistics
-  { ownerId: 'teladi_company', ownerType: 'state', behavior: 'corp-logistics', shipType: 'Vulture', modelPath: '/models/00188.obj', capacity: 2800, speed: 1.0, autonomy: 0.3, profitShare: 0.1, homeSectorId: 'seizewell' },
-  { ownerId: 'teladi_company', ownerType: 'state', behavior: 'corp-logistics', shipType: 'Vulture', modelPath: '/models/00188.obj', capacity: 2800, speed: 1.0, autonomy: 0.3, profitShare: 0.1, homeSectorId: 'profit_share' },
-  { ownerId: 'teladi_company', ownerType: 'state', behavior: 'freelance', shipType: 'Albatross', modelPath: '/models/00187.obj', capacity: 8000, speed: 0.7, autonomy: 0.8, profitShare: 0.2, homeSectorId: 'seizewell' },
+  { ownerId: 'teladi_company', ownerType: 'state', behavior: 'corp-logistics', shipType: 'Vulture', modelPath: '/models/00007.obj', capacity: 2800, speed: 1.0, autonomy: 0.3, profitShare: 0.1, homeSectorId: 'seizewell', race: 'teladi' },
+  { ownerId: 'teladi_company', ownerType: 'state', behavior: 'corp-logistics', shipType: 'Vulture', modelPath: '/models/00007.obj', capacity: 2800, speed: 1.0, autonomy: 0.3, profitShare: 0.1, homeSectorId: 'profit_share', race: 'teladi' },
+  { ownerId: 'teladi_company', ownerType: 'state', behavior: 'freelance', shipType: 'Albatross', modelPath: '/models/00187.obj', capacity: 8000, speed: 0.7, autonomy: 0.8, profitShare: 0.2, homeSectorId: 'seizewell', race: 'teladi' },
 
   // Sunward Consortium - station supply for solar plants
-  { ownerId: 'sunward_consortium', ownerType: 'guild', behavior: 'station-supply', homeStationId: 'sz_spp_b', shipType: 'Vulture', modelPath: '/models/00188.obj', capacity: 2800, speed: 1.0, autonomy: 0.2, profitShare: 0.15, homeSectorId: 'seizewell' },
-  { ownerId: 'sunward_consortium', ownerType: 'guild', behavior: 'station-distribute', homeStationId: 'ps_spp', shipType: 'Vulture', modelPath: '/models/00188.obj', capacity: 2800, speed: 1.0, autonomy: 0.3, profitShare: 0.15, homeSectorId: 'profit_share' },
+  { ownerId: 'sunward_consortium', ownerType: 'guild', behavior: 'station-supply', homeStationId: 'sz_spp_b', shipType: 'Vulture', modelPath: '/models/00007.obj', capacity: 2800, speed: 1.0, autonomy: 0.2, profitShare: 0.15, homeSectorId: 'seizewell', race: 'teladi' },
+  { ownerId: 'sunward_consortium', ownerType: 'guild', behavior: 'station-distribute', homeStationId: 'ps_spp', shipType: 'Vulture', modelPath: '/models/00007.obj', capacity: 2800, speed: 1.0, autonomy: 0.3, profitShare: 0.15, homeSectorId: 'profit_share', race: 'teladi' },
 
   // Family Zhi'kkt - family business
-  { ownerId: 'family_zhikkt', ownerType: 'family', behavior: 'station-distribute', homeStationId: 'sz_spp_d', shipType: 'Vulture', modelPath: '/models/00188.obj', capacity: 2800, speed: 1.0, autonomy: 0.4, profitShare: 0.25, homeSectorId: 'seizewell' },
+  { ownerId: 'family_zhikkt', ownerType: 'family', behavior: 'station-distribute', homeStationId: 'sz_spp_d', shipType: 'Vulture', modelPath: '/models/00007.obj', capacity: 2800, speed: 1.0, autonomy: 0.4, profitShare: 0.25, homeSectorId: 'seizewell', race: 'teladi' },
 
   // Family Tek'ra - oil business
-  { ownerId: 'family_tekra', ownerType: 'family', behavior: 'station-supply', homeStationId: 'sz_oil', shipType: 'Vulture', modelPath: '/models/00188.obj', capacity: 2800, speed: 1.0, autonomy: 0.3, profitShare: 0.2, homeSectorId: 'seizewell' },
+  { ownerId: 'family_tekra', ownerType: 'family', behavior: 'station-supply', homeStationId: 'sz_oil', shipType: 'Vulture', modelPath: '/models/00007.obj', capacity: 2800, speed: 1.0, autonomy: 0.3, profitShare: 0.2, homeSectorId: 'seizewell', race: 'teladi' },
 
   // Crimson Commerce - weapon traders
-  { ownerId: 'crimson_commerce', ownerType: 'guild', behavior: 'station-supply', homeStationId: 'sz_ire', shipType: 'Vulture', modelPath: '/models/00188.obj', capacity: 2800, speed: 1.0, autonomy: 0.2, profitShare: 0.1, homeSectorId: 'seizewell' },
-  { ownerId: 'crimson_commerce', ownerType: 'guild', behavior: 'freelance', shipType: 'Vulture', modelPath: '/models/00188.obj', capacity: 2800, speed: 1.1, autonomy: 0.9, profitShare: 0.3, homeSectorId: 'seizewell' },
+  { ownerId: 'crimson_commerce', ownerType: 'guild', behavior: 'station-supply', homeStationId: 'sz_ire', shipType: 'Vulture', modelPath: '/models/00007.obj', capacity: 2800, speed: 1.0, autonomy: 0.2, profitShare: 0.1, homeSectorId: 'seizewell', race: 'teladi' },
+  { ownerId: 'crimson_commerce', ownerType: 'guild', behavior: 'freelance', shipType: 'Vulture', modelPath: '/models/00007.obj', capacity: 2800, speed: 1.1, autonomy: 0.9, profitShare: 0.3, homeSectorId: 'seizewell', race: 'teladi' },
 
   // Profit Guild - recreational goods
-  { ownerId: 'profit_guild', ownerType: 'guild', behavior: 'guild-assigned', shipType: 'Vulture', modelPath: '/models/00188.obj', capacity: 2800, speed: 1.0, autonomy: 0.5, profitShare: 0.2, homeSectorId: 'teladi_gain' },
-  { ownerId: 'profit_guild', ownerType: 'guild', behavior: 'station-supply', homeStationId: 'gp_dream', shipType: 'Vulture', modelPath: '/models/00188.obj', capacity: 2800, speed: 1.0, autonomy: 0.3, profitShare: 0.15, homeSectorId: 'greater_profit' },
+  { ownerId: 'profit_guild', ownerType: 'guild', behavior: 'guild-assigned', shipType: 'Vulture', modelPath: '/models/00007.obj', capacity: 2800, speed: 1.0, autonomy: 0.5, profitShare: 0.2, homeSectorId: 'teladi_gain', race: 'teladi' },
+  { ownerId: 'profit_guild', ownerType: 'guild', behavior: 'station-supply', homeStationId: 'gp_dream', shipType: 'Vulture', modelPath: '/models/00007.obj', capacity: 2800, speed: 1.0, autonomy: 0.3, profitShare: 0.15, homeSectorId: 'greater_profit', race: 'teladi' },
 
   // Independent traders - pure profit seekers
-  { ownerId: null, ownerType: 'independent', behavior: 'freelance', shipType: 'Vulture', modelPath: '/models/00188.obj', capacity: 2800, speed: 1.05, autonomy: 1.0, profitShare: 1.0, homeSectorId: 'seizewell' },
-  { ownerId: null, ownerType: 'independent', behavior: 'freelance', shipType: 'Vulture', modelPath: '/models/00188.obj', capacity: 2800, speed: 0.95, autonomy: 1.0, profitShare: 1.0, homeSectorId: 'profit_share' },
-  { ownerId: null, ownerType: 'independent', behavior: 'freelance', shipType: 'Vulture', modelPath: '/models/00188.obj', capacity: 2800, speed: 1.0, autonomy: 1.0, profitShare: 1.0, homeSectorId: 'teladi_gain' },
+  { ownerId: null, ownerType: 'independent', behavior: 'freelance', shipType: 'Vulture', modelPath: '/models/00007.obj', capacity: 2800, speed: 1.05, autonomy: 1.0, profitShare: 1.0, homeSectorId: 'seizewell', race: 'teladi' },
+  { ownerId: null, ownerType: 'independent', behavior: 'freelance', shipType: 'Vulture', modelPath: '/models/00007.obj', capacity: 2800, speed: 0.95, autonomy: 1.0, profitShare: 1.0, homeSectorId: 'profit_share', race: 'teladi' },
+  { ownerId: null, ownerType: 'independent', behavior: 'freelance', shipType: 'Vulture', modelPath: '/models/00007.obj', capacity: 2800, speed: 1.0, autonomy: 1.0, profitShare: 1.0, homeSectorId: 'teladi_gain', race: 'teladi' },
+
+  // Argon logistics & guilds
+  { ownerId: 'argon_fleet_command', ownerType: 'state', behavior: 'corp-logistics', shipType: 'Lifter', modelPath: '/models/00002.obj', capacity: 2600, speed: 1.0, autonomy: 0.35, profitShare: 0.12, homeSectorId: 'argon_prime', race: 'argon' },
+  { ownerId: 'argon_fleet_command', ownerType: 'state', behavior: 'corp-logistics', shipType: 'Lifter', modelPath: '/models/00002.obj', capacity: 2600, speed: 1.05, autonomy: 0.35, profitShare: 0.12, homeSectorId: 'home_of_light', race: 'argon' },
+  { ownerId: 'argon_commerce_guild', ownerType: 'guild', behavior: 'guild-assigned', shipType: 'Lifter', modelPath: '/models/00002.obj', capacity: 2500, speed: 1.0, autonomy: 0.55, profitShare: 0.25, homeSectorId: 'the_wall', race: 'argon' },
+  { ownerId: 'cahoona_supply', ownerType: 'corporation', behavior: 'station-supply', shipType: 'Lifter', modelPath: '/models/00002.obj', capacity: 2400, speed: 0.95, autonomy: 0.35, profitShare: 0.18, homeSectorId: 'the_hole', race: 'argon' },
+  { ownerId: null, ownerType: 'independent', behavior: 'freelance', shipType: 'Lifter', modelPath: '/models/00002.obj', capacity: 2400, speed: 1.1, autonomy: 1.0, profitShare: 1.0, homeSectorId: 'power_circle', race: 'argon' },
+
+  // Boron trade fleets
+  { ownerId: 'royal_boron_logistics', ownerType: 'state', behavior: 'corp-logistics', shipType: 'Dolphin', modelPath: '/models/00141.obj', capacity: 3000, speed: 0.9, autonomy: 0.3, profitShare: 0.12, homeSectorId: 'kingdom_end', race: 'boron' },
+  { ownerId: 'queens_merchants', ownerType: 'guild', behavior: 'station-distribute', shipType: 'Dolphin', modelPath: '/models/00141.obj', capacity: 2900, speed: 0.95, autonomy: 0.45, profitShare: 0.22, homeSectorId: 'queens_space', race: 'boron' },
+  { ownerId: 'queens_merchants', ownerType: 'guild', behavior: 'guild-assigned', shipType: 'Dolphin', modelPath: '/models/00141.obj', capacity: 2800, speed: 0.95, autonomy: 0.55, profitShare: 0.22, homeSectorId: 'rolk_s_drift', race: 'boron' },
+  { ownerId: null, ownerType: 'independent', behavior: 'freelance', shipType: 'Dolphin', modelPath: '/models/00141.obj', capacity: 2700, speed: 1.0, autonomy: 1.0, profitShare: 1.0, homeSectorId: 'menelaus_frontier', race: 'boron' },
+
+  // Split family logistics
+  { ownerId: 'family_whi_couriers', ownerType: 'family', behavior: 'station-distribute', shipType: 'Mule', modelPath: '/models/00117.obj', capacity: 2600, speed: 1.1, autonomy: 0.5, profitShare: 0.25, homeSectorId: 'family_whi', race: 'split' },
+  { ownerId: 'thuruk_exports', ownerType: 'family', behavior: 'corp-logistics', shipType: 'Mule', modelPath: '/models/00117.obj', capacity: 2600, speed: 1.05, autonomy: 0.45, profitShare: 0.22, homeSectorId: 'thuruks_pride', race: 'split' },
+  { ownerId: 'thuruk_exports', ownerType: 'family', behavior: 'freelance', shipType: 'Mule', modelPath: '/models/00117.obj', capacity: 2500, speed: 1.15, autonomy: 0.8, profitShare: 0.3, homeSectorId: 'family_zein', race: 'split' },
+  { ownerId: null, ownerType: 'independent', behavior: 'freelance', shipType: 'Mule', modelPath: '/models/00117.obj', capacity: 2400, speed: 1.2, autonomy: 1.0, profitShare: 1.0, homeSectorId: 'family_pride', race: 'split' },
+
+  // Paranid traders
+  { ownerId: 'holy_light_provisioners', ownerType: 'state', behavior: 'corp-logistics', shipType: 'Ganymede', modelPath: '/models/00393.obj', capacity: 2500, speed: 1.0, autonomy: 0.35, profitShare: 0.18, homeSectorId: 'paranid_prime', race: 'paranid' },
+  { ownerId: 'trinity_enclave', ownerType: 'corporation', behavior: 'guild-assigned', shipType: 'Ganymede', modelPath: '/models/00393.obj', capacity: 2400, speed: 1.05, autonomy: 0.6, profitShare: 0.28, homeSectorId: 'priest_rings', race: 'paranid' },
+  { ownerId: null, ownerType: 'independent', behavior: 'freelance', shipType: 'Ganymede', modelPath: '/models/00393.obj', capacity: 2300, speed: 1.05, autonomy: 1.0, profitShare: 1.0, homeSectorId: 'emperor_mines', race: 'paranid' },
+
+  // Pirate operations
+  { ownerId: 'pirate_clans', ownerType: 'guild', behavior: 'freelance', shipType: 'Pirate Lifter', modelPath: '/models/00391.obj', capacity: 2600, speed: 1.05, autonomy: 0.9, profitShare: 0.6, homeSectorId: 'spaceweed_drift', race: 'pirate' },
+  { ownerId: 'pirate_clans', ownerType: 'guild', behavior: 'guild-assigned', shipType: 'Pirate Dolphin', modelPath: '/models/00392.obj', capacity: 2800, speed: 1.0, autonomy: 0.85, profitShare: 0.6, homeSectorId: 'greater_profit', race: 'pirate' },
+  { ownerId: 'black_marketeers', ownerType: 'independent', behavior: 'freelance', shipType: 'Pirate Mule', modelPath: '/models/00394.obj', capacity: 2500, speed: 1.1, autonomy: 0.95, profitShare: 0.75, homeSectorId: 'company_pride', race: 'pirate' },
+  { ownerId: null, ownerType: 'independent', behavior: 'freelance', shipType: 'Pirate Vulture', modelPath: '/models/00395.obj', capacity: 2500, speed: 1.05, autonomy: 1.0, profitShare: 1.0, homeSectorId: 'ceo_s_sprite', race: 'pirate' },
+
+  // Xenon automatons
+  { ownerId: 'xenon_collective', ownerType: 'state', behavior: 'corp-logistics', shipType: 'Transporter', modelPath: '/models/00038.obj', capacity: 3200, speed: 1.2, autonomy: 0.7, profitShare: 0.0, homeSectorId: 'xenon_sector_3', race: 'xenon' },
+  { ownerId: 'xenon_collective', ownerType: 'state', behavior: 'freelance', shipType: 'Transporter', modelPath: '/models/00038.obj', capacity: 3000, speed: 1.15, autonomy: 0.8, profitShare: 0.0, homeSectorId: 'xenon_sector_5', race: 'xenon' },
+  { ownerId: null, ownerType: 'independent', behavior: 'freelance', shipType: 'Transporter', modelPath: '/models/00038.obj', capacity: 3000, speed: 1.1, autonomy: 1.0, profitShare: 1.0, homeSectorId: 'xenon_sector_1', race: 'xenon' },
 ]
 
 // ============================================================================

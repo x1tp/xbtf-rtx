@@ -1311,6 +1311,52 @@ function EconomyAdmin() {
                       </div>
                     </div>
 
+                    {/* CEO Focus */}
+                    <div style={{ marginBottom: 12, background: '#0a1a24', border: '1px solid #184b6a', borderRadius: 6, padding: 10 }}>
+                      <div style={{ color: '#6090a0', fontSize: 10, marginBottom: 6 }}>CURRENT GOAL</div>
+                      {(() => {
+                        const goal = (corp.aiState?.currentGoal ?? 'stabilize') as 'stabilize' | 'expand' | 'war'
+                        const pending = corp.aiState?.pendingConstructions ?? []
+                        const goalColors: Record<'stabilize' | 'expand' | 'war', string> = {
+                          stabilize: '#ffcc44',
+                          expand: '#88cc44',
+                          war: '#ff6666'
+                        }
+                        const goalCopy: Record<'stabilize' | 'expand' | 'war', string> = {
+                          stabilize: 'Shoring up profits and cash reserves',
+                          expand: 'Pushing for new stations and fleets',
+                          war: 'Aggressive moves and risky trades'
+                        }
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ color: goalColors[goal], fontWeight: 'bold' }}>{goal.toUpperCase()}</span>
+                              <span style={{ color: '#8ab6d6', fontSize: 11, textAlign: 'right' }}>{goalCopy[goal]}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                              <span style={{ color: '#6090a0' }}>Pending builds</span>
+                              <span style={{ color: pending.length > 0 ? '#88cc44' : '#3a4b5c' }}>
+                                {pending.length > 0 ? `${pending.length} in queue` : 'none'}
+                              </span>
+                            </div>
+                            {pending.length > 0 && (
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 4, fontSize: 11, background: '#0f2230', border: '1px solid #184b6a', borderRadius: 4, padding: 6 }}>
+                                {pending.slice(0, 3).map((job) => (
+                                  <Fragment key={job.id}>
+                                    <span style={{ color: '#c3e7ff' }}>{job.stationType} → {job.targetSectorId}</span>
+                                    <span style={{ color: '#8ab6d6', textTransform: 'capitalize' }}>{job.status}</span>
+                                  </Fragment>
+                                ))}
+                                {pending.length > 3 && (
+                                  <span style={{ gridColumn: '1 / span 2', color: '#6090a0' }}>+{pending.length - 3} more queued</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })()}
+                    </div>
+
                     {/* Personality Traits */}
                     <div style={{ fontSize: 11 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>

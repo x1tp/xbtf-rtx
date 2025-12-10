@@ -18,7 +18,7 @@ const BRAKE_DISTANCE_LARGE = 600;
 const STATS = {
     trader: { accel: 15, speed: 180, turn: 1.5, physics: 1.0 },
     military: { accel: 20, speed: 220, turn: 2.0, physics: 1.2 },
-    builder: { accel: 8, speed: 90, turn: 0.4, physics: 1.0 }, // Heavy
+    builder: { accel: 12, speed: 240, turn: 0.6, physics: 1.0 }, // Heavy TLs need faster gate runs
 };
 
 interface FleetRuntimeState {
@@ -32,7 +32,7 @@ interface FleetRuntimeState {
     dockStationId?: string;
     holdDock: boolean;
     idleAnchor: Vector3 | null;
-    localState: 'idle' | 'flying-to-station' | 'flying-to-gate' | 'docking' | 'docked' | 'loading' | 'unloading' | 'undocking' | 'entering-gate' | 'patrolling' | 'gone';
+    localState: 'idle' | 'flying-to-station' | 'flying-to-gate' | 'docking' | 'docked' | 'loading' | 'unloading' | 'undocking' | 'entering-gate' | 'patrolling' | 'in-transit' | 'gone';
     currentCommandIndex: number;
     actionTimer: number;
     lastReport: string;
@@ -614,20 +614,36 @@ export class FleetSimulator {
                     state.lastProgress.pos.copy(posVec);
                 }
 
-                // Gate Entry
-                if (state.localState === 'entering-gate' || state.localState === 'flying-to-gate') {
-                    if (nav) {
-                        for (const g of nav.gatePositions) {
-                            const gatePos = new Vector3(g.position[0], g.position[1], g.position[2]);
-                            if (posVec.distanceTo(gatePos) < Math.max(150, g.radius)) {
-                                const cmd = fleet.commandQueue?.[state.currentCommandIndex];
-                                const finalDest = cmd?.targetSectorId || fleet.destinationSectorId;
-                                if (finalDest) {
-                                    const nextHop = findNextHop(fleet.currentSectorId, finalDest);
-                                    const targetSector = nextHop || finalDest;
-                                    this.enterGate(fleet, state, targetSector, g.gateType);
-                                    posVec.set(fleet.position[0], fleet.position[1], fleet.position[2]);
-                                }
+                // Gate Entry (robust)
+                if (nav) {
+                    const cmd = fleet.commandQueue?.[state.currentCommandIndex];
+                    const wantsGate = cmd && (cmd.type === 'goto-gate' || cmd.type === 'use-gate' || cmd.type === 'move-to-sector');
+                    for (const g of nav.gatePositions) {
+                        const gatePos = new Vector3(g.position[0], g.position[1], g.position[2]);
+                        const gateDist = posVec.distanceTo(gatePos);
+                        const enterRadius = Math.max(300, g.radius * 0.9);
+
+                        // If we're explicitly heading to a gate, use a larger envelope to avoid jitter loops
+                        if ((state.localState === 'entering-gate' || state.localState === 'flying-to-gate' || wantsGate) && gateDist < enterRadius) {
+                            const finalDest = cmd?.targetSectorId || fleet.destinationSectorId;
+                            if (finalDest) {
+                                const nextHop = findNextHop(fleet.currentSectorId, finalDest);
+                                const targetSector = nextHop || finalDest;
+                                this.enterGate(fleet, state, targetSector, g.gateType);
+                                posVec.set(fleet.position[0], fleet.position[1], fleet.position[2]);
+                                break;
+                            }
+                        }
+
+                        // Safety: if hovering near a gate for a long time while "in-transit", force entry
+                        const stuckNearGate = gateDist < enterRadius * 2 && (state.localState === 'entering-gate' || state.localState === 'flying-to-gate' || state.localState === 'in-transit');
+                        if (stuckNearGate && (now - state.lastProgress.time) > 8000) {
+                            const finalDest = cmd?.targetSectorId || fleet.destinationSectorId;
+                            if (finalDest) {
+                                const nextHop = findNextHop(fleet.currentSectorId, finalDest);
+                                const targetSector = nextHop || finalDest;
+                                this.enterGate(fleet, state, targetSector, g.gateType);
+                                posVec.set(fleet.position[0], fleet.position[1], fleet.position[2]);
                                 break;
                             }
                         }

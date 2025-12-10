@@ -2,6 +2,9 @@ import { defineConfig } from 'vite'
 import type { ViteDevServer } from 'vite'
 import type { IncomingMessage, ServerResponse } from 'http'
 import react from '@vitejs/plugin-react'
+import { INITIAL_CORPORATIONS, INITIAL_FLEETS, STATION_OWNERSHIP } from './src/types/simulation'
+import { UNIVERSE_SECTORS_XBTF } from './src/config/universe_xbtf'
+import { getSectorLayoutById } from './src/config/sector'
 // fs and path are already imported at the top
 
 type Ware = { id: string; name: string; category: 'primary' | 'food' | 'intermediate' | 'end'; basePrice: number; volume: number }
@@ -423,38 +426,86 @@ function createUniverse() {
       // === COMPANY PRIDE ===
       { id: 'cp_silicon', name: 'Silicon Mine (M)', recipeId: 'silicon_mine', sectorId: 'company_pride', inventory: { silicon_wafers: 10, energy_cells: 100 }, reorderLevel: { energy_cells: 150 }, reserveLevel: { silicon_wafers: 10 } },
     ]
+
+    // Also register stations from all sector blueprints so the economy admin reflects the whole universe
+    const spacing = 30
+    const slug = (name: string, fallback: string) => {
+      const s = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+      return s || fallback
+    }
+    const existingIds = new Set(stations.map(s => s.id))
+    const pickRecipeId = (name: string): string => {
+      const n = name.toLowerCase()
+      if (n.includes('solar power')) return 'spp_teladi'
+      if (n.includes('spp')) return 'spp_teladi'
+      if (n.includes('flower')) return 'flower_farm'
+      if (n.includes('dream')) return 'dream_farm'
+      if (n.includes('bliss')) return 'bliss_place'
+      if (n.includes('sun oil') || n.includes('oil refinery')) return 'sun_oil_refinery'
+      if (n.includes('teladianium')) return 'teladianium_foundry'
+      if (n.includes('ore mine')) return 'ore_mine'
+      if (n.includes('silicon')) return 'silicon_mine'
+      if (n.includes('crystal')) return 'crystal_fab'
+      if (n.includes('equipment dock') || n.includes('trading station')) return 'logistics_hub'
+      if (n.includes('shipyard')) return 'shipyard'
+      if (n.includes('cattle ranch') || n.includes('wheat')) return 'argon_farm'
+      if (n.includes('cahoona')) return 'cahoona_bakery'
+      if (n.includes('plankton')) return 'plankton_farm'
+      if (n.includes('bogas')) return 'bogas_plant'
+      if (n.includes('bofu')) return 'bofu_lab'
+      if (n.includes('scruffin')) return 'scruffin_farm'
+      if (n.includes('rastar')) return 'rastar_refinery'
+      if (n.includes('quantum')) return 'quantum_tube_fab'
+      if (n.includes('chip')) return 'chip_plant'
+      if (n.includes('computer')) return 'computer_plant'
+      if (n.includes('shield')) return 'hept_forge'
+      if (n.includes('ire') || n.includes('laser')) return 'ire_forge'
+      return 'logistics_hub'
+    }
+
+    for (const sector of UNIVERSE_SECTORS_XBTF) {
+      const layout = getSectorLayoutById(sector.id)
+      if (!layout) continue
+      layout.stations.forEach((st, idx) => {
+        const id = `${sector.id}_${slug(st.name, String(idx))}`
+        if (existingIds.has(id)) return
+        existingIds.add(id)
+        stations.push({
+          id,
+          name: st.name,
+          recipeId: pickRecipeId(st.name),
+          sectorId: sector.id,
+          position: [st.position[0] * spacing, st.position[1] * spacing, st.position[2] * spacing],
+          modelPath: st.modelPath,
+          inventory: {},
+          reorderLevel: {},
+          reserveLevel: {},
+        })
+      })
+    }
     state.wares = wares
     state.recipes = recipes
     state.stations = stations
     state.sectorPrices = computeSectorPrices(stations, recipes, wares)
 
-    // Initialize corporations
-    const corporations: Corporation[] = [
-      { id: 'teladi_company', name: 'Teladi Company', race: 'teladi', type: 'state', stationIds: ['ps_foundry'], fleetIds: [], credits: 5_000_000, netWorth: 50_000_000, aggressiveness: 0.4, expansionBudget: 500_000, riskTolerance: 0.3, lifetimeProfit: 0, lifetimeTrades: 0 },
-      { id: 'sunward_consortium', name: 'Sunward Consortium', race: 'teladi', type: 'guild', stationIds: ['sz_spp_b', 'ps_spp', 'gp_crystal', 'cp_silicon'], fleetIds: [], credits: 800_000, netWorth: 4_000_000, aggressiveness: 0.5, expansionBudget: 100_000, riskTolerance: 0.4, lifetimeProfit: 0, lifetimeTrades: 0 },
-      { id: 'family_zhikkt', name: "Family Zhi'kkt", race: 'teladi', type: 'family', stationIds: ['sz_spp_d', 'sz_flower_b', 'tg_flower'], fleetIds: [], credits: 300_000, netWorth: 1_500_000, aggressiveness: 0.6, expansionBudget: 50_000, riskTolerance: 0.5, lifetimeProfit: 0, lifetimeTrades: 0 },
-      { id: 'family_tekra', name: "Family Tek'ra", race: 'teladi', type: 'family', stationIds: ['sz_oil', 'tg_oil'], fleetIds: [], credits: 400_000, netWorth: 2_000_000, aggressiveness: 0.55, expansionBudget: 60_000, riskTolerance: 0.45, lifetimeProfit: 0, lifetimeTrades: 0 },
-      { id: 'crimson_commerce', name: 'Crimson Commerce Guild', race: 'teladi', type: 'guild', stationIds: ['sz_ire'], fleetIds: [], credits: 1_200_000, netWorth: 6_000_000, aggressiveness: 0.7, expansionBudget: 200_000, riskTolerance: 0.6, lifetimeProfit: 0, lifetimeTrades: 0 },
-      { id: 'profit_guild', name: 'Profit Guild', race: 'teladi', type: 'guild', stationIds: ['tg_bliss', 'gp_dream', 'gp_bliss'], fleetIds: [], credits: 600_000, netWorth: 3_000_000, aggressiveness: 0.65, expansionBudget: 80_000, riskTolerance: 0.55, lifetimeProfit: 0, lifetimeTrades: 0 },
-    ]
+    // Initialize corporations (multi-race)
+    const corporations: Corporation[] = INITIAL_CORPORATIONS.map((c) => ({
+      ...c,
+      stationIds: [...c.stationIds],
+      fleetIds: [...c.fleetIds],
+    }))
+
+    // Apply station ownership mapping for existing seeded stations
+    Object.entries(STATION_OWNERSHIP).forEach(([stationId, ownerId]) => {
+      const corp = corporations.find((c) => c.id === ownerId)
+      if (corp && !corp.stationIds.includes(stationId)) {
+        corp.stationIds.push(stationId)
+      }
+    })
 
     // Initial fleet spawn configs
     const fleetConfigs = [
-      { ownerId: 'teladi_company', ownerType: 'state' as OwnershipType, behavior: 'corp-logistics' as FleetBehavior, shipType: 'Vulture', capacity: 2800, speed: 1.0, autonomy: 0.3, profitShare: 0.1, homeSectorId: 'seizewell' },
-      { ownerId: 'teladi_company', ownerType: 'state' as OwnershipType, behavior: 'corp-logistics' as FleetBehavior, shipType: 'Vulture', capacity: 2800, speed: 1.0, autonomy: 0.3, profitShare: 0.1, homeSectorId: 'profit_share' },
-      { ownerId: 'teladi_company', ownerType: 'state' as OwnershipType, behavior: 'freelance' as FleetBehavior, shipType: 'Albatross', capacity: 8000, speed: 0.7, autonomy: 0.8, profitShare: 0.2, homeSectorId: 'seizewell' },
-      { ownerId: 'sunward_consortium', ownerType: 'guild' as OwnershipType, behavior: 'station-supply' as FleetBehavior, homeStationId: 'sz_spp_b', shipType: 'Vulture', capacity: 2800, speed: 1.0, autonomy: 0.2, profitShare: 0.15, homeSectorId: 'seizewell' },
-      { ownerId: 'sunward_consortium', ownerType: 'guild' as OwnershipType, behavior: 'station-distribute' as FleetBehavior, homeStationId: 'ps_spp', shipType: 'Vulture', capacity: 2800, speed: 1.0, autonomy: 0.3, profitShare: 0.15, homeSectorId: 'profit_share' },
-      { ownerId: 'family_zhikkt', ownerType: 'family' as OwnershipType, behavior: 'station-distribute' as FleetBehavior, homeStationId: 'sz_spp_d', shipType: 'Vulture', capacity: 2800, speed: 1.0, autonomy: 0.4, profitShare: 0.25, homeSectorId: 'seizewell' },
-      { ownerId: 'family_tekra', ownerType: 'family' as OwnershipType, behavior: 'station-supply' as FleetBehavior, homeStationId: 'sz_oil', shipType: 'Vulture', capacity: 2800, speed: 1.0, autonomy: 0.3, profitShare: 0.2, homeSectorId: 'seizewell' },
-      { ownerId: 'crimson_commerce', ownerType: 'guild' as OwnershipType, behavior: 'station-supply' as FleetBehavior, homeStationId: 'sz_ire', shipType: 'Vulture', capacity: 2800, speed: 1.0, autonomy: 0.2, profitShare: 0.1, homeSectorId: 'seizewell' },
-      { ownerId: 'crimson_commerce', ownerType: 'guild' as OwnershipType, behavior: 'freelance' as FleetBehavior, shipType: 'Vulture', capacity: 2800, speed: 1.1, autonomy: 0.9, profitShare: 0.3, homeSectorId: 'seizewell' },
-      { ownerId: 'profit_guild', ownerType: 'guild' as OwnershipType, behavior: 'guild-assigned' as FleetBehavior, shipType: 'Vulture', capacity: 2800, speed: 1.0, autonomy: 0.5, profitShare: 0.2, homeSectorId: 'teladi_gain' },
-      { ownerId: 'profit_guild', ownerType: 'guild' as OwnershipType, behavior: 'station-supply' as FleetBehavior, homeStationId: 'gp_dream', shipType: 'Vulture', capacity: 2800, speed: 1.0, autonomy: 0.3, profitShare: 0.15, homeSectorId: 'greater_profit' },
-      { ownerId: null, ownerType: 'independent' as OwnershipType, behavior: 'freelance' as FleetBehavior, shipType: 'Vulture', capacity: 2800, speed: 1.05, autonomy: 1.0, profitShare: 1.0, homeSectorId: 'seizewell' },
-      { ownerId: null, ownerType: 'independent' as OwnershipType, behavior: 'freelance' as FleetBehavior, shipType: 'Vulture', capacity: 2800, speed: 0.95, autonomy: 1.0, profitShare: 1.0, homeSectorId: 'profit_share' },
-      { ownerId: null, ownerType: 'independent' as OwnershipType, behavior: 'freelance' as FleetBehavior, shipType: 'Vulture', capacity: 2800, speed: 1.0, autonomy: 1.0, profitShare: 1.0, homeSectorId: 'teladi_gain' },
-
+      ...INITIAL_FLEETS,
       // === Military / Special Ships ===
       // Seizewell: Teladi Destroyer Phoenix (M2)
       { ownerId: 'teladi_company', ownerType: 'state' as OwnershipType, behavior: 'patrol' as FleetBehavior, shipType: 'Phoenix', capacity: 5000, speed: 0.6, autonomy: 0.9, profitShare: 0, homeSectorId: 'seizewell' },
@@ -466,7 +517,7 @@ function createUniverse() {
 
     // Spawn fleets
     const fleets: NPCFleet[] = fleetConfigs.map((cfg, i) => {
-      let modelPath = '/models/00007.obj' // Default Vulture
+      let modelPath = cfg.modelPath || '/models/00007.obj'
       if (cfg.shipType === 'Phoenix') modelPath = '/models/00140.obj'
       else if (cfg.shipType === 'Albatross') modelPath = '/models/00187.obj'
       else if (cfg.shipType === 'Osprey') modelPath = '/models/00141.obj'
@@ -476,7 +527,7 @@ function createUniverse() {
         name: `${cfg.shipType} ${cfg.ownerId ? corporations.find(c => c.id === cfg.ownerId)?.name?.split(' ')[0] || '' : 'Independent'}-${i + 1}`,
         shipType: cfg.shipType,
         modelPath: modelPath,
-        race: 'teladi',
+        race: cfg.race || 'teladi',
         capacity: cfg.capacity,
         speed: cfg.speed,
         homeSectorId: cfg.homeSectorId,
@@ -1043,7 +1094,8 @@ function createUniverse() {
       if (hasQueuedCommands) {
         const stuckDuration = now - (fleet.stateStartTime || now)
         const isDesync = fleet.state === 'idle'
-        const isZombieTransit = fleet.state === 'in-transit' && stuckDuration > 300000 // 5 min
+        const zombieLimit = fleet.behavior === 'construction' ? 900000 : 300000 // Construction TLs get a bigger window
+        const isZombieTransit = fleet.state === 'in-transit' && stuckDuration > zombieLimit
 
         if (isDesync || isZombieTransit) {
           const cmd = fleet.commandQueue[0]
@@ -1201,6 +1253,23 @@ function createUniverse() {
                 }
               }
             }
+          }
+        }
+
+        // 1.5 REQUEUE LOST TRANSIT (e.g., TLs with destination but empty queue)
+        if (fleet.state === 'in-transit' && !hasQueuedCommands && fleet.destinationSectorId) {
+          const path = findSectorPath(fleet.currentSectorId, fleet.destinationSectorId)
+          if (path && path.length > 0) {
+            const nextSector = path[0]
+            issueCommand(fleet.id, { type: 'goto-gate', targetSectorId: nextSector })
+            issueCommand(fleet.id, { type: 'use-gate', targetSectorId: nextSector })
+            fleet.state = 'in-transit'
+            fleet.stateStartTime = now
+            continue
+          } else if (path && path.length === 0) {
+            // Already there
+            fleet.state = 'idle'
+            fleet.destinationSectorId = undefined
           }
         }
 
