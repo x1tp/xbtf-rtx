@@ -1,4 +1,4 @@
-import { Suspense, useRef, useState, useEffect, Fragment, useMemo, type FC } from 'react';
+import { Suspense, useRef, useState, useEffect, Fragment } from 'react';
 import { persist } from './services/persist';
 import { Canvas, useThree } from '@react-three/fiber';
 import { Scene } from './Scene';
@@ -30,137 +30,9 @@ import { UniverseMap } from './components/UniverseMap';
 import { EconomyTicker } from './components/EconomyTicker';
 import { getAllPresets } from './config/plumes';
 import { StationInfo } from './components/StationInfo';
-import { NPCTrader } from './components/NPCTrader';
-import { NPCMilitary } from './components/NPCMilitary';
-import { NPCBuilder } from './components/NPCBuilder';
-import { buildNavGraph, buildNavNodesFromLayout } from './ai/navigation';
-import type { NavGraph, NavObstacle } from './ai/navigation';
-import type { NPCFleet, FleetBehavior } from './types/simulation';
+import { FleetSimulator } from './simulation/FleetSimulator';
 
-const HiddenFleetSimulator: FC<{ excludeCurrentSector?: boolean; behaviors?: FleetBehavior[] }> = ({ excludeCurrentSector = false, behaviors }) => {
-  const fleets = useGameStore((s) => s.fleets);
-  const economyStations = useGameStore((s) => s.stations);
-  const reportShipAction = useGameStore((s) => s.reportShipAction);
-  const currentSectorId = useGameStore((s) => s.currentSectorId);
 
-  const navDataBySector = useMemo(() => {
-    const map = new Map<string, {
-      stationPositions: Map<string, [number, number, number]>;
-      gatePositions: { position: [number, number, number]; destinationSectorId: string }[];
-      navGraph: NavGraph | null;
-      obstacles: NavObstacle[];
-    }>();
-    const spacing = 30;
-    const place = (p: [number, number, number]): [number, number, number] => [p[0] * spacing, p[1] * spacing, p[2] * spacing];
-    const sectorIds = new Set<string>();
-    fleets.forEach((f) => {
-      if (excludeCurrentSector && currentSectorId && f.currentSectorId === currentSectorId) return;
-      if (f.currentSectorId) sectorIds.add(f.currentSectorId);
-    });
-    sectorIds.forEach((sectorId) => {
-      const layout = getSectorLayoutById(sectorId || 'seizewell');
-      if (!layout) return;
-      const stationPositions = new Map<string, [number, number, number]>();
-      const layoutByName = new Map<string, [number, number, number]>();
-      const obstacles: NavObstacle[] = [];
-
-      for (const st of layout.stations) {
-        const pos = place(st.position);
-        layoutByName.set(st.name, pos);
-        obstacles.push({
-          id: `station-${st.name}`,
-          center: new Vector3(pos[0], pos[1], pos[2]),
-          radius: (st.scale ?? 24) * 5,
-          label: st.name
-        });
-      }
-      for (const econStation of economyStations.filter((s) => s.sectorId === sectorId)) {
-        const layoutPos = layoutByName.get(econStation.name);
-        if (layoutPos) {
-          stationPositions.set(econStation.id, layoutPos);
-          stationPositions.set(econStation.name, layoutPos);
-        }
-      }
-      for (const st of layout.stations) {
-        if (!stationPositions.has(st.name)) {
-          stationPositions.set(st.name, place(st.position));
-        }
-      }
-      const gatePositions = layout.gates
-        .filter((g) => g.destinationSectorId)
-        .map((g) => {
-          const pos = place(g.position) as [number, number, number];
-          obstacles.push({
-            id: `gate-${g.name}`,
-            center: new Vector3(pos[0], pos[1], pos[2]),
-            radius: (g.scale ?? 40) * 6,
-            label: g.name
-          });
-          return {
-            position: pos,
-            destinationSectorId: g.destinationSectorId!,
-            radius: (g.scale ?? 40) * 5,
-            gateType: g.gateType,
-          };
-        });
-
-      // Add planet obstacle if present
-      if (layout.planet) {
-        // Planet is usually huge and far away, but let's add it just in case ships fly through it
-        // Use a conservative radius
-        obstacles.push({
-          id: 'planet',
-          center: new Vector3(layout.planet.position[0] * spacing, layout.planet.position[1] * spacing, layout.planet.position[2] * spacing),
-          radius: layout.planet.size * 0.8, // Reduced radius to be safe against phantom collisions
-          label: 'planet'
-        });
-      }
-
-      const nodes = buildNavNodesFromLayout(layout, spacing);
-      const navGraph = buildNavGraph(nodes, obstacles);
-      map.set(sectorId, { stationPositions, gatePositions, navGraph, obstacles });
-    });
-    return map;
-  }, [fleets, economyStations, excludeCurrentSector, currentSectorId]);
-
-  const filteredFleets = fleets.filter((f) => {
-    if (excludeCurrentSector && currentSectorId && f.currentSectorId === currentSectorId) return false;
-    if (behaviors && behaviors.length > 0 && !behaviors.includes(f.behavior)) return false;
-    return true;
-  });
-
-  if (filteredFleets.length === 0) return null;
-
-  return (
-    <Canvas
-      frameloop="always"
-      style={{ position: 'fixed', width: 1, height: 1, pointerEvents: 'none', opacity: 0, left: -10, top: -10 }}
-    >
-      <Suspense fallback={null}>
-        {filteredFleets.map((fleet: NPCFleet) => {
-          const nav = navDataBySector.get(fleet.currentSectorId || 'seizewell');
-          if (!nav) return null;
-
-          let Component: any = NPCTrader;
-          if (fleet.behavior === 'patrol') Component = NPCMilitary;
-          if (fleet.behavior === 'construction') Component = NPCBuilder;
-
-          return (
-            <Component
-              key={`bg-${fleet.id}`}
-              fleet={fleet}
-              stationPositions={nav.stationPositions}
-              gatePositions={nav.gatePositions}
-              navGraph={nav.navGraph}
-              obstacles={nav.obstacles}
-              onReport={reportShipAction}
-            />
-          );
-        })}
-      </Suspense>
-    </Canvas>
-  );
-};
 
 
 function OverExposureOverlay() {
@@ -213,11 +85,27 @@ function App() {
   const setCurrentSectorId = useGameStore((s) => s.setCurrentSectorId);
 
   useEffect(() => {
-      // DEBUG: Force jump to Kingdom End to investigate model loading
-      if (currentSectorId !== 'kingdom_end') {
-          console.log('DEBUG: Forcing jump to Kingdom End');
-          setCurrentSectorId('kingdom_end');
+    // Debug code removed
+  }, []);
+
+  // Initialize Simulation Loop
+  useEffect(() => {
+    let rafId = 0;
+    let lastTime = performance.now();
+    const loop = () => {
+      const now = performance.now();
+      const dt = Math.min((now - lastTime) / 1000, 0.1); // Cap dt at 100ms
+      lastTime = now;
+
+      const timeScale = useGameStore.getState().timeScale;
+      if (timeScale > 0) {
+        FleetSimulator.getInstance().update(dt * timeScale);
       }
+
+      rafId = requestAnimationFrame(loop);
+    };
+    rafId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(rafId);
   }, []);
 
   const economyStations = useGameStore((s) => s.stations);
@@ -277,7 +165,7 @@ function App() {
   if (path === '/admin') {
     return (
       <>
-        <HiddenFleetSimulator />
+
         <AdminHome />
       </>
     );
@@ -286,7 +174,7 @@ function App() {
   if (path.startsWith('/admin/sector')) {
     return (
       <>
-        <HiddenFleetSimulator />
+
         <PlanetEditor />
       </>
     );
@@ -295,9 +183,7 @@ function App() {
   if (path.startsWith('/admin/economy')) {
     return (
       <>
-        <HiddenFleetSimulator />
         {/* Ensure construction TLs keep simulating even when only the economy admin is open */}
-        <HiddenFleetSimulator behaviors={['construction']} />
         <EconomyAdmin />
       </>
     );
@@ -306,7 +192,7 @@ function App() {
   if (path.startsWith('/admin/plume')) {
     return (
       <>
-        <HiddenFleetSimulator />
+
         <PlumeEditor />
       </>
     );
@@ -316,7 +202,7 @@ function App() {
     const modelFromPath = new URLSearchParams(window.location.search).get('model') || adminModel;
     return (
       <div style={{ width: '100vw', height: '100vh', background: '#0b1016' }}>
-        <HiddenFleetSimulator />
+
         <ShipEditorCanvas modelPath={modelFromPath} />
       </div>
     );
@@ -324,9 +210,7 @@ function App() {
 
   return (
     <div style={{ width: '100vw', height: '100vh', background: 'black' }}>
-      <HiddenFleetSimulator excludeCurrentSector />
       {/* Always simulate construction TLs, even in current sector, to keep them moving cross-sector */}
-      <HiddenFleetSimulator behaviors={['construction']} />
       <Canvas
         shadows
         gl={{ logarithmicDepthBuffer: true, antialias: true }}
@@ -1085,10 +969,10 @@ function EconomyAdmin() {
                         ) : (
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 4 }}>
                             {items.map(([wid, price]) => (
-                              <>
+                              <Fragment key={wid}>
                                 <div style={{ color: '#c3e7ff' }}>{wareMap.get(wid) || wid}</div>
                                 <div style={{ color: '#88cc44', textAlign: 'right' }}>{Math.round(price)}</div>
-                              </>
+                              </Fragment>
                             ))}
                           </div>
                         )}
@@ -1105,10 +989,10 @@ function EconomyAdmin() {
                   ) : (
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 4 }}>
                       {items.map(([wid, price]) => (
-                        <>
+                        <Fragment key={wid}>
                           <div style={{ color: '#c3e7ff' }}>{wareMap.get(wid) || wid}</div>
                           <div style={{ color: '#88cc44', textAlign: 'right' }}>{Math.round(price)}</div>
-                        </>
+                        </Fragment>
                       ))}
                     </div>
                   )
@@ -1154,11 +1038,11 @@ function EconomyAdmin() {
               <div style={{ marginBottom: 8, color: '#8ab6d6' }}>Wares</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 4 }}>
                 {wares.map((w) => (
-                  <>
+                  <Fragment key={w.id}>
                     <div style={{ color: '#c3e7ff' }}>{w.name}</div>
                     <div style={{ color: '#6090a0', textAlign: 'right' }}>{w.category}</div>
                     <div style={{ color: '#88cc44', textAlign: 'right' }}>{w.basePrice}</div>
-                  </>
+                  </Fragment>
                 ))}
               </div>
             </div>
@@ -1166,11 +1050,11 @@ function EconomyAdmin() {
               <div style={{ marginBottom: 8, color: '#8ab6d6' }}>Recipes</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 4 }}>
                 {recipes.map((r) => (
-                  <>
+                  <Fragment key={r.id}>
                     <div style={{ color: '#c3e7ff' }}>{wareMap.get(r.productId) || r.productId}</div>
                     <div style={{ color: '#6090a0', textAlign: 'right' }}>{r.batchSize}</div>
                     <div style={{ color: '#6090a0', textAlign: 'right' }}>{r.cycleTimeSec}s</div>
-                  </>
+                  </Fragment>
                 ))}
               </div>
             </div>
@@ -1352,7 +1236,7 @@ function EconomyAdmin() {
               </div>
             </div>
           </div>
-        
+
         ) : activeTab === 'corporations' ? (
           /* Corporations Tab */
           <div style={{ background: '#0f2230', border: '1px solid #184b6a', borderRadius: 6, padding: 12, overflow: 'auto', height: '100%' }}>

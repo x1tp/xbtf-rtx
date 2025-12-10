@@ -5,9 +5,8 @@ import { useShallow } from 'zustand/react/shallow';
 import type { NPCFleet } from './types/simulation';
 import { Ship } from './components/Ship';
 import { AIShip } from './components/AIShip';
-import { NPCTrader } from './components/NPCTrader';
-import { NPCMilitary } from './components/NPCMilitary';
-import { NPCBuilder } from './components/NPCBuilder';
+import { VisualFleet } from './components/VisualFleet';
+
 import { Planet } from './components/Planet';
 import { Station } from './components/Station';
 import { Gate } from './components/Gate';
@@ -41,7 +40,6 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
     // Use useShallow to prevent re-renders when fleets array reference changes but content is same
     const fleets = useGameStore(useShallow((s: GameState) => s.fleets));
     const economyStations = useGameStore(useShallow((s: GameState) => s.stations));
-    const reportShipAction = useGameStore((s: GameState) => s.reportShipAction);
     const layout = useMemo(() => getSectorLayoutById(currentSectorId || 'seizewell'), [currentSectorId]);
     const background = layout?.background || cfg.background;
 
@@ -49,7 +47,7 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
         // console.log(`[Scene] Loaded layout for ${currentSectorId}:`, layout);
         // console.log(`[Scene] Background config:`, background);
         if (background?.texturePath) {
-             // console.log(`[Scene] Using skybox texture: ${background.texturePath}`);
+            // console.log(`[Scene] Using skybox texture: ${background.texturePath}`);
         }
     }, [layout, background, currentSectorId]);
 
@@ -78,48 +76,10 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
 
     // Build station position map for NPC traders
     // Maps economy station IDs to layout station positions by matching names
-    const stationPositions = useMemo(() => {
-        const map = new Map<string, [number, number, number]>();
-        if (layout) {
-            // First, map layout stations by their exact names
-            const layoutByName = new Map<string, [number, number, number]>();
-            for (const st of layout.stations) {
-                layoutByName.set(st.name, place(st.position));
-            }
 
-            // Then map economy station IDs to positions by matching names
-            for (const econStation of economyStations) {
-                const layoutPos = layoutByName.get(econStation.name);
-                if (layoutPos) {
-                    // Map by ID (e.g., 'sz_spp_b')
-                    map.set(econStation.id, layoutPos);
-                    // Also map by name for fallback
-                    map.set(econStation.name, layoutPos);
-                }
-            }
-
-            // Also add layout stations by name directly (for stations not in economy)
-            for (const st of layout.stations) {
-                if (!map.has(st.name)) {
-                    map.set(st.name, place(st.position));
-                }
-            }
-        }
-        return map;
-    }, [layout, economyStations]);
 
     // Build gate positions for NPC trader navigation
-    const gatePositions = useMemo(() => {
-        if (!layout) return [];
-        return layout.gates
-            .filter(g => g.destinationSectorId)
-            .map(g => ({
-                position: place(g.position) as [number, number, number],
-                destinationSectorId: g.destinationSectorId!,
-                radius: (g.scale ?? 40) * 5,
-                gateType: g.gateType
-            }));
-    }, [layout]);
+
 
     // Merge static and dynamic stations for rendering
     const stationsToRender = useMemo(() => {
@@ -278,28 +238,10 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
                         }
                         {/* NPC Trader Fleets */}
                         <Suspense fallback={null}>
-                            {sectorFleets.map((fleet: NPCFleet) => {
-                                let Component = NPCTrader;
-                                if (fleet.behavior === 'patrol') {
-                                    // @ts-ignore
-                                    Component = NPCMilitary;
-                                } else if (fleet.behavior === 'construction') {
-                                    // @ts-ignore
-                                    Component = NPCBuilder;
-                                }
+                            {sectorFleets.map((fleet: NPCFleet) => (
+                                <VisualFleet key={fleet.id} fleet={fleet} />
+                            ))}
 
-                                return (
-                                    <Component
-                                        key={fleet.id}
-                                        fleet={fleet}
-                                        stationPositions={stationPositions}
-                                        gatePositions={gatePositions}
-                                        navGraph={navData.graph}
-                                        obstacles={navData.obstacles}
-                                        onReport={reportShipAction}
-                                    />
-                                );
-                            })}
                         </Suspense>
                     </>
                 )

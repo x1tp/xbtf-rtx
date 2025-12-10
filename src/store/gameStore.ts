@@ -226,13 +226,15 @@ export const useGameStore = create<GameState>((set, get) => ({
       set((state) => {
         // Merge fleets to preserve local positions for current sector
         const backendFleets = data.fleets || [];
-        const currentSectorId = state.currentSectorId;
         const mergedFleets = backendFleets.map((bFleet: NPCFleet) => {
-          if (currentSectorId && bFleet.currentSectorId === currentSectorId) {
-            const localFleet = state.fleets.find(f => f.id === bFleet.id);
-            if (localFleet) {
-              return { ...bFleet, position: localFleet.position };
-            }
+          // ALWAYS preserve local position for visual smoothness, but allow backend state/commands to propagate
+          const localFleet = state.fleets.find(f => f.id === bFleet.id);
+          if (localFleet) {
+            return {
+              ...bFleet,
+              position: localFleet.position,
+              // Don't override state/currentSectorId - backend is authoritative for these
+            };
           }
           return bFleet;
         });

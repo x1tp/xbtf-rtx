@@ -979,7 +979,10 @@ function createUniverse() {
         }
       }
 
-      if (routes.length === 0) return null
+      if (routes.length === 0) {
+        // console.log(`[Universe] No routes found for ${fleet.name} (checked ${state.stations.length} stations)`)
+        return null
+      }
 
       // Pick best route (highest profit, with some randomness for variety)
       routes.sort((a, b) => b.profit - a.profit)
@@ -1157,13 +1160,25 @@ function createUniverse() {
             const randomStation = sectorStations[Math.floor(Math.random() * sectorStations.length)]
             // Don't just fly to the same station we are at
             if (randomStation.id !== fleet.targetStationId) {
+              // Issue explicit patrol order: Fly -> Dock -> Undock (simulating a patrol stop/visit)
+              // This prevents the "fly to where I already am" loop and adds meaningful delay
               issueCommand(fleet.id, {
                 type: 'goto-station',
                 targetStationId: randomStation.id,
-                targetSectorId: fleet.currentSectorId
+                targetSectorId: fleet.currentSectorId,
               })
+              issueCommand(fleet.id, {
+                type: 'dock',
+                targetStationId: randomStation.id
+              })
+              issueCommand(fleet.id, {
+                type: 'undock',
+                targetStationId: randomStation.id
+              })
+
               fleet.state = 'in-transit'
               fleet.stateStartTime = now
+              fleet.targetStationId = randomStation.id // Update this so we don't pick it again immediately
             }
           }
         } else if (fleet.behavior === 'construction') {
@@ -1173,37 +1188,86 @@ function createUniverse() {
             const sectorStations = state.stations.filter(s => s.sectorId === fleet.currentSectorId)
             if (sectorStations.length > 0) {
               const randomStation = sectorStations[Math.floor(Math.random() * sectorStations.length)]
-              issueCommand(fleet.id, {
-                type: 'goto-station',
-                targetStationId: randomStation.id,
-                targetSectorId: fleet.currentSectorId
-              })
-              fleet.state = 'in-transit'
-              fleet.stateStartTime = now
+
+              if (randomStation.id !== fleet.targetStationId) {
+                issueCommand(fleet.id, {
+                  type: 'goto-station',
+                  targetStationId: randomStation.id,
+                  targetSectorId: fleet.currentSectorId
+                })
+                issueCommand(fleet.id, {
+                  type: 'dock',
+                  targetStationId: randomStation.id
+                })
+                issueCommand(fleet.id, {
+                  type: 'undock',
+                  targetStationId: randomStation.id
+                })
+
+                fleet.state = 'in-transit'
+                fleet.stateStartTime = now
+                fleet.targetStationId = randomStation.id
+              }
             }
           }
         } else {
           // Trade logic
           const order = findBestTradeRoute(fleet)
+          if (!order) {
+            console.log(`[Universe] Idle: No profitable trade found for ${fleet.name}`)
+          }
           if (order) {
             fleet.currentOrder = order
-            // Issue high-level trade command
-            // The frontend will handle navigation, docking, and loading
+            fleet.currentOrder = order
+
+            // Issue explicit granular commands sequence
+            // 1. Go to Buy Station
             issueCommand(fleet.id, {
-              type: 'trade-buy',
+              type: 'goto-station',
               targetStationId: order.buyStationId,
-              targetSectorId: order.buySectorId,
+              targetSectorId: order.buySectorId
+            })
+            // 2. Dock
+            issueCommand(fleet.id, {
+              type: 'dock',
+              targetStationId: order.buyStationId
+            })
+            // 3. Load Cargo
+            issueCommand(fleet.id, {
+              type: 'load-cargo',
+              targetStationId: order.buyStationId,
               wareId: order.buyWareId,
               amount: order.buyQty
             })
-            // Queue Sell command immediately
+            // 4. Undock
             issueCommand(fleet.id, {
-              type: 'trade-sell',
+              type: 'undock',
+              targetStationId: order.buyStationId
+            })
+            // 5. Go to Sell Station
+            issueCommand(fleet.id, {
+              type: 'goto-station',
               targetStationId: order.sellStationId,
-              targetSectorId: order.sellSectorId,
+              targetSectorId: order.sellSectorId
+            })
+            // 6. Dock
+            issueCommand(fleet.id, {
+              type: 'dock',
+              targetStationId: order.sellStationId
+            })
+            // 7. Unload Cargo
+            issueCommand(fleet.id, {
+              type: 'unload-cargo',
+              targetStationId: order.sellStationId,
               wareId: order.sellWareId,
               amount: order.sellQty
             })
+            // 8. Undock
+            issueCommand(fleet.id, {
+              type: 'undock',
+              targetStationId: order.sellStationId
+            })
+
             fleet.state = 'in-transit' // Generic busy state
             fleet.stateStartTime = now
           }
@@ -1369,29 +1433,26 @@ function createUniverse() {
         // Transaction: Buy from station
         if (report.wareId && report.amount && report.stationId) {
           const station = state.stations.find(s => s.id === report.stationId)
+          // The order is now embedded in the queue, we don't strictly need currentOrder for the prices if we trust the queue,
+          // but let's keep using fleet.currentOrder for the financials if available.
           const order = fleet.currentOrder
 
-          if (station && order) {
+          if (station) {
             // Deduct from station, add to fleet
             const available = station.inventory[report.wareId] || 0
             const actualAmount = Math.min(report.amount, available)
 
             station.inventory[report.wareId] = Math.max(0, available - actualAmount)
             fleet.cargo[report.wareId] = (fleet.cargo[report.wareId] || 0) + actualAmount
-            fleet.credits -= actualAmount * order.buyPrice
 
-            // Issue next command: Sell
-            // Remove the buy command from queue (it should be done)
-            fleet.commandQueue = []
+            if (order) {
+              fleet.credits -= actualAmount * order.buyPrice
+            }
 
-            issueCommand(fleet.id, {
-              type: 'trade-sell',
-              targetStationId: order.sellStationId,
-              targetSectorId: order.sellSectorId,
-              wareId: order.sellWareId,
-              amount: actualAmount
-            })
-            fleet.state = 'in-transit'
+            // Do NOT clear queue or issue new commands. The queue has the next steps (undock -> fly -> dock -> sell).
+            // We just finished loading, so we are still at the station (docked) until the undock command processes.
+            // Note: FleetState uses 'docking' for both docking and docked states.
+            fleet.state = 'docking'
           }
         }
         break
