@@ -187,6 +187,13 @@ export const WARES_CONFIG: Ware[] = [
     { id: 'mosquito_missile', name: 'Mosquito Missile', category: 'end', basePrice: 150, volume: 1 },
     { id: 'wasp_missile', name: 'Wasp Missile', category: 'end', basePrice: 1000, volume: 1 },
     { id: 'hornet_missile', name: 'Hornet Missile', category: 'end', basePrice: 10000, volume: 3 },
+
+    // --- SHIPS (High Volume Assets) ---
+    { id: 'ship_vulture', name: 'Vulture Hauler', category: 'end', basePrice: 85000, volume: 500 },
+    { id: 'ship_toucan', name: 'Toucan Transport', category: 'end', basePrice: 120000, volume: 500 },
+    { id: 'ship_express', name: 'Express Hauler', category: 'end', basePrice: 150000, volume: 500 },
+    { id: 'ship_buster', name: 'Buster Fighter', category: 'end', basePrice: 400000, volume: 300 },
+    { id: 'ship_discoverer', name: 'Discoverer Scout', category: 'end', basePrice: 60000, volume: 100 },
 ]
 
 export const RECIPES_CONFIG: Recipe[] = [
@@ -273,13 +280,47 @@ export const RECIPES_CONFIG: Recipe[] = [
     // Logistics
     { id: 'logistics_hub', productId: 'trade_goods', inputs: [], cycleTimeSec: 120, batchSize: 5, productStorageCap: 500 },
 
-    // SHIPYARD
+    // SHIPYARD PRODUCTION (Dynamic)
     {
-        id: 'shipyard', productId: 'ship_parts', inputs: [
+        id: 'build_vulture', productId: 'ship_vulture', inputs: [
             { wareId: 'hull_parts', amount: 50 },
             { wareId: 'engine_parts', amount: 20 },
-            { wareId: 'energy_cells', amount: 200 },
-        ], cycleTimeSec: 600, batchSize: 1, productStorageCap: 50
+            { wareId: 'energy_cells', amount: 200 }, // Labor/Power
+            { wareId: 'shield_components', amount: 5 },
+        ], cycleTimeSec: 300, batchSize: 1, productStorageCap: 10
+    },
+    {
+        id: 'build_toucan', productId: 'ship_toucan', inputs: [
+            { wareId: 'hull_parts', amount: 60 },
+            { wareId: 'engine_parts', amount: 30 },
+            { wareId: 'energy_cells', amount: 250 },
+            { wareId: 'scanning_arrays', amount: 5 },
+        ], cycleTimeSec: 400, batchSize: 1, productStorageCap: 10
+    },
+    {
+        id: 'build_express', productId: 'ship_express', inputs: [
+            { wareId: 'hull_parts', amount: 80 },
+            { wareId: 'engine_parts', amount: 40 },
+            { wareId: 'energy_cells', amount: 300 },
+            { wareId: 'advanced_composites', amount: 10 },
+        ], cycleTimeSec: 500, batchSize: 1, productStorageCap: 10
+    },
+    {
+        id: 'build_buster', productId: 'ship_buster', inputs: [
+            { wareId: 'hull_parts', amount: 40 },
+            { wareId: 'weapon_components', amount: 20 },
+            { wareId: 'shield_components', amount: 20 },
+            { wareId: 'energy_cells', amount: 300 },
+            { wareId: 'advanced_electronics', amount: 5 },
+        ], cycleTimeSec: 600, batchSize: 1, productStorageCap: 5
+    },
+    {
+        id: 'build_discoverer', productId: 'ship_discoverer', inputs: [
+            { wareId: 'hull_parts', amount: 20 },
+            { wareId: 'engine_parts', amount: 20 },
+            { wareId: 'energy_cells', amount: 150 },
+            { wareId: 'scanning_arrays', amount: 2 },
+        ], cycleTimeSec: 200, batchSize: 1, productStorageCap: 10
     },
 
     // Planetary

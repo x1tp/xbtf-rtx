@@ -7,13 +7,23 @@ import { UNIVERSE_SECTORS_XBTF } from './src/config/universe_xbtf'
 import { getSectorLayoutById } from './src/config/sector'
 import { CUSTOM_STATIONS } from './src/config/stations_custom'
 import { WARES_CONFIG, RECIPES_CONFIG } from './src/config/economy'
+import { SHIP_CATALOG } from './src/config/ship_catalog'
 // fs and path are already imported at the top
 
 
 type Station = {
-  id: string; name: string; recipeId: string; sectorId: string;
-  inventory: Record<string, number>; reorderLevel: Record<string, number>; reserveLevel: Record<string, number>;
-  productionProgress?: number; position?: [number, number, number]; modelPath?: string; ownerId?: string;
+  id: string
+  name: string
+  recipeId: string
+  capabilities?: string[] // List of recipe IDs this station can perform (e.g., shipyard: ['build_vulture', 'build_toucan'])
+  sectorId: string
+  inventory: Record<string, number>
+  reorderLevel: Record<string, number>
+  reserveLevel: Record<string, number>
+  productionProgress?: number
+  position?: [number, number, number]
+  modelPath?: string
+  ownerId?: string
   population?: number;
 }
 
@@ -126,13 +136,8 @@ const STATION_BLUEPRINTS: Record<string, { id: string; name: string; cost: numbe
   'orbital_habitat': { id: 'orbital_habitat', name: 'Orbital Habitat', cost: 1500000, modelPath: '/models/00001.obj' } // Use Trading Station model for now as well
 }
 
-// Ship Catalog for purchasing
-const SHIP_CATALOG = {
-  vulture: { id: 'vulture', name: 'Vulture', cost: 85000, capacity: 2800, speed: 1.0, modelPath: '/models/00007.obj' },
-  albatross: { id: 'albatross', name: 'Albatross', cost: 450000, capacity: 8000, speed: 0.7, modelPath: '/models/00187.obj' },
-  express: { id: 'express', name: 'Express', cost: 60000, capacity: 1500, speed: 1.6, modelPath: '/models/00007.obj' }, // Placeholder model
-  toucan: { id: 'toucan', name: 'Toucan', cost: 55000, capacity: 1600, speed: 1.5, modelPath: '/models/00007.obj' }, // Placeholder model
-}
+// Ship Catalog imported from config
+
 
 // Dynamic Economy Settings
 const ECONOMY_SETTINGS = {
@@ -486,6 +491,34 @@ function createUniverse() {
         }))
         state.tradeLog = loadedState.tradeLog || []
         remapLegacyStations()
+
+        // PATCH: Ensure Shipyards have capabilities and ship inventory
+        state.stations.forEach(st => {
+          if (st.recipeId === 'shipyard' || st.name.toLowerCase().includes('shipyard') || st.name.toLowerCase().includes('wharf')) {
+            // 1. Ensure Capabilities
+            if (!st.capabilities || st.capabilities.length === 0) {
+              st.capabilities = Object.keys(SHIP_CATALOG).map(k => `build_${k}`);
+              console.log(`[Universe] Patched capabilities for ${st.name}`);
+            }
+
+            // 2. Ensure Inventory Keys for Ships
+            st.capabilities.forEach(cap => {
+              const shipKey = cap.replace('build_', 'ship_');
+              if (typeof st.inventory[shipKey] === 'undefined') {
+                st.inventory[shipKey] = 0;
+                console.log(`[Universe] Patched inventory key ${shipKey} for ${st.name}`);
+              }
+            });
+
+            // 3. Ensure Build Resources
+            ['energy_cells', 'hull_parts', 'computer_components', 'quantum_tubes', 'microchips'].forEach(res => {
+              if (!st.inventory[res]) {
+                st.inventory[res] = 500;
+              }
+            });
+          }
+        });
+
         console.log(`[Universe] State restored! ${state.stations.length} stations, ${state.fleets.length} fleets.`)
         return
       }
@@ -727,10 +760,19 @@ function createUniverse() {
         recipeId = recipes.find(r => r.id === guessed) ? guessed : 'logistics_hub'
       }
 
+
+
+      // Determine capabilities for Shipyards
+      let capabilities: string[] | undefined;
+      if (recipeId === 'shipyard' || cs.name.toLowerCase().includes('shipyard') || cs.name.toLowerCase().includes('wharf')) {
+        capabilities = Object.keys(SHIP_CATALOG).map(k => `build_${k}`);
+      }
+
       const st: Station = {
         id: finalId,
         name: cs.name,
         recipeId: recipeId,
+        capabilities: capabilities, // Assign capabilities
         sectorId: cs.sectorId,
         inventory: cs.inventory as Record<string, number>,
         reorderLevel: cs.reorderLevel,
@@ -770,6 +812,24 @@ function createUniverse() {
           if (recipe.productStorageCap > 0) {
             st.inventory[recipe.productId] = Math.max(1, Math.floor(recipe.productStorageCap * (0.1 + Math.random() * 0.2)))
           }
+        }
+
+        // Ensure capabilities are represented in inventory (ships)
+        if (st.capabilities) {
+          st.capabilities.forEach(cap => {
+            const shipKey = cap.replace('build_', 'ship_');
+            if (typeof st.inventory[shipKey] === 'undefined') {
+              st.inventory[shipKey] = 0; // Initialize key so UI sees it
+            }
+          });
+
+          // Also ensure there are resources to BUILD ships so they don't stay at 0 forever
+          // Shipyards need Hull Parts, Computer Components, Energy Cells, etc.
+          // Since we don't have a rigid universal recipe for 'shipyard' yet (it uses dynamic capabilities),
+          // we should seed generic ship building resources if missing.
+          ['energy_cells', 'hull_parts', 'computer_components', 'quantum_tubes', 'microchips'].forEach(res => {
+            if (!st.inventory[res]) st.inventory[res] = 500;
+          });
         }
 
         // Ensure reorder/reserve levels are set
@@ -1131,6 +1191,7 @@ function createUniverse() {
                 if (job.stationType === 'xenon_power') return 'spp_teladi'
                 return job.stationType
               })(),
+              capabilities: job.stationType === 'shipyard' ? ['build_vulture', 'build_toucan', 'build_express', 'build_buster', 'build_discoverer'] : undefined,
               sectorId: job.targetSectorId,
               position: randomPos(),
               modelPath: blueprint.modelPath,
@@ -1200,39 +1261,77 @@ function createUniverse() {
       const desiredFleetSize = Math.max(1, Math.floor(corpStations.length / 2))
 
       if (corpFleets.length < desiredFleetSize && corp.credits > SHIP_CATALOG.vulture.cost + ECONOMY_SETTINGS.CORP_MIN_CREDITS_TO_BUY_SHIP) {
-        // Purchase new trader
-        const shipyard = getRaceHub(corp.race)
-        const newFleet: NPCFleet = {
-          id: `fleet_${genId()}`,
-          name: `${corp.name.split(' ')[0]} Trader ${genId().substring(0, 4)}`,
-          shipType: 'Vulture',
-          modelPath: SHIP_CATALOG.vulture.modelPath,
-          race: corp.race,
-          capacity: SHIP_CATALOG.vulture.capacity,
-          speed: SHIP_CATALOG.vulture.speed,
-          homeSectorId: shipyard,
-          ownerId: corp.id,
-          ownerType: corp.type,
-          behavior: 'corp-logistics',
-          autonomy: 0.5,
-          profitShare: 0.15,
-          currentSectorId: shipyard,
-          position: randomPos(),
-          state: 'idle',
-          stateStartTime: now,
-          lastReportAt: now,
-          cargo: {},
-          credits: 10000,
-          commandQueue: [],
-          totalProfit: 0,
-          tripsCompleted: 0
+        // Purchase new trader - find a shipyard selling Vultures
+        const shipyards = state.stations.filter(st => st.capabilities && st.capabilities.includes('build_vulture'))
+
+        let chosenShipyard: Station | null = null
+        let price: number = SHIP_CATALOG.vulture.cost
+
+        // Prefer race-aligned shipyard, then any
+        const raceYards = shipyards.filter(_st => {
+          // Heuristic: map shipyard model race or owner race (not strictly tracked in blueprint but by name/model)
+          // Simple fallback: all shipyards sell all ships for now.
+          return true
+        })
+
+        // Find one with stock
+        for (const yard of raceYards) {
+          const stock = yard.inventory['ship_vulture'] || 0
+          if (stock >= 1) {
+            // Check price
+            const p = state.sectorPrices[yard.sectorId]?.['ship_vulture'] || SHIP_CATALOG.vulture.cost
+            if (corp.credits >= p) {
+              chosenShipyard = yard
+              price = p
+              break
+            }
+          }
         }
 
-        state.fleets.push(newFleet)
-        corp.fleetIds.push(newFleet.id)
-        corp.credits -= SHIP_CATALOG.vulture.cost
+        if (chosenShipyard) {
+          // BUY SHIP
+          chosenShipyard.inventory['ship_vulture']--
+          corp.credits -= price
 
-        console.log(`[CorpAI] ${corp.name} purchased new trader: ${newFleet.name}`)
+          // Spawn it at the shipyard
+          const newFleet: NPCFleet = {
+            id: `fleet_${genId()}`,
+            name: `${corp.name.split(' ')[0]} Trader ${genId().substring(0, 4)}`,
+            shipType: 'Vulture',
+            modelPath: SHIP_CATALOG.vulture.modelPath,
+            race: corp.race,
+            capacity: SHIP_CATALOG.vulture.capacity,
+            speed: SHIP_CATALOG.vulture.speed,
+            homeSectorId: chosenShipyard.sectorId,
+            ownerId: corp.id,
+            ownerType: corp.type,
+            behavior: 'corp-logistics',
+            autonomy: 0.5,
+            profitShare: 0.15,
+            currentSectorId: chosenShipyard.sectorId,
+            position: chosenShipyard.position || [0, 0, 0], // Spawn at station
+            state: 'undocking', // Start undocking!
+            stateStartTime: now,
+            lastReportAt: now,
+            cargo: {},
+            credits: 10000,
+            commandQueue: [],
+            totalProfit: 0,
+            tripsCompleted: 0
+          }
+          // Add undock command
+          newFleet.commandQueue.push({
+            id: genId(),
+            type: 'undock',
+            targetStationId: chosenShipyard.id,
+            createdAt: now
+          })
+
+          state.fleets.push(newFleet)
+          corp.fleetIds.push(newFleet.id)
+
+          console.log(`[CorpAI] ${corp.name} BOUGHT ${newFleet.name} from ${chosenShipyard.name} for ${price.toFixed(0)}Cr (Stock left: ${chosenShipyard.inventory['ship_vulture']})`)
+        }
       }
     })
   }
@@ -1256,8 +1355,8 @@ function createUniverse() {
         const rand = Math.random()
         let type = 'Vulture'
         let model = SHIP_CATALOG.vulture.modelPath
-        let cap = SHIP_CATALOG.vulture.capacity
-        let spd = SHIP_CATALOG.vulture.speed
+        let cap: number = SHIP_CATALOG.vulture.capacity
+        let spd: number = SHIP_CATALOG.vulture.speed
 
         if (rand < 0.2) {
           type = 'Express'
@@ -1372,6 +1471,41 @@ function createUniverse() {
 
       if (typeof st.productionProgress !== 'number') st.productionProgress = 0
 
+      // DYNAMIC PRODUCTION LOGIC (for Shipyards/Factories with multiple capabilities)
+      if (st.capabilities && st.capabilities.length > 0 && st.productionProgress === 0) {
+        // Decide what to build next based on inventory levels (build what we are low on)
+        // Check current recipe product stock
+        const currentStock = st.inventory[r.productId] || 0
+        const currentCap = r.productStorageCap || 10
+
+        // If current product is nearly full (>80%), consider switching
+        if (currentStock / currentCap > 0.8) {
+          // Find a candidate recipe with lower stock percentage
+          let bestCandidate = st.recipeId
+          let lowestRatio = 1.0
+
+          for (const capId of st.capabilities) {
+            const capR = recipeById.get(capId)
+            if (!capR) continue
+            const stock = st.inventory[capR.productId] || 0
+            const cap = capR.productStorageCap || 10
+            const ratio = stock / cap
+            if (ratio < lowestRatio) {
+              lowestRatio = ratio
+              bestCandidate = capId
+            }
+          }
+
+          if (bestCandidate !== st.recipeId) {
+            // Switch recipe!
+            st.recipeId = bestCandidate
+            // Initialize reserves for new inputs if needed
+            // console.log(`[Production] ${st.name} switching line to ${bestCandidate} (Stock: ${(lowestRatio*100).toFixed(0)}%)`)
+            continue // Skip this tick to allow initialization
+          }
+        }
+      }
+
       if (canRun) {
         st.productionProgress += deltaSec / r.cycleTimeSec
         if (st.productionProgress >= 1.0) {
@@ -1396,6 +1530,14 @@ function createUniverse() {
     const findBestTradeRoute = (fleet: NPCFleet): TradeOrder | null => {
       const routes: { buyStation: Station; sellStation: Station; wareId: string; profit: number; qty: number }[] = []
 
+      // Allow stations to trade a slice of their current stock even if they're below their ideal reserve.
+      // This prevents newly-seeded stations with large reserve targets from never exporting anything.
+      const getAvailable = (stock: number, reserve: number) => {
+        if (stock <= 0) return 0
+        const softReserve = Math.min(reserve || 0, stock * 0.5)
+        return Math.max(0, stock - softReserve)
+      }
+
       // For station-supply behavior: find wares the home station needs
       if ((fleet.behavior === 'station-supply' || fleet.behavior === 'station-distribute') && fleet.homeStationId) {
         const homeSt = getStation(fleet.homeStationId)
@@ -1414,7 +1556,7 @@ function createUniverse() {
               if (seller.id === homeSt.id) continue
               const sellerRecipe = recipeById.get(seller.recipeId)
               if (!sellerRecipe || sellerRecipe.productId !== input.wareId) continue
-              const available = (seller.inventory[input.wareId] || 0) - (seller.reserveLevel[input.wareId] || 0)
+              const available = getAvailable(seller.inventory[input.wareId] || 0, seller.reserveLevel[input.wareId] || 0)
               if (available <= 0) continue
 
               const qty = Math.min(available, need, fleet.capacity)
@@ -1429,7 +1571,7 @@ function createUniverse() {
         } else {
           // station-distribute: sell home station's products
           const productId = recipe.productId
-          const available = (homeSt.inventory[productId] || 0) - (homeSt.reserveLevel[productId] || 0)
+          const available = getAvailable(homeSt.inventory[productId] || 0, homeSt.reserveLevel[productId] || 0)
           if (available > 0) {
             // Find buyers
             for (const buyer of state.stations) {
@@ -1458,7 +1600,7 @@ function createUniverse() {
           const sellers = state.stations.filter(st => {
             const r = recipeById.get(st.recipeId)
             if (!r || r.productId !== ware.id) return false
-            const available = (st.inventory[ware.id] || 0) - (st.reserveLevel[ware.id] || 0)
+            const available = getAvailable(st.inventory[ware.id] || 0, st.reserveLevel[ware.id] || 0)
             return available > 0
           })
 
@@ -2328,6 +2470,71 @@ function universePlugin() {
           res.end()
           return
         }
+        if (req.method === 'POST' && url.startsWith('/__universe/command')) {
+          let body = ''
+          req.on('data', chunk => body += chunk)
+          req.on('end', () => {
+            try {
+              const cmd = JSON.parse(body)
+              if (cmd.command === 'buy-ship') {
+                const { stationId, wareId } = cmd
+                const station = u.state.stations.find(s => s.id === stationId)
+                if (station) {
+                  const stock = station.inventory[wareId] || 0
+                  const shipKey = wareId.replace('ship_', '') as keyof typeof SHIP_CATALOG
+                  const shipInfo = SHIP_CATALOG[shipKey]
+                  // Price check
+                  const price = u.state.sectorPrices[station.sectorId]?.[wareId] || u.state.wares.find(w => w.id === wareId)?.basePrice || 100000
+
+                  if (stock >= 1 && shipInfo) {
+                    station.inventory[wareId]--
+                    // Deduct player credits logic omitted (frontend display only for now, logic trusts frontend command for single player)
+
+                    const newFleet: NPCFleet = {
+                      id: `player_fleet_${Math.random().toString(36).substr(2, 9)}`,
+                      name: `${shipInfo.name} (Player)`,
+                      shipType: shipInfo.name,
+                      modelPath: shipInfo.modelPath,
+                      race: 'teladi', // Default to Teladi to satisfy RaceType
+                      capacity: shipInfo.capacity,
+                      speed: shipInfo.speed,
+                      homeSectorId: station.sectorId,
+                      ownerId: 'player',
+                      ownerType: 'independent',
+                      behavior: 'freelance',
+                      autonomy: 0,
+                      profitShare: 1,
+                      currentSectorId: station.sectorId,
+                      position: station.position || [0, 0, 0],
+                      state: 'undocking',
+                      stateStartTime: Date.now(),
+                      lastReportAt: Date.now(),
+                      cargo: {},
+                      credits: 0,
+                      commandQueue: [{
+                        id: Math.random().toString(36).substr(2, 9), type: 'undock', targetStationId: station.id, createdAt: Date.now()
+                      }],
+                      totalProfit: 0,
+                      tripsCompleted: 0
+                    }
+                    u.state.fleets.push(newFleet)
+                    console.log(`[Universe] Player bought ${shipInfo.name} from ${station.name}`)
+                    res.statusCode = 200
+                    res.end(JSON.stringify({ success: true, fleetId: newFleet.id, price }))
+                    return
+                  }
+                }
+              }
+              res.statusCode = 400
+              res.end(JSON.stringify({ error: 'Invalid command' }))
+            } catch (e) {
+              res.statusCode = 500
+              res.end(JSON.stringify({ error: 'Server error' }))
+            }
+          })
+          return
+        }
+
         // Ship report endpoint for autonomous ships
         if (req.method === 'POST' && url.startsWith('/__universe/ship-report')) {
           let body = ''

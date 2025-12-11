@@ -40,6 +40,7 @@ export interface GameState {
   position: { x: number; y: number; z: number };
   setPosition: (position: { x: number; y: number; z: number }) => void;
   isDocked: boolean;
+  dockedStationId: string | null;
   sunVisible: boolean;
   sunAdapt: number;
   sunIntensity: number;
@@ -80,7 +81,7 @@ export interface GameState {
   updateSpeed: (speed?: number) => void;
   updatePosition: () => void;
   setRotation: (rotation: { x: number; y: number; z: number }) => void;
-  setDocked: (docked: boolean) => void;
+  setDocked: (docked: boolean, stationId?: string | null) => void;
 
   wares: { id: string; name: string; category: 'primary' | 'food' | 'intermediate' | 'end'; basePrice: number; volume: number }[];
   recipes: { id: string; productId: string; inputs: { wareId: string; amount: number }[]; cycleTimeSec: number; batchSize: number; productStorageCap: number }[];
@@ -112,6 +113,10 @@ export interface GameState {
     wareId?: string;
     amount?: number;
   }) => Promise<void>;
+
+  player: {
+    credits: number;
+  };
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -121,9 +126,14 @@ export const useGameStore = create<GameState>((set, get) => ({
   rotation: { x: 0, y: 0, z: 0 },
   position: { x: 0, y: 0, z: 0 },
   isDocked: false,
+  dockedStationId: null,
   sunVisible: false,
   sunAdapt: 0,
   sunIntensity: 0,
+
+  player: {
+    credits: 100000 // Start with 100k for testing
+  },
 
   timeScale: 1.0,
   elapsedTimeSec: 0,
@@ -197,7 +207,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   setPosition: (position) => set({ position }),
 
   setRotation: (rot) => set({ rotation: rot }),
-  setDocked: (docked) => set({ isDocked: docked, speed: 0, throttle: 0 }),
+  setDocked: (docked, stationId = null) => set({ isDocked: docked, dockedStationId: stationId, speed: 0, throttle: 0 }),
   setSunVisible: (v) => set({ sunVisible: v }),
   setSunAdapt: (v) => set({ sunAdapt: Math.max(0, Math.min(1, v)) }),
   setSunIntensity: (v: number) => set({ sunIntensity: Math.max(0, Math.min(1, v)) }),

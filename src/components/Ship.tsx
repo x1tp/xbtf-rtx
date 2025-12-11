@@ -316,11 +316,14 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
             }
         }
 
-        // Skip all ship controls when sector map or universe map is open
+        // Skip all ship controls when sector map or universe map is open OR docked
         const sectorMapOpen = useGameStore.getState().sectorMapOpen;
         const universeMapOpen = useGameStore.getState().universeMapOpen;
-        if (sectorMapOpen || universeMapOpen) {
+        const isDocked = useGameStore.getState().isDocked;
+        if (sectorMapOpen || universeMapOpen || isDocked) {
             // Still update camera to follow ship, but no input processing
+            // If docked, we might want to kill velocity too to prevent drifting while trading
+            if (isDocked) velocity.set(0, 0, 0);
             updateCameraFollow();
             return;
         }
@@ -517,15 +520,38 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
             body.setNextKinematicRotation({ x: q.x, y: q.y, z: q.z, w: q.w });
         }
 
-        // Docking Logic (Simplified)
-        // Check distance to station (hardcoded position for now: [-100, 0, -200])
-        const stationObj2 = scene.getObjectByName('Station') as Group | null;
-        const dist = stationObj2 ? shipRef.current.position.distanceTo(new Vector3().setFromMatrixPosition(stationObj2.matrixWorld)) : Infinity;
+        // Docking Logic (Robust)
+        // Check distance to any station in the current sector
+        const stations = useGameStore.getState().stations;
+        const currentSectorId = useGameStore.getState().currentSectorId;
+        const shipPos = shipRef.current.position;
 
-        if (dist < 50 && speed < 10) {
+        let nearestStationId: string | null = null;
+        let nearestDist = Infinity;
+
+        // Optimization: Filter logic inside frame loop - should be fast enough for < 100 stations
+        for (const st of stations) {
+            if (st.sectorId !== currentSectorId) continue;
+            // Station positions are [x,y,z] tuple
+            const d = Math.sqrt(
+                Math.pow(shipPos.x - st.position[0], 2) +
+                Math.pow(shipPos.y - st.position[1], 2) +
+                Math.pow(shipPos.z - st.position[2], 2)
+            );
+            if (d < nearestDist) {
+                nearestDist = d;
+                nearestStationId = st.id;
+            }
+        }
+
+        const DOCK_DIST = 600; // Increased range
+        const DOCK_SPEED = 50; // Increased allowance
+
+        if (nearestStationId && nearestDist < DOCK_DIST && speed < DOCK_SPEED) {
             // Allow docking
+            // TODO: Ideally verify ship is facing docking buy/light? For now, distance check.
             if (keys.current['KeyC']) { // 'C' to communicate/dock
-                useGameStore.getState().setDocked(true);
+                useGameStore.getState().setDocked(true, nearestStationId);
                 velocity.set(0, 0, 0);
             }
         }

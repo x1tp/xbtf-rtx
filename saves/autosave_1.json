@@ -1852,9 +1852,9 @@
       "recipeId": "sun_oil_refinery",
       "sectorId": "seizewell",
       "inventory": {
-        "sun_oil": 510,
+        "sun_oil": 890,
         "sunrise_flowers": 0,
-        "energy_cells": 955
+        "energy_cells": 670
       },
       "reorderLevel": {
         "sunrise_flowers": 400,
@@ -2207,7 +2207,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "kingdom_end",
       "inventory": {
-        "trade_goods": 10033
+        "trade_goods": 10633
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -2228,7 +2228,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "kingdom_end",
       "inventory": {
-        "trade_goods": 10026
+        "trade_goods": 10626
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -2249,7 +2249,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "kingdom_end",
       "inventory": {
-        "trade_goods": 10001
+        "trade_goods": 10601
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -2467,7 +2467,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "queens_space",
       "inventory": {
-        "trade_goods": 10012
+        "trade_goods": 10612
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -2539,7 +2539,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "ceo_s_buckzoid",
       "inventory": {
-        "trade_goods": 9985,
+        "trade_goods": 10585,
         "crystals": 40
       },
       "reorderLevel": {},
@@ -2637,7 +2637,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "teladi_gain",
       "inventory": {
-        "trade_goods": 10025
+        "trade_goods": 10625
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -2711,7 +2711,7 @@
       "inventory": {
         "water": 106,
         "energy_cells": 0,
-        "sunrise_flowers": 1532
+        "sunrise_flowers": 1152
       },
       "reorderLevel": {
         "water": 200,
@@ -2735,7 +2735,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "family_whi",
       "inventory": {
-        "trade_goods": 10003
+        "trade_goods": 10603
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -2781,7 +2781,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "three_worlds",
       "inventory": {
-        "trade_goods": 10028
+        "trade_goods": 10628
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -2803,7 +2803,7 @@
       "sectorId": "three_worlds",
       "inventory": {
         "crystals": 0,
-        "energy_cells": 33518
+        "energy_cells": 39518
       },
       "reorderLevel": {
         "crystals": 40
@@ -2854,7 +2854,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "three_worlds",
       "inventory": {
-        "trade_goods": 9940
+        "trade_goods": 10540
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -2953,7 +2953,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "antigone_memorial",
       "inventory": {
-        "trade_goods": 10039
+        "trade_goods": 10639
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -3050,7 +3050,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "rolk_s_fate",
       "inventory": {
-        "trade_goods": 10020
+        "trade_goods": 10620
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -3094,7 +3094,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "rolk_s_fate",
       "inventory": {
-        "trade_goods": 10037
+        "trade_goods": 10637
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -3142,7 +3142,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "profit_share",
       "inventory": {
-        "trade_goods": 10029
+        "trade_goods": 10629
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -3212,7 +3212,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "seizewell",
       "inventory": {
-        "trade_goods": 9999
+        "trade_goods": 10599
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -3233,7 +3233,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "seizewell",
       "inventory": {
-        "trade_goods": 10007
+        "trade_goods": 10607
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -3254,7 +3254,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "seizewell",
       "inventory": {
-        "trade_goods": 10022
+        "trade_goods": 10622
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -3475,7 +3475,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "family_zein",
       "inventory": {
-        "trade_goods": 10023
+        "trade_goods": 10623
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -3574,7 +3574,7 @@
         "silicon_wafers": 176,
         "cahoonas": 26,
         "energy_cells": 1,
-        "crystals": 151
+        "crystals": 0
       },
       "reorderLevel": {
         "silicon_wafers": 200,
@@ -3627,7 +3627,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "herron_s_nebula",
       "inventory": {
-        "trade_goods": 10007
+        "trade_goods": 10607
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -3672,7 +3672,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "herron_s_nebula",
       "inventory": {
-        "trade_goods": 10013
+        "trade_goods": 10613
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -3771,7 +3771,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "atreus_clouds",
       "inventory": {
-        "trade_goods": 9971
+        "trade_goods": 10571
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -3891,7 +3891,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "greater_profit",
       "inventory": {
-        "trade_goods": 9957
+        "trade_goods": 10557
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -4042,7 +4042,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "family_pride",
       "inventory": {
-        "trade_goods": 9977
+        "trade_goods": 10577
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -4062,7 +4062,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "family_pride",
       "inventory": {
-        "trade_goods": 10016
+        "trade_goods": 10616
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -4082,7 +4082,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "family_pride",
       "inventory": {
-        "trade_goods": 9944
+        "trade_goods": 10544
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -4258,7 +4258,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "argon_prime",
       "inventory": {
-        "trade_goods": 10034
+        "trade_goods": 10634
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -4279,7 +4279,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "argon_prime",
       "inventory": {
-        "trade_goods": 9971
+        "trade_goods": 10571
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -4300,7 +4300,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "argon_prime",
       "inventory": {
-        "trade_goods": 9967
+        "trade_goods": 10567
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -4665,7 +4665,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "chins_clouds",
       "inventory": {
-        "trade_goods": 9942
+        "trade_goods": 10542
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -4735,7 +4735,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "red_light",
       "inventory": {
-        "trade_goods": 9942
+        "trade_goods": 10542
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -4833,7 +4833,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "home_of_light",
       "inventory": {
-        "trade_goods": 9986
+        "trade_goods": 10586
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -4853,7 +4853,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "home_of_light",
       "inventory": {
-        "trade_goods": 10036
+        "trade_goods": 10636
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -4979,7 +4979,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "xenon_sector_3",
       "inventory": {
-        "trade_goods": 9995
+        "trade_goods": 10595
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -4999,7 +4999,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "xenon_sector_4",
       "inventory": {
-        "trade_goods": 10016
+        "trade_goods": 10616
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -5094,7 +5094,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "family_chin",
       "inventory": {
-        "trade_goods": 10002
+        "trade_goods": 10602
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -5115,7 +5115,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "cloudbase_south_west",
       "inventory": {
-        "trade_goods": 10015
+        "trade_goods": 10615
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -5136,7 +5136,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "cloudbase_south_west",
       "inventory": {
-        "trade_goods": 9997
+        "trade_goods": 10597
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -5181,7 +5181,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "ore_belt",
       "inventory": {
-        "trade_goods": 10022
+        "trade_goods": 10622
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -5326,7 +5326,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "xenon_sector_5",
       "inventory": {
-        "trade_goods": 10024
+        "trade_goods": 10624
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -5346,7 +5346,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "xenon_sector_6",
       "inventory": {
-        "trade_goods": 9941
+        "trade_goods": 10541
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -5367,7 +5367,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "xenon_sector_6",
       "inventory": {
-        "trade_goods": 9952
+        "trade_goods": 10552
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -5387,7 +5387,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "company_pride",
       "inventory": {
-        "trade_goods": 9989
+        "trade_goods": 10589
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -5431,7 +5431,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "thuruks_beard",
       "inventory": {
-        "trade_goods": 10025
+        "trade_goods": 10625
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -5573,7 +5573,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "paranid_prime",
       "inventory": {
-        "trade_goods": 10031
+        "trade_goods": 10631
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -5594,7 +5594,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "paranid_prime",
       "inventory": {
-        "trade_goods": 9955
+        "trade_goods": 10555
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -5615,7 +5615,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "paranid_prime",
       "inventory": {
-        "trade_goods": 10015
+        "trade_goods": 10615
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -5636,7 +5636,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "paranid_prime",
       "inventory": {
-        "trade_goods": 9977
+        "trade_goods": 10577
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -5761,7 +5761,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "priest_pity",
       "inventory": {
-        "trade_goods": 10015
+        "trade_goods": 10615
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -5831,7 +5831,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "xenon_sector_7",
       "inventory": {
-        "trade_goods": 9982
+        "trade_goods": 10582
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -5851,7 +5851,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "xenon_sector_8",
       "inventory": {
-        "trade_goods": 10001
+        "trade_goods": 10601
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -5872,7 +5872,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "xenon_sector_9",
       "inventory": {
-        "trade_goods": 9992
+        "trade_goods": 10592
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -5893,7 +5893,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "xenon_sector_9",
       "inventory": {
-        "trade_goods": 10034
+        "trade_goods": 10634
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -6012,7 +6012,7 @@
       "recipeId": "logistics_hub",
       "sectorId": "emperors_ridge",
       "inventory": {
-        "trade_goods": 10002
+        "trade_goods": 10602
       },
       "reorderLevel": {},
       "reserveLevel": {
@@ -6088,7 +6088,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -6133,7 +6133,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -6152,7 +6152,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -6197,7 +6197,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -6325,7 +6325,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -6482,7 +6482,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -6584,7 +6584,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -6713,7 +6713,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -6841,7 +6841,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -6887,7 +6887,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -7044,7 +7044,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -7063,7 +7063,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -7082,7 +7082,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -7101,7 +7101,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -7175,7 +7175,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -7194,7 +7194,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -7350,7 +7350,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -7369,7 +7369,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -7389,7 +7389,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -7408,7 +7408,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -7455,7 +7455,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -7637,7 +7637,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -7656,7 +7656,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -7703,7 +7703,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -7749,7 +7749,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -7768,7 +7768,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -7787,7 +7787,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -7833,7 +7833,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -7852,7 +7852,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -7871,7 +7871,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -7891,7 +7891,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -7910,7 +7910,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -7930,7 +7930,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -7949,7 +7949,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -7968,7 +7968,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -8014,7 +8014,7 @@
       ],
       "modelPath": "/models/00001.obj",
       "inventory": {
-        "trade_goods": 9890
+        "trade_goods": 10490
       },
       "reorderLevel": {},
       "reserveLevel": {},
@@ -8261,7 +8261,7 @@
       "scruffin_fruit": 12.5
     },
     "cloudbase_north_west": {
-      "crystals": 800,
+      "crystals": 3200,
       "energy_cells": 32,
       "water": 100,
       "wheat": 15,
@@ -8548,7 +8548,7 @@
   },
   "timeScale": 30,
   "acc": 30,
-  "elapsedTimeSec": 237606,
+  "elapsedTimeSec": 252006,
   "corporations": [
     {
       "id": "teladi_company",
@@ -8577,15 +8577,15 @@
         "fleet_629p72ozz",
         "fleet_1pqsvkk3f"
       ],
-      "credits": 1104927.8399999999,
+      "credits": 1191327.8399999999,
       "netWorth": 50000000,
       "aggressiveness": 0.4,
       "expansionBudget": 500000,
       "riskTolerance": 0.3,
-      "lifetimeProfit": 204927.84000000003,
-      "lifetimeTrades": 3,
+      "lifetimeProfit": 291327.84,
+      "lifetimeTrades": 4,
       "aiState": {
-        "lastExpansionCheck": 1765483412750,
+        "lastExpansionCheck": 1765483893078,
         "currentGoal": "expand",
         "pendingConstructions": []
       }
@@ -8619,7 +8619,7 @@
       "lifetimeProfit": 35700,
       "lifetimeTrades": 2,
       "aiState": {
-        "lastExpansionCheck": 1765483412750,
+        "lastExpansionCheck": 1765483893078,
         "currentGoal": "stabilize",
         "pendingConstructions": []
       }
@@ -8646,7 +8646,7 @@
       "lifetimeProfit": 0,
       "lifetimeTrades": 0,
       "aiState": {
-        "lastExpansionCheck": 1765483412750,
+        "lastExpansionCheck": 1765483893078,
         "currentGoal": "expand",
         "pendingConstructions": []
       }
@@ -8673,9 +8673,9 @@
       "expansionBudget": 60000,
       "riskTolerance": 0.45,
       "lifetimeProfit": 4927.6,
-      "lifetimeTrades": 4,
+      "lifetimeTrades": 5,
       "aiState": {
-        "lastExpansionCheck": 1765483412750,
+        "lastExpansionCheck": 1765483893078,
         "currentGoal": "expand",
         "pendingConstructions": []
       }
@@ -8709,7 +8709,7 @@
       "lifetimeProfit": 2304,
       "lifetimeTrades": 1,
       "aiState": {
-        "lastExpansionCheck": 1765483412750,
+        "lastExpansionCheck": 1765483893078,
         "currentGoal": "war",
         "pendingConstructions": []
       }
@@ -8743,7 +8743,7 @@
       "lifetimeProfit": 272,
       "lifetimeTrades": 1,
       "aiState": {
-        "lastExpansionCheck": 1765483412750,
+        "lastExpansionCheck": 1765483893078,
         "currentGoal": "expand",
         "pendingConstructions": []
       }
@@ -8780,7 +8780,7 @@
       "lifetimeProfit": 226693.632,
       "lifetimeTrades": 4,
       "aiState": {
-        "lastExpansionCheck": 1765483412750,
+        "lastExpansionCheck": 1765483893078,
         "currentGoal": "expand",
         "pendingConstructions": []
       }
@@ -8822,7 +8822,7 @@
       "lifetimeProfit": 98773.20000000001,
       "lifetimeTrades": 2,
       "aiState": {
-        "lastExpansionCheck": 1765483412750,
+        "lastExpansionCheck": 1765483893078,
         "currentGoal": "stabilize",
         "pendingConstructions": []
       }
@@ -8858,7 +8858,7 @@
       "lifetimeProfit": 29272.032000000007,
       "lifetimeTrades": 1,
       "aiState": {
-        "lastExpansionCheck": 1765483412750,
+        "lastExpansionCheck": 1765483893078,
         "currentGoal": "expand",
         "pendingConstructions": []
       }
@@ -8885,7 +8885,7 @@
       "lifetimeProfit": 20339.029333333332,
       "lifetimeTrades": 2,
       "aiState": {
-        "lastExpansionCheck": 1765483412750,
+        "lastExpansionCheck": 1765483893078,
         "currentGoal": "stabilize",
         "pendingConstructions": []
       }
@@ -8917,7 +8917,7 @@
       "lifetimeProfit": 0,
       "lifetimeTrades": 0,
       "aiState": {
-        "lastExpansionCheck": 1765483412750,
+        "lastExpansionCheck": 1765483893078,
         "currentGoal": "expand",
         "pendingConstructions": []
       }
@@ -8949,7 +8949,7 @@
       "lifetimeProfit": 0,
       "lifetimeTrades": 0,
       "aiState": {
-        "lastExpansionCheck": 1765483412750,
+        "lastExpansionCheck": 1765483893078,
         "currentGoal": "expand",
         "pendingConstructions": []
       }
@@ -8979,7 +8979,7 @@
       "lifetimeProfit": 0,
       "lifetimeTrades": 0,
       "aiState": {
-        "lastExpansionCheck": 1765483412750,
+        "lastExpansionCheck": 1765483893078,
         "currentGoal": "war",
         "pendingConstructions": []
       }
@@ -9007,7 +9007,7 @@
       "lifetimeProfit": 263058.624,
       "lifetimeTrades": 4,
       "aiState": {
-        "lastExpansionCheck": 1765483412750,
+        "lastExpansionCheck": 1765483893078,
         "currentGoal": "stabilize",
         "pendingConstructions": []
       }
@@ -9044,7 +9044,7 @@
       "lifetimeProfit": 0,
       "lifetimeTrades": 0,
       "aiState": {
-        "lastExpansionCheck": 1765483412750,
+        "lastExpansionCheck": 1765483893078,
         "currentGoal": "expand",
         "pendingConstructions": []
       }
@@ -9072,7 +9072,7 @@
       "lifetimeProfit": 0,
       "lifetimeTrades": 0,
       "aiState": {
-        "lastExpansionCheck": 1765483412750,
+        "lastExpansionCheck": 1765483893078,
         "currentGoal": "war",
         "pendingConstructions": []
       }
@@ -9094,7 +9094,7 @@
       "lifetimeProfit": 0,
       "lifetimeTrades": 0,
       "aiState": {
-        "lastExpansionCheck": 1765483412750,
+        "lastExpansionCheck": 1765483893078,
         "currentGoal": "expand",
         "pendingConstructions": []
       }
@@ -9121,7 +9121,7 @@
       "lifetimeProfit": 0,
       "lifetimeTrades": 0,
       "aiState": {
-        "lastExpansionCheck": 1765483412750,
+        "lastExpansionCheck": 1765483893078,
         "currentGoal": "war",
         "pendingConstructions": []
       }
@@ -9149,8 +9149,8 @@
         0
       ],
       "state": "in-transit",
-      "stateStartTime": 1765483356717,
-      "lastReportAt": 1765478125567,
+      "stateStartTime": 1765483656910,
+      "lastReportAt": 1765483753744,
       "cargo": {},
       "credits": 10000,
       "commandQueue": [
@@ -9426,109 +9426,181 @@
       "behavior": "corp-logistics",
       "autonomy": 0.3,
       "profitShare": 0.1,
-      "currentSectorId": "cloudbase_north_west",
+      "currentSectorId": "menelaus_frontier",
       "position": [
+        -150000,
         0,
-        0,
-        -148000
+        2000
       ],
       "state": "in-transit",
-      "stateStartTime": 1765483277667,
-      "lastReportAt": 1765478173019,
+      "stateStartTime": 1765483889076,
+      "lastReportAt": 1765483888074,
       "cargo": {
-        "energy_cells": 0,
-        "crystals": 0
+        "energy_cells": 0
       },
-      "credits": 205697.6,
+      "credits": 301697.6,
       "commandQueue": [
         {
-          "type": "goto-station",
-          "targetStationId": "cloudbase_north_west_crystal_fab_m",
-          "targetSectorId": "cloudbase_north_west",
-          "id": "0mc97ai2v",
-          "createdAt": 1765478172022
-        },
-        {
-          "type": "dock",
-          "targetStationId": "cloudbase_north_west_crystal_fab_m",
-          "id": "ajoxxon1b",
-          "createdAt": 1765478172022
-        },
-        {
-          "type": "load-cargo",
-          "targetStationId": "cloudbase_north_west_crystal_fab_m",
-          "wareId": "crystals",
-          "amount": 40,
-          "id": "xai60l2j2",
-          "createdAt": 1765478172022
-        },
-        {
-          "type": "undock",
-          "targetStationId": "cloudbase_north_west_crystal_fab_m",
-          "id": "p9listo26",
-          "createdAt": 1765478172022
-        },
-        {
           "type": "goto-gate",
-          "targetSectorId": "three_worlds",
-          "id": "itax7d4zs",
-          "createdAt": 1765478172022
+          "targetSectorId": "ceo_s_buckzoid",
+          "id": "1xoy9747j",
+          "createdAt": 1765483686944
         },
         {
           "type": "use-gate",
-          "targetSectorId": "three_worlds",
-          "id": "318ahr4ko",
-          "createdAt": 1765478172022
+          "targetSectorId": "ceo_s_buckzoid",
+          "id": "qm6ks18ua",
+          "createdAt": 1765483686944
+        },
+        {
+          "type": "goto-gate",
+          "targetSectorId": "teladi_gain",
+          "id": "8orfolysz",
+          "createdAt": 1765483686944
+        },
+        {
+          "type": "use-gate",
+          "targetSectorId": "teladi_gain",
+          "id": "cj7o4crnu",
+          "createdAt": 1765483686944
+        },
+        {
+          "type": "goto-gate",
+          "targetSectorId": "seizewell",
+          "id": "zgis8wr1i",
+          "createdAt": 1765483686944
+        },
+        {
+          "type": "use-gate",
+          "targetSectorId": "seizewell",
+          "id": "ekt8a8v3j",
+          "createdAt": 1765483686944
+        },
+        {
+          "type": "goto-gate",
+          "targetSectorId": "greater_profit",
+          "id": "ay5rx8553",
+          "createdAt": 1765483686944
+        },
+        {
+          "type": "use-gate",
+          "targetSectorId": "greater_profit",
+          "id": "j9zpjzrow",
+          "createdAt": 1765483686944
         },
         {
           "type": "goto-station",
-          "targetStationId": "three_worlds_solar_power_plant_m",
-          "targetSectorId": "three_worlds",
-          "id": "59bmhaf2l",
-          "createdAt": 1765478172022
+          "targetStationId": "greater_profit_crystal_fab_m_2",
+          "targetSectorId": "greater_profit",
+          "id": "9c6cpc8yy",
+          "createdAt": 1765483686944
         },
         {
           "type": "dock",
-          "targetStationId": "three_worlds_solar_power_plant_m",
-          "id": "t8ny3ygh2",
-          "createdAt": 1765478172022
+          "targetStationId": "greater_profit_crystal_fab_m_2",
+          "id": "deutx54nh",
+          "createdAt": 1765483686944
         },
         {
-          "type": "unload-cargo",
-          "targetStationId": "three_worlds_solar_power_plant_m",
+          "type": "load-cargo",
+          "targetStationId": "greater_profit_crystal_fab_m_2",
           "wareId": "crystals",
           "amount": 40,
-          "id": "c7mgcvihi",
-          "createdAt": 1765478172022
+          "id": "d4l8ujz7w",
+          "createdAt": 1765483686944
         },
         {
           "type": "undock",
-          "targetStationId": "three_worlds_solar_power_plant_m",
-          "id": "x2piky6kb",
-          "createdAt": 1765478172022
+          "targetStationId": "greater_profit_crystal_fab_m_2",
+          "id": "2fixjyc7o",
+          "createdAt": 1765483686944
+        },
+        {
+          "type": "goto-gate",
+          "targetSectorId": "seizewell",
+          "id": "8ipv0yu5s",
+          "createdAt": 1765483686944
+        },
+        {
+          "type": "use-gate",
+          "targetSectorId": "seizewell",
+          "id": "6kvsv0lqy",
+          "createdAt": 1765483686944
+        },
+        {
+          "type": "goto-gate",
+          "targetSectorId": "teladi_gain",
+          "id": "qty2hhwwh",
+          "createdAt": 1765483686944
+        },
+        {
+          "type": "use-gate",
+          "targetSectorId": "teladi_gain",
+          "id": "12s97m2az",
+          "createdAt": 1765483686944
+        },
+        {
+          "type": "goto-gate",
+          "targetSectorId": "ceo_s_buckzoid",
+          "id": "cbmjnbd5w",
+          "createdAt": 1765483686944
+        },
+        {
+          "type": "use-gate",
+          "targetSectorId": "ceo_s_buckzoid",
+          "id": "40v07h4qv",
+          "createdAt": 1765483686944
+        },
+        {
+          "type": "goto-station",
+          "targetStationId": "ceo_s_buckzoid_solar_power_plant_m",
+          "targetSectorId": "ceo_s_buckzoid",
+          "id": "etlg75xfh",
+          "createdAt": 1765483686944
+        },
+        {
+          "type": "dock",
+          "targetStationId": "ceo_s_buckzoid_solar_power_plant_m",
+          "id": "hr1tizolu",
+          "createdAt": 1765483686944
+        },
+        {
+          "type": "unload-cargo",
+          "targetStationId": "ceo_s_buckzoid_solar_power_plant_m",
+          "wareId": "crystals",
+          "amount": 40,
+          "id": "tc9ycfvej",
+          "createdAt": 1765483686944
+        },
+        {
+          "type": "undock",
+          "targetStationId": "ceo_s_buckzoid_solar_power_plant_m",
+          "id": "e43s2ilek",
+          "createdAt": 1765483686944
         }
       ],
-      "totalProfit": 227697.6,
-      "tripsCompleted": 3,
+      "totalProfit": 323697.6,
+      "tripsCompleted": 4,
       "currentOrder": {
-        "id": "goady7nps",
-        "buyStationId": "cloudbase_north_west_crystal_fab_m",
+        "id": "lh0o8rn02",
+        "buyStationId": "greater_profit_crystal_fab_m_2",
         "buyStationName": "Crystal Fab (M)",
-        "buySectorId": "cloudbase_north_west",
+        "buySectorId": "greater_profit",
         "buyWareId": "crystals",
         "buyWareName": "Crystals",
         "buyQty": 40,
         "buyPrice": 800,
-        "sellStationId": "three_worlds_solar_power_plant_m",
+        "sellStationId": "ceo_s_buckzoid_solar_power_plant_m",
         "sellStationName": "Solar Power Plant (M)",
-        "sellSectorId": "three_worlds",
+        "sellSectorId": "ceo_s_buckzoid",
         "sellWareId": "crystals",
         "sellWareName": "Crystals",
         "sellQty": 40,
         "sellPrice": 3200,
         "expectedProfit": 96000,
-        "createdAt": 1765478172019
-      }
+        "createdAt": 1765483686936
+      },
+      "destinationSectorId": "ceo_s_buckzoid"
     },
     {
       "id": "fleet_7yochrw9j",
@@ -9551,8 +9623,8 @@
         148635.0553924922
       ],
       "state": "in-transit",
-      "stateStartTime": 1765483408747,
-      "lastReportAt": 1765478125568,
+      "stateStartTime": 1765483708948,
+      "lastReportAt": 1765483753745,
       "cargo": {
         "energy_cells": 0
       },
@@ -9790,8 +9862,8 @@
         -148617.53630036724
       ],
       "state": "in-transit",
-      "stateStartTime": 1765483370726,
-      "lastReportAt": 1765478125568,
+      "stateStartTime": 1765483670924,
+      "lastReportAt": 1765483753745,
       "cargo": {
         "crystals": 18
       },
@@ -9850,7 +9922,7 @@
       ],
       "state": "idle",
       "stateStartTime": 1765473785290,
-      "lastReportAt": 1765478125568,
+      "lastReportAt": 1765483753745,
       "cargo": {},
       "credits": 10960,
       "commandQueue": [],
@@ -9880,7 +9952,7 @@
       ],
       "state": "idle",
       "stateStartTime": 1765473672200,
-      "lastReportAt": 1765478125569,
+      "lastReportAt": 1765483753746,
       "cargo": {},
       "credits": 10000,
       "commandQueue": [],
@@ -9902,105 +9974,249 @@
       "behavior": "station-supply",
       "autonomy": 0.3,
       "profitShare": 0.2,
-      "currentSectorId": "teladi_gain",
+      "currentSectorId": "blue_profit",
       "position": [
         0,
         0,
-        152000
+        -106952.28016005688
       ],
       "state": "in-transit",
-      "stateStartTime": 1765483275666,
-      "lastReportAt": 1765478171018,
+      "stateStartTime": 1765483672925,
+      "lastReportAt": 1765483752424,
       "cargo": {},
       "credits": 10399.5,
       "commandQueue": [
         {
+          "type": "goto-gate",
+          "targetSectorId": "blue_profit",
+          "id": "3px611kq2",
+          "createdAt": 1765483654916
+        },
+        {
+          "type": "use-gate",
+          "targetSectorId": "blue_profit",
+          "id": "yeqk48sjk",
+          "createdAt": 1765483654916
+        },
+        {
+          "type": "goto-gate",
+          "targetSectorId": "ceo_s_sprite",
+          "id": "04awvjdc4",
+          "createdAt": 1765483654916
+        },
+        {
+          "type": "use-gate",
+          "targetSectorId": "ceo_s_sprite",
+          "id": "g83iapc3l",
+          "createdAt": 1765483654916
+        },
+        {
+          "type": "goto-gate",
+          "targetSectorId": "company_pride",
+          "id": "jb8ify015",
+          "createdAt": 1765483654916
+        },
+        {
+          "type": "use-gate",
+          "targetSectorId": "company_pride",
+          "id": "5wz6oeacl",
+          "createdAt": 1765483654916
+        },
+        {
+          "type": "goto-gate",
+          "targetSectorId": "thuruks_beard",
+          "id": "pij3uyckc",
+          "createdAt": 1765483654916
+        },
+        {
+          "type": "use-gate",
+          "targetSectorId": "thuruks_beard",
+          "id": "q0jae3xg2",
+          "createdAt": 1765483654916
+        },
+        {
+          "type": "goto-gate",
+          "targetSectorId": "xenon_sector_9",
+          "id": "oiz2lh457",
+          "createdAt": 1765483654916
+        },
+        {
+          "type": "use-gate",
+          "targetSectorId": "xenon_sector_9",
+          "id": "q9yph6gn2",
+          "createdAt": 1765483654916
+        },
+        {
+          "type": "goto-gate",
+          "targetSectorId": "xenon_sector_8",
+          "id": "rjm11a4nc",
+          "createdAt": 1765483654916
+        },
+        {
+          "type": "use-gate",
+          "targetSectorId": "xenon_sector_8",
+          "id": "0elt8vnzn",
+          "createdAt": 1765483654916
+        },
+        {
           "type": "goto-station",
-          "targetStationId": "teladi_gain_flower_farm_m_2",
-          "targetSectorId": "teladi_gain",
-          "id": "j8n5d7dgm",
-          "createdAt": 1765477937858
+          "targetStationId": "station_argon_fleet_command_sw6ft0xhw",
+          "targetSectorId": "xenon_sector_8",
+          "id": "35fh66vol",
+          "createdAt": 1765483654916
         },
         {
           "type": "dock",
-          "targetStationId": "teladi_gain_flower_farm_m_2",
-          "id": "lng0jm0r0",
-          "createdAt": 1765477937858
+          "targetStationId": "station_argon_fleet_command_sw6ft0xhw",
+          "id": "nipw7pgo1",
+          "createdAt": 1765483654916
         },
         {
           "type": "load-cargo",
-          "targetStationId": "teladi_gain_flower_farm_m_2",
+          "targetStationId": "station_argon_fleet_command_sw6ft0xhw",
           "wareId": "sunrise_flowers",
-          "amount": 380,
-          "id": "s7kgnl8w6",
-          "createdAt": 1765477937858
+          "amount": 20,
+          "id": "zkwk6zbjj",
+          "createdAt": 1765483654916
         },
         {
           "type": "undock",
-          "targetStationId": "teladi_gain_flower_farm_m_2",
-          "id": "msqwasa4z",
-          "createdAt": 1765477937858
+          "targetStationId": "station_argon_fleet_command_sw6ft0xhw",
+          "id": "dhisi7dkj",
+          "createdAt": 1765483654916
+        },
+        {
+          "type": "goto-gate",
+          "targetSectorId": "xenon_sector_9",
+          "id": "pe3gkssya",
+          "createdAt": 1765483654916
+        },
+        {
+          "type": "use-gate",
+          "targetSectorId": "xenon_sector_9",
+          "id": "qofyz4f2b",
+          "createdAt": 1765483654916
+        },
+        {
+          "type": "goto-gate",
+          "targetSectorId": "thuruks_beard",
+          "id": "ulwz9jfp0",
+          "createdAt": 1765483654916
+        },
+        {
+          "type": "use-gate",
+          "targetSectorId": "thuruks_beard",
+          "id": "cm2erqw1m",
+          "createdAt": 1765483654916
+        },
+        {
+          "type": "goto-gate",
+          "targetSectorId": "company_pride",
+          "id": "e8l28m5ir",
+          "createdAt": 1765483654916
+        },
+        {
+          "type": "use-gate",
+          "targetSectorId": "company_pride",
+          "id": "wzo4f2hat",
+          "createdAt": 1765483654916
+        },
+        {
+          "type": "goto-gate",
+          "targetSectorId": "ceo_s_sprite",
+          "id": "tbyg72x4r",
+          "createdAt": 1765483654916
+        },
+        {
+          "type": "use-gate",
+          "targetSectorId": "ceo_s_sprite",
+          "id": "y850erntd",
+          "createdAt": 1765483654916
+        },
+        {
+          "type": "goto-gate",
+          "targetSectorId": "blue_profit",
+          "id": "k1r0pfi7o",
+          "createdAt": 1765483654916
+        },
+        {
+          "type": "use-gate",
+          "targetSectorId": "blue_profit",
+          "id": "pdnyl4nkb",
+          "createdAt": 1765483654916
+        },
+        {
+          "type": "goto-gate",
+          "targetSectorId": "greater_profit",
+          "id": "nks3eqfi1",
+          "createdAt": 1765483654916
+        },
+        {
+          "type": "use-gate",
+          "targetSectorId": "greater_profit",
+          "id": "7ujbtj9gl",
+          "createdAt": 1765483654916
         },
         {
           "type": "goto-gate",
           "targetSectorId": "seizewell",
-          "id": "5p4xwmvpk",
-          "createdAt": 1765477937858
+          "id": "lc6b9prdt",
+          "createdAt": 1765483654916
         },
         {
           "type": "use-gate",
           "targetSectorId": "seizewell",
-          "id": "bfhg90y1h",
-          "createdAt": 1765477937858
+          "id": "4g8odmuco",
+          "createdAt": 1765483654916
         },
         {
           "type": "goto-station",
           "targetStationId": "seizewell_sun_oil_refinery_beta",
           "targetSectorId": "seizewell",
-          "id": "vmtoddks8",
-          "createdAt": 1765477937858
+          "id": "jm6e8qedr",
+          "createdAt": 1765483654916
         },
         {
           "type": "dock",
           "targetStationId": "seizewell_sun_oil_refinery_beta",
-          "id": "lsgmpcjbs",
-          "createdAt": 1765477937858
+          "id": "8rq0mtrli",
+          "createdAt": 1765483654916
         },
         {
           "type": "unload-cargo",
           "targetStationId": "seizewell_sun_oil_refinery_beta",
           "wareId": "sunrise_flowers",
-          "amount": 380,
-          "id": "ii7glxdme",
-          "createdAt": 1765477937858
+          "amount": 20,
+          "id": "olvvy2774",
+          "createdAt": 1765483654916
         },
         {
           "type": "undock",
           "targetStationId": "seizewell_sun_oil_refinery_beta",
-          "id": "39sozxwe6",
-          "createdAt": 1765477937858
+          "id": "u55m9bigd",
+          "createdAt": 1765483654916
         }
       ],
       "totalProfit": 6159.5,
-      "tripsCompleted": 4,
+      "tripsCompleted": 5,
       "currentOrder": {
-        "id": "wfsh4o6ym",
-        "buyStationId": "teladi_gain_flower_farm_m_2",
-        "buyStationName": "Flower Farm (M)",
-        "buySectorId": "teladi_gain",
+        "id": "rs8hvgchl",
+        "buyStationId": "station_argon_fleet_command_sw6ft0xhw",
+        "buyStationName": "Flower Farm",
+        "buySectorId": "xenon_sector_8",
         "buyWareId": "sunrise_flowers",
         "buyWareName": "Sunrise Flowers",
-        "buyQty": 380,
-        "buyPrice": 15,
+        "buyQty": 20,
+        "buyPrice": 30,
         "sellStationId": "seizewell_sun_oil_refinery_beta",
         "sellStationName": "Sun Oil Refinery (beta)",
         "sellSectorId": "seizewell",
         "sellWareId": "sunrise_flowers",
         "sellWareName": "Sunrise Flowers",
-        "sellQty": 380,
+        "sellQty": 20,
         "sellPrice": 15,
-        "expectedProfit": 570,
-        "createdAt": 1765477937857
+        "expectedProfit": 60,
+        "createdAt": 1765483654915
       },
       "destinationSectorId": "blue_profit"
     },
@@ -10027,7 +10243,7 @@
       ],
       "state": "docking",
       "stateStartTime": 1765476513640,
-      "lastReportAt": 1765478125569,
+      "lastReportAt": 1765483753746,
       "cargo": {},
       "credits": -10480,
       "commandQueue": [],
@@ -10055,8 +10271,8 @@
         148635.0553924922
       ],
       "state": "in-transit",
-      "stateStartTime": 1765483408747,
-      "lastReportAt": 1765478125569,
+      "stateStartTime": 1765483708948,
+      "lastReportAt": 1765483753746,
       "cargo": {
         "energy_cells": 0
       },
@@ -10293,8 +10509,8 @@
         0
       ],
       "state": "in-transit",
-      "stateStartTime": 1765483373728,
-      "lastReportAt": 1765478125569,
+      "stateStartTime": 1765483673926,
+      "lastReportAt": 1765483753746,
       "cargo": {
         "energy_cells": 0
       },
@@ -10485,7 +10701,7 @@
       ],
       "state": "idle",
       "stateStartTime": 1765476521617,
-      "lastReportAt": 1765478125570,
+      "lastReportAt": 1765483753746,
       "cargo": {},
       "credits": 7440,
       "commandQueue": [],
@@ -10506,19 +10722,19 @@
       "behavior": "freelance",
       "autonomy": 1,
       "profitShare": 1,
-      "currentSectorId": "cloudbase_north_west",
+      "currentSectorId": "three_worlds",
       "position": [
+        107.96288070463825,
         0,
-        0,
-        -148000
+        -98559.32827795927
       ],
       "state": "in-transit",
-      "stateStartTime": 1765483200617,
-      "lastReportAt": 1765478396170,
+      "stateStartTime": 1765483649907,
+      "lastReportAt": 1765483752544,
       "cargo": {
-        "crystals": 0
+        "crystals": 40
       },
-      "credits": 198099.2,
+      "credits": 166099.2,
       "commandQueue": [
         {
           "type": "goto-station",
@@ -10667,8 +10883,8 @@
         148000
       ],
       "state": "in-transit",
-      "stateStartTime": 1765483179601,
-      "lastReportAt": 1765478125570,
+      "stateStartTime": 1765483780004,
+      "lastReportAt": 1765483753746,
       "cargo": {
         "energy_cells": 0
       },
@@ -10828,13 +11044,13 @@
       "profitShare": 1,
       "currentSectorId": "kingdom_end",
       "position": [
-        56519.92098444466,
         0,
-        92716.29629955014
+        0,
+        25646.47092481947
       ],
       "state": "in-transit",
-      "stateStartTime": 1765483389737,
-      "lastReportAt": 1765478126582,
+      "stateStartTime": 1765483689937,
+      "lastReportAt": 1765483753747,
       "cargo": {
         "energy_cells": 0
       },
@@ -11040,16 +11256,18 @@
       "behavior": "corp-logistics",
       "autonomy": 0.35,
       "profitShare": 0.12,
-      "currentSectorId": "cloudbase_north_west",
+      "currentSectorId": "three_worlds",
       "position": [
+        111.71555594435253,
         0,
-        0,
-        -148000
+        -36704.94197674875
       ],
       "state": "in-transit",
-      "stateStartTime": 1765483155585,
-      "lastReportAt": 1765478351139,
-      "cargo": {},
+      "stateStartTime": 1765483718956,
+      "lastReportAt": 1765483753611,
+      "cargo": {
+        "crystals": 0
+      },
       "credits": 135908.8,
       "commandQueue": [
         {
@@ -11170,13 +11388,13 @@
       "profitShare": 0.12,
       "currentSectorId": "kingdom_end",
       "position": [
-        56519.92098444466,
         0,
-        92716.29629955014
+        0,
+        25646.47092481947
       ],
       "state": "in-transit",
-      "stateStartTime": 1765483389737,
-      "lastReportAt": 1765478126583,
+      "stateStartTime": 1765483689937,
+      "lastReportAt": 1765483753747,
       "cargo": {
         "energy_cells": 0
       },
@@ -11334,19 +11552,20 @@
       "behavior": "guild-assigned",
       "autonomy": 0.55,
       "profitShare": 0.25,
-      "currentSectorId": "cloudbase_north_west",
+      "currentSectorId": "three_worlds",
       "position": [
+        15.396493870766385,
         0,
-        0,
-        -148000
+        147643.31455866055
       ],
       "state": "in-transit",
-      "stateStartTime": 1765483156587,
-      "lastReportAt": 1765478352139,
+      "stateStartTime": 1765483691938,
+      "lastReportAt": 1765483752664,
       "cargo": {
-        "energy_cells": 0
+        "energy_cells": 0,
+        "crystals": 40
       },
-      "credits": 173697.6,
+      "credits": 141697.6,
       "commandQueue": [
         {
           "type": "goto-station",
@@ -11471,8 +11690,8 @@
         78.45349946819015
       ],
       "state": "in-transit",
-      "stateStartTime": 1765483291676,
-      "lastReportAt": 1765478125571,
+      "stateStartTime": 1765483892078,
+      "lastReportAt": 1765483753747,
       "cargo": {
         "energy_cells": 0,
         "crystals": 0
@@ -11602,8 +11821,8 @@
         0
       ],
       "state": "in-transit",
-      "stateStartTime": 1765483288675,
-      "lastReportAt": 1765478125980,
+      "stateStartTime": 1765483889076,
+      "lastReportAt": 1765483753747,
       "cargo": {
         "energy_cells": 0,
         "crystals": 0
@@ -11750,20 +11969,20 @@
       "behavior": "corp-logistics",
       "autonomy": 0.3,
       "profitShare": 0.12,
-      "currentSectorId": "cloudbase_north_west",
+      "currentSectorId": "three_worlds",
       "position": [
+        572.8920578762385,
         0,
-        0,
-        -148000
+        -67127.29515027873
       ],
       "state": "in-transit",
-      "stateStartTime": 1765483127565,
-      "lastReportAt": 1765478323121,
+      "stateStartTime": 1765483712950,
+      "lastReportAt": 1765483753398,
       "cargo": {
         "energy_cells": 0,
-        "crystals": 0
+        "crystals": 31
       },
-      "credits": 33112.53333333333,
+      "credits": 8312.533333333333,
       "commandQueue": [
         {
           "type": "goto-station",
@@ -11912,8 +12131,8 @@
         148000
       ],
       "state": "in-transit",
-      "stateStartTime": 1765483385734,
-      "lastReportAt": 1765478125571,
+      "stateStartTime": 1765483685935,
+      "lastReportAt": 1765483753748,
       "cargo": {
         "energy_cells": 0
       },
@@ -12150,8 +12369,8 @@
         148000
       ],
       "state": "in-transit",
-      "stateStartTime": 1765483385734,
-      "lastReportAt": 1765478125571,
+      "stateStartTime": 1765483685935,
+      "lastReportAt": 1765483753748,
       "cargo": {
         "energy_cells": 0
       },
@@ -12383,13 +12602,13 @@
       "profitShare": 1,
       "currentSectorId": "emperor_mines",
       "position": [
-        6000.097632267057,
+        6000.2872215214875,
         0,
-        6002.50589141925
+        6007.37200893889
       ],
       "state": "in-transit",
-      "stateStartTime": 1765483356717,
-      "lastReportAt": 1765478125572,
+      "stateStartTime": 1765483656910,
+      "lastReportAt": 1765483753748,
       "cargo": {
         "energy_cells": 0
       },
@@ -12554,8 +12773,8 @@
         148980.28229581876
       ],
       "state": "in-transit",
-      "stateStartTime": 1765483395740,
-      "lastReportAt": 1765478125572,
+      "stateStartTime": 1765483695942,
+      "lastReportAt": 1765483753748,
       "cargo": {},
       "credits": 10000,
       "commandQueue": [
@@ -12742,8 +12961,8 @@
         148000
       ],
       "state": "in-transit",
-      "stateStartTime": 1765483184604,
-      "lastReportAt": 1765478125572,
+      "stateStartTime": 1765483785006,
+      "lastReportAt": 1765483753748,
       "cargo": {
         "energy_cells": 0
       },
@@ -12905,11 +13124,11 @@
       "position": [
         0,
         0,
-        106852.42943483815
+        148000
       ],
       "state": "in-transit",
-      "stateStartTime": 1765483293678,
-      "lastReportAt": 1765478126779,
+      "stateStartTime": 1765483894079,
+      "lastReportAt": 1765483753749,
       "cargo": {
         "energy_cells": 0
       },
@@ -13146,8 +13365,8 @@
         2000
       ],
       "state": "in-transit",
-      "stateStartTime": 1765483385734,
-      "lastReportAt": 1765478125572,
+      "stateStartTime": 1765483685935,
+      "lastReportAt": 1765483753749,
       "cargo": {},
       "credits": 50000,
       "commandQueue": [
@@ -13329,13 +13548,13 @@
       "profitShare": 0.18,
       "currentSectorId": "queens_space",
       "position": [
-        38918.112024892995,
+        78021.30293509892,
         0,
         0
       ],
       "state": "in-transit",
-      "stateStartTime": 1765483392739,
-      "lastReportAt": 1765478125774,
+      "stateStartTime": 1765483692938,
+      "lastReportAt": 1765483753749,
       "cargo": {
         "energy_cells": 0
       },
@@ -13524,8 +13743,8 @@
         148000
       ],
       "state": "in-transit",
-      "stateStartTime": 1765483247648,
-      "lastReportAt": 1765478125572,
+      "stateStartTime": 1765483848052,
+      "lastReportAt": 1765483753749,
       "cargo": {
         "energy_cells": 0
       },
@@ -13709,13 +13928,13 @@
       "profitShare": 1,
       "currentSectorId": "menelaus_frontier",
       "position": [
-        2983.186084325505,
-        1500.1739370590992,
-        6000.695748236397
+        3007.3709002936553,
+        1499.9237493072164,
+        5999.694997228866
       ],
       "state": "in-transit",
-      "stateStartTime": 1765483291676,
-      "lastReportAt": 1765478126260,
+      "stateStartTime": 1765483892078,
+      "lastReportAt": 1765483753749,
       "cargo": {
         "energy_cells": 0,
         "crystals": 0
@@ -13845,8 +14064,8 @@
         2000
       ],
       "state": "in-transit",
-      "stateStartTime": 1765483385734,
-      "lastReportAt": 1765478125573,
+      "stateStartTime": 1765483685935,
+      "lastReportAt": 1765483753750,
       "cargo": {},
       "credits": 10000,
       "commandQueue": [
@@ -14078,11 +14297,11 @@
       "position": [
         0,
         0,
-        111472.1441499214
+        -145938.50928479052
       ],
       "state": "in-transit",
-      "stateStartTime": 1765483293678,
-      "lastReportAt": 1765478125981,
+      "stateStartTime": 1765483894079,
+      "lastReportAt": 1765483753750,
       "cargo": {
         "energy_cells": 0
       },
@@ -14319,8 +14538,8 @@
         148897.6323333805
       ],
       "state": "in-transit",
-      "stateStartTime": 1765483382733,
-      "lastReportAt": 1765478125573,
+      "stateStartTime": 1765483682934,
+      "lastReportAt": 1765483753750,
       "cargo": {
         "energy_cells": 0
       },
@@ -14557,8 +14776,8 @@
         2000
       ],
       "state": "in-transit",
-      "stateStartTime": 1765483385734,
-      "lastReportAt": 1765478125573,
+      "stateStartTime": 1765483685935,
+      "lastReportAt": 1765483753750,
       "cargo": {},
       "credits": 50000,
       "commandQueue": [
@@ -14721,8 +14940,8 @@
         0
       ],
       "state": "in-transit",
-      "stateStartTime": 1765483409748,
-      "lastReportAt": 1765478125573,
+      "stateStartTime": 1765483709948,
+      "lastReportAt": 1765483753750,
       "cargo": {
         "energy_cells": 0
       },
@@ -14911,8 +15130,8 @@
         148000
       ],
       "state": "in-transit",
-      "stateStartTime": 1765483247648,
-      "lastReportAt": 1765478125574,
+      "stateStartTime": 1765483848052,
+      "lastReportAt": 1765483753750,
       "cargo": {
         "energy_cells": 0
       },
@@ -15077,8 +15296,8 @@
         2000
       ],
       "state": "in-transit",
-      "stateStartTime": 1765483352716,
-      "lastReportAt": 1765478125574,
+      "stateStartTime": 1765483652909,
+      "lastReportAt": 1765483753750,
       "cargo": {},
       "credits": 50000,
       "commandQueue": [
@@ -15242,7 +15461,7 @@
       ],
       "state": "docking",
       "stateStartTime": 1765476715678,
-      "lastReportAt": 1765478125574,
+      "lastReportAt": 1765483753751,
       "cargo": {},
       "credits": 10000,
       "commandQueue": [
@@ -15292,7 +15511,7 @@
       ],
       "state": "docking",
       "stateStartTime": 1765476524525,
-      "lastReportAt": 1765478125574,
+      "lastReportAt": 1765483753751,
       "cargo": {},
       "credits": 10000,
       "commandQueue": [
@@ -15341,8 +15560,8 @@
         -148000
       ],
       "state": "in-transit",
-      "stateStartTime": 1765483209625,
-      "lastReportAt": 1765478125575,
+      "stateStartTime": 1765483810023,
+      "lastReportAt": 1765483753751,
       "cargo": {},
       "credits": 10000,
       "commandQueue": [
@@ -15372,6 +15591,38 @@
     }
   ],
   "tradeLog": [
+    {
+      "id": "ndb0qgfl4",
+      "timestamp": 1765483686167,
+      "fleetId": "fleet_o53ixe88w",
+      "fleetName": "Vulture Teladi-2",
+      "wareId": "crystals",
+      "wareName": "Crystals",
+      "quantity": 40,
+      "buyPrice": 800,
+      "sellPrice": 3200,
+      "profit": 96000,
+      "buySectorId": "cloudbase_north_west",
+      "sellSectorId": "three_worlds",
+      "buyStationName": "Crystal Fab (M)",
+      "sellStationName": "Solar Power Plant (M)"
+    },
+    {
+      "id": "0rf4dw9ut",
+      "timestamp": 1765483654351,
+      "fleetId": "fleet_hr1qt12l5",
+      "fleetName": "Vulture Family-7",
+      "wareId": "sunrise_flowers",
+      "wareName": "Sunrise Flowers",
+      "quantity": 380,
+      "buyPrice": 15,
+      "sellPrice": 15,
+      "profit": 0,
+      "buySectorId": "teladi_gain",
+      "sellSectorId": "seizewell",
+      "buyStationName": "Flower Farm (M)",
+      "sellStationName": "Sun Oil Refinery (beta)"
+    },
     {
       "id": "66sysw753",
       "timestamp": 1765478186028,
@@ -15917,6 +16168,6 @@
       "sellStationName": "Beta I.R.E. Laser Forge (alpha)"
     }
   ],
-  "lastTickTime": 1765483413750,
-  "lastTraderSpawnCheck": 1765483352716
+  "lastTickTime": 1765483894079,
+  "lastTraderSpawnCheck": 1765483652909
 }

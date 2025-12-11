@@ -618,13 +618,23 @@ export class UniverseService {
         fleet.state = 'docking'
         break
       case 'cargo-loaded':
-        if (station && report.wareId && typeof report.amount === 'number') {
-          const available = station.inventory[report.wareId] || 0
-          const amt = Math.min(report.amount, available)
-          station.inventory[report.wareId] = Math.max(0, available - amt)
-          fleet.cargo[report.wareId] = (fleet.cargo[report.wareId] || 0) + amt
-          fleet.state = 'in-transit'
+        if (!station || !report.wareId || typeof report.amount !== 'number') break
+
+        // If the source station is sold out, abort the job so the trader can pick a new one
+        const available = station.inventory[report.wareId] || 0
+        const requested = Math.max(0, report.amount)
+        if (available <= 0 || requested <= 0) {
+          fleet.state = 'idle'
+          fleet.commandQueue = []
+          fleet.currentOrder = undefined
+          fleet.targetStationId = undefined
+          break
         }
+
+        const amt = Math.min(requested, available)
+        station.inventory[report.wareId] = Math.max(0, available - amt)
+        fleet.cargo[report.wareId] = (fleet.cargo[report.wareId] || 0) + amt
+        fleet.state = 'in-transit'
         break
       case 'cargo-unloaded':
         if (station && report.wareId && typeof report.amount === 'number') {
