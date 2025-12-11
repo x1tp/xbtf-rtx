@@ -59,7 +59,7 @@ export const StationInfo: React.FC = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
                     <div style={{ color: '#006699' }}>SECTOR</div>
                     <div>{useGameStore.getState().currentSectorId}</div>
-                    
+
                     <div style={{ color: '#006699' }}>DISTANCE</div>
                     <div>{(Math.sqrt(
                         Math.pow(target.position[0] - useGameStore.getState().position.x, 2) +
@@ -73,6 +73,23 @@ export const StationInfo: React.FC = () => {
 
                 {stationData ? (
                     <div>
+                        {/* Demographics Area */}
+                        {(stationData.recipeId && (stationData.recipeId.includes('planetary_hub') || stationData.recipeId.includes('orbital_habitat'))) && (
+                            <div style={{ marginBottom: '15px' }}>
+                                <h3 style={{ fontSize: '14px', borderBottom: '1px solid #004466', paddingBottom: '5px', marginBottom: '10px' }}>POPULATION</h3>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                    <div style={{ color: '#006699' }}>TYPE</div>
+                                    <div>{stationData.recipeId.includes('planetary_hub') ? 'PLANETARY SURFACE' : 'ORBITAL HABITAT'}</div>
+
+                                    <div style={{ color: '#006699' }}>RESIDENTS</div>
+                                    <div>{stationData.recipeId.includes('planetary_hub') ? '~15,000,000' : '~5,000'}</div>
+
+                                    <div style={{ color: '#006699' }}>TRANSIENT</div>
+                                    <div>{stationData.inventory && stationData.inventory['passengers'] ? stationData.inventory['passengers'] : 0}</div>
+                                </div>
+                            </div>
+                        )}
+
                         <h3 style={{ fontSize: '14px', borderBottom: '1px solid #004466', paddingBottom: '5px', marginBottom: '10px' }}>PRODUCTION INFO</h3>
                         {/* If we had recipe info, we could show it here. For now, show inventory if available */}
                         {stationData.inventory && Object.keys(stationData.inventory).length > 0 ? (
@@ -99,10 +116,10 @@ export const StationInfo: React.FC = () => {
                         {stationData.productionProgress !== undefined && (
                             <div style={{ marginTop: '15px' }}>
                                 <div style={{ color: '#006699', fontSize: '12px', marginBottom: '5px' }}>CYCLE PROGRESS</div>
-                                <div style={{ 
-                                    width: '100%', 
-                                    height: '10px', 
-                                    backgroundColor: '#002233', 
+                                <div style={{
+                                    width: '100%',
+                                    height: '10px',
+                                    backgroundColor: '#002233',
                                     border: '1px solid #004466',
                                     position: 'relative'
                                 }}>

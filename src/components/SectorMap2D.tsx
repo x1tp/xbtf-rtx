@@ -152,6 +152,46 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
         return [...storeObjects, ...fleetObjects];
     }, [objects, selectedSectorId, currentSectorId, storeObjects, fleets, fleetPositions, economyStations]);
 
+    // Calculate Sector Population Details
+    const popStats = React.useMemo(() => {
+        const targetId = selectedSectorId || currentSectorId;
+        const stations = economyStations.filter(s => s.sectorId === targetId);
+
+        // 1. Residential Population (from Station.population)
+        let residential = 0;
+        stations.forEach(s => {
+            if (s.population) residential += s.population;
+            // Fallback for older saves or stations without pop data
+            else if (s.recipeId?.includes('planetary_hub')) residential += 15000000;
+            else if (s.recipeId?.includes('orbital_habitat')) residential += 5000;
+        });
+
+        // 2. Transient Population (Passengers at stations waiting)
+        let transient = 0;
+        stations.forEach(s => {
+            if (s.inventory?.passengers) transient += s.inventory.passengers;
+        });
+
+        // 3. In-Transit Population (Passengers on ships in sector)
+        let inTransit = 0;
+        // Filter fleets in this sector
+        const sectorFleets = fleets.filter(f => f.currentSectorId === targetId);
+        sectorFleets.forEach(f => {
+            if (f.cargo?.passengers) inTransit += f.cargo.passengers;
+        });
+
+        return { residential, transient, inTransit, total: residential + transient + inTransit };
+    }, [economyStations, fleets, selectedSectorId, currentSectorId]);
+
+    const formatPop = (n: number) => {
+        if (n >= 1000000000) return (n / 1000000000).toFixed(2) + 'B';
+        if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+        if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+        return n.toString();
+    };
+
+    const [showPopCard, setShowPopCard] = useState(false);
+
     const mapRef = useRef<SVGSVGElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -638,9 +678,50 @@ export const SectorMap2D: React.FC<SectorMapProps> = ({ objects, playerPosition 
                     <span style={{ color: '#ff9944', fontSize: 14, fontWeight: 'bold' }}>
                         {(() => { const s = UNIVERSE_SECTORS_XBTF.find((x) => x.id === (selectedSectorId || currentSectorId || 'seizewell')); return s ? s.name : (selectedSectorId || currentSectorId || 'seizewell'); })()}
                     </span>
-                    <span style={{ color: '#6090a0', fontSize: 10 }}>
-                        &lt;&lt; Select a position &gt;&gt;
-                    </span>
+                    <div
+                        onMouseEnter={() => setShowPopCard(true)}
+                        onMouseLeave={() => setShowPopCard(false)}
+                        style={{ cursor: 'help', position: 'relative' }}
+                    >
+                        <span style={{ color: '#6090a0', fontSize: 10 }}>
+                            POP: {formatPop(popStats.total)}
+                        </span>
+
+                        {/* Detailed Population Card */}
+                        {showPopCard && (
+                            <div style={{
+                                position: 'absolute',
+                                top: '100%',
+                                right: 0,
+                                marginTop: 10,
+                                width: 220,
+                                background: 'rgba(10, 20, 30, 0.98)',
+                                border: '1px solid #4a8ab0',
+                                padding: 12,
+                                zIndex: 2000,
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                                pointerEvents: 'none' // Don't interfere with mouse leave
+                            }}>
+                                <div style={{ color: '#6ad0ff', fontSize: 12, borderBottom: '1px solid #2a5070', paddingBottom: 4, marginBottom: 8, textTransform: 'uppercase' }}>
+                                    Demographics
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 6, fontSize: 11 }}>
+                                    <span style={{ color: '#88a0b0' }}>Residential:</span>
+                                    <span style={{ color: '#ffffff' }}>{formatPop(popStats.residential)}</span>
+
+                                    <span style={{ color: '#88a0b0' }}>Transient:</span>
+                                    <span style={{ color: '#ffffaa' }}>{formatPop(popStats.transient)}</span>
+
+                                    <span style={{ color: '#88a0b0' }}>In-Transit:</span>
+                                    <span style={{ color: '#aaffaa' }}>{formatPop(popStats.inTransit)}</span>
+                                </div>
+                                <div style={{ marginTop: 8, borderTop: '1px solid #2a5070', paddingTop: 6, display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 'bold' }}>
+                                    <span style={{ color: '#c0d0e0' }}>TOTAL:</span>
+                                    <span style={{ color: '#ffffff' }}>{formatPop(popStats.total)}</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* Tabs */}

@@ -29,6 +29,7 @@ export interface Station {
   reorderLevel: Record<string, number>;
   reserveLevel: Record<string, number>;
   productionProgress?: number;
+  population?: number;
 }
 
 export interface GameState {

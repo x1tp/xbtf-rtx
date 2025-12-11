@@ -13,7 +13,8 @@ type Recipe = { id: string; productId: string; inputs: { wareId: string; amount:
 type Station = {
   id: string; name: string; recipeId: string; sectorId: string;
   inventory: Record<string, number>; reorderLevel: Record<string, number>; reserveLevel: Record<string, number>;
-  productionProgress?: number; position?: [number, number, number]; modelPath?: string; ownerId?: string
+  productionProgress?: number; position?: [number, number, number]; modelPath?: string; ownerId?: string;
+  population?: number;
 }
 
 type PendingConstruction = {
@@ -75,13 +76,17 @@ const STATION_BLUEPRINTS: Record<string, { id: string; name: string; cost: numbe
   'trading_station': { id: 'trading_station', name: 'Trading Station', cost: 1200000, modelPath: '/models/00001.obj' },
   'shipyard': { id: 'shipyard', name: 'Shipyard', cost: 5000000, modelPath: '/models/00444.obj' },
   'pirate_station': { id: 'pirate_station', name: 'Pirate Station', cost: 1800000, modelPath: '/models/00397.obj' },
-  'xenon_power': { id: 'xenon_power', name: 'Xenon Power Plant', cost: 900000, modelPath: '/models/00323.obj' }
+  'xenon_power': { id: 'xenon_power', name: 'Xenon Power Plant', cost: 900000, modelPath: '/models/00323.obj' },
+  'planetary_trading_post': { id: 'planetary_hub', name: 'Planetary Trading Post', cost: 2000000, modelPath: '/models/00001.obj' }, // Use Trading Station model
+  'orbital_habitat': { id: 'orbital_habitat', name: 'Orbital Habitat', cost: 1500000, modelPath: '/models/00001.obj' } // Use Trading Station model for now as well
 }
 
 // Ship Catalog for purchasing
 const SHIP_CATALOG = {
   vulture: { id: 'vulture', name: 'Vulture', cost: 85000, capacity: 2800, speed: 1.0, modelPath: '/models/00007.obj' },
   albatross: { id: 'albatross', name: 'Albatross', cost: 450000, capacity: 8000, speed: 0.7, modelPath: '/models/00187.obj' },
+  express: { id: 'express', name: 'Express', cost: 60000, capacity: 1500, speed: 1.6, modelPath: '/models/00007.obj' }, // Placeholder model
+  toucan: { id: 'toucan', name: 'Toucan', cost: 55000, capacity: 1600, speed: 1.5, modelPath: '/models/00007.obj' }, // Placeholder model
 }
 
 // Dynamic Economy Settings
@@ -462,75 +467,148 @@ function createUniverse() {
       { id: 'chelt_meat', name: 'Chelt Meat', category: 'food', basePrice: 104, volume: 1 },
       { id: 'nostrop_oil', name: 'Nostrop Oil', category: 'food', basePrice: 72, volume: 1 }, // Teladi secondary food?
       { id: 'swamp_plant', name: 'Swamp Plant', category: 'food', basePrice: 154, volume: 1 }, // Space weed ingredient usually
+      // Shields
+      { id: '1mw_shield', name: '1MW Shield', category: 'end', basePrice: 3000, volume: 2 },
+      { id: '5mw_shield', name: '5MW Shield', category: 'end', basePrice: 15000, volume: 4 },
+      { id: '25mw_shield', name: '25MW Shield', category: 'end', basePrice: 85000, volume: 10 },
+      { id: '125mw_shield', name: '125MW Shield', category: 'end', basePrice: 250000, volume: 10 },
+      // Missiles
+      { id: 'mosquito_missile', name: 'Mosquito Missile', category: 'end', basePrice: 150, volume: 1 },
+      { id: 'wasp_missile', name: 'Wasp Missile', category: 'end', basePrice: 1000, volume: 1 },
+      { id: 'dragonfly_missile', name: 'Dragonfly Missile', category: 'end', basePrice: 2000, volume: 1 },
+      { id: 'silkworm_missile', name: 'Silkworm Missile', category: 'end', basePrice: 4000, volume: 2 },
+      { id: 'hornet_missile', name: 'Hornet Missile', category: 'end', basePrice: 10000, volume: 3 },
+      { id: 'passengers', name: 'Passengers', category: 'end', basePrice: 80, volume: 1 },
     ]
     // Recipes for Teladi stations
     const recipes: Recipe[] = [
-      // Solar Power Plants - produce energy from crystals
-      { id: 'spp_teladi', productId: 'energy_cells', inputs: [{ wareId: 'crystals', amount: 1 }], cycleTimeSec: 60, batchSize: 120, productStorageCap: 6000 },
-      // Sun Oil Refinery - produces oil from flowers + energy
-      { id: 'sun_oil_refinery', productId: 'sun_oil', inputs: [{ wareId: 'sunrise_flowers', amount: 4 }, { wareId: 'energy_cells', amount: 8 }], cycleTimeSec: 90, batchSize: 6, productStorageCap: 2000 },
-      // Flower Farm - produces sunrise flowers from energy
-      { id: 'flower_farm', productId: 'sunrise_flowers', inputs: [{ wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 80, batchSize: 20, productStorageCap: 4000 },
-      // Teladianium Foundry - produces teladianium from ore + energy
-      { id: 'teladianium_foundry', productId: 'teladianium', inputs: [{ wareId: 'ore', amount: 6 }, { wareId: 'energy_cells', amount: 20 }], cycleTimeSec: 120, batchSize: 8, productStorageCap: 2000 },
-      // Ore Mine - produces ore from energy
-      { id: 'ore_mine', productId: 'ore', inputs: [{ wareId: 'energy_cells', amount: 20 }], cycleTimeSec: 90, batchSize: 8, productStorageCap: 1200 },
-      // Crystal Fab - produces crystals from silicon + food + energy
-      { id: 'crystal_fab', productId: 'crystals', inputs: [{ wareId: 'silicon_wafers', amount: 4 }, { wareId: 'sun_oil', amount: 8 }, { wareId: 'energy_cells', amount: 80 }], cycleTimeSec: 120, batchSize: 4, productStorageCap: 1000 },
-      // Silicon Mine - produces silicon from energy
-      { id: 'silicon_mine', productId: 'silicon_wafers', inputs: [{ wareId: 'energy_cells', amount: 24 }], cycleTimeSec: 90, batchSize: 1, productStorageCap: 200 },
-      // Bliss Place - produces space weed from energy + flowers
-      { id: 'bliss_place', productId: 'space_weed', inputs: [{ wareId: 'sunrise_flowers', amount: 8 }, { wareId: 'energy_cells', amount: 15 }], cycleTimeSec: 150, batchSize: 10, productStorageCap: 1500 },
-      // Dream Farm - produces space fuel from weed + energy
-      { id: 'dream_farm', productId: 'space_fuel', inputs: [{ wareId: 'space_weed', amount: 4 }, { wareId: 'energy_cells', amount: 12 }], cycleTimeSec: 100, batchSize: 8, productStorageCap: 2000 },
-      // IRE Laser Forge - produces lasers from teladianium + energy
-      { id: 'ire_forge', productId: 'ire_laser', inputs: [{ wareId: 'teladianium', amount: 2 }, { wareId: 'energy_cells', amount: 40 }], cycleTimeSec: 180, batchSize: 1, productStorageCap: 50 },
-      // HEPT Laser Forge
-      { id: 'hept_forge', productId: 'hept_laser', inputs: [{ wareId: 'teladianium', amount: 6 }, { wareId: 'energy_cells', amount: 120 }], cycleTimeSec: 200, batchSize: 1, productStorageCap: 20 },
-      // PAC Laser Forge
-      { id: 'pac_forge', productId: 'pac_laser', inputs: [{ wareId: 'ore', amount: 6 }, { wareId: 'energy_cells', amount: 80 }], cycleTimeSec: 180, batchSize: 1, productStorageCap: 20 },
-      // Plankton Farm (Boron)
-      { id: 'plankton_farm', productId: 'plankton', inputs: [{ wareId: 'energy_cells', amount: 8 }], cycleTimeSec: 80, batchSize: 40, productStorageCap: 800 },
-      // BoGas Plant (Boron)
-      { id: 'bogas_plant', productId: 'bogas', inputs: [{ wareId: 'plankton', amount: 20 }, { wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 90, batchSize: 30, productStorageCap: 600 },
-      // BoFu Lab (Boron)
-      { id: 'bofu_lab', productId: 'bofu', inputs: [{ wareId: 'bogas', amount: 20 }, { wareId: 'energy_cells', amount: 12 }], cycleTimeSec: 100, batchSize: 30, productStorageCap: 600 },
-      // Argon Farm (wheat)
-      { id: 'argon_farm', productId: 'wheat', inputs: [{ wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 80, batchSize: 30, productStorageCap: 800 },
-      // Cahoona Bakery
-      { id: 'cahoona_bakery', productId: 'cahoonas', inputs: [{ wareId: 'wheat', amount: 20 }, { wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 90, batchSize: 30, productStorageCap: 600 },
-      // Scruffin Farm (Split)
-      { id: 'scruffin_farm', productId: 'scruffin_fruit', inputs: [{ wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 80, batchSize: 30, productStorageCap: 800 },
-      // Rastar Refinery (Split)
-      { id: 'rastar_refinery', productId: 'rastar_oil', inputs: [{ wareId: 'scruffin_fruit', amount: 20 }, { wareId: 'energy_cells', amount: 15 }], cycleTimeSec: 100, batchSize: 30, productStorageCap: 600 },
-      // Quantum Tube Fab
-      { id: 'quantum_tube_fab', productId: 'quantum_tubes', inputs: [{ wareId: 'silicon_wafers', amount: 4 }, { wareId: 'teladianium', amount: 2 }, { wareId: 'energy_cells', amount: 40 }], cycleTimeSec: 140, batchSize: 4, productStorageCap: 400 },
-      // Chip Plant
-      { id: 'chip_plant', productId: 'microchips', inputs: [{ wareId: 'silicon_wafers', amount: 4 }, { wareId: 'quantum_tubes', amount: 1 }, { wareId: 'energy_cells', amount: 30 }], cycleTimeSec: 160, batchSize: 2, productStorageCap: 200 },
+      // --- SOLAR POWER PLANTS (Race Specific Crystal Usage?) ---
+      // In XBTF, everything used Crystals. But to fix chains, maybe we vary?
+      // Actually XBTF standard: SPP needs Crystals. Crystals need Silicon + Food.
+      { id: 'spp_teladi', productId: 'energy_cells', inputs: [{ wareId: 'crystals', amount: 1 }], cycleTimeSec: 60, batchSize: 130, productStorageCap: 6000 }, // Teladi prefer efficiency
+      { id: 'spp_argon', productId: 'energy_cells', inputs: [{ wareId: 'crystals', amount: 1 }], cycleTimeSec: 60, batchSize: 120, productStorageCap: 6000 },
+      { id: 'spp_boron', productId: 'energy_cells', inputs: [{ wareId: 'crystals', amount: 1 }], cycleTimeSec: 60, batchSize: 120, productStorageCap: 6000 },
+      { id: 'spp_split', productId: 'energy_cells', inputs: [{ wareId: 'crystals', amount: 1 }], cycleTimeSec: 60, batchSize: 110, productStorageCap: 6000 }, // Split fast but wasteful?
+      { id: 'spp_paranid', productId: 'energy_cells', inputs: [{ wareId: 'crystals', amount: 1 }], cycleTimeSec: 60, batchSize: 120, productStorageCap: 6000 },
+      { id: 'spp_xenon', productId: 'energy_cells', inputs: [{ wareId: 'crystals', amount: 0 }], cycleTimeSec: 10, batchSize: 50, productStorageCap: 10000 }, // Xenon magic (no inputs for now to keep them threatening)
+
+      // --- FOOD TIER 1 (Basic) ---
+      // Argon
+      { id: 'argon_cattle_ranch', productId: 'wheat', inputs: [{ wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 60, batchSize: 30, productStorageCap: 1500 }, // Actually Argnu Beef in X3, Wheat in XBTF/X2 sometimes conflated. Sticking to 'wheat' as 'basic food' for now or 'Argnu Beef'? The list has 'Wheat'. Let's rename to Cattle Ranch but produce Wheat (proxy for beef) or just Argon Farm -> Wheat.
+      { id: 'argon_farm', productId: 'wheat', inputs: [{ wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 60, batchSize: 30, productStorageCap: 1500 },
+      // Boron
+      { id: 'plankton_farm', productId: 'plankton', inputs: [{ wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 60, batchSize: 30, productStorageCap: 1500 },
+      // Teladi
+      { id: 'flower_farm', productId: 'sunrise_flowers', inputs: [{ wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 60, batchSize: 30, productStorageCap: 1500 },
+      // Split
+      { id: 'scruffin_farm', productId: 'scruffin_fruit', inputs: [{ wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 60, batchSize: 30, productStorageCap: 1500 },
+      { id: 'chelt_aquarium', productId: 'chelt_meat', inputs: [{ wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 60, batchSize: 30, productStorageCap: 1500 },
+      // Paranid
+      { id: 'soyfarm', productId: 'soya_beans', inputs: [{ wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 60, batchSize: 30, productStorageCap: 1500 },
+      { id: 'snail_ranch', productId: 'maja_snails', inputs: [{ wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 60, batchSize: 30, productStorageCap: 1500 },
+
+      // --- FOOD TIER 2 (Refined / Intermediate) ---
+      // Argon: Wheat -> Cahoonas
+      { id: 'cahoona_bakery', productId: 'cahoonas', inputs: [{ wareId: 'wheat', amount: 10 }, { wareId: 'energy_cells', amount: 15 }], cycleTimeSec: 90, batchSize: 20, productStorageCap: 1000 },
+      // Boron: Plankton -> Stott Spices? No, Plankton -> BoGas -> BoFu?
+      // Check XBTF:
+      // Boron Chain: Plankton (T1) -> Stott Mixery (T2 Stott)
+      //              BoGas (T1 Resource?) -> BoFu (T2 Food)
+      // Actually BoGas is Tier 1 gas in X3. In XBTF: "BoGas Factory" makes BoGas from Energy. "BoFu Chemical Lab" makes BoFu from BoGas.
+      { id: 'bogas_plant', productId: 'bogas', inputs: [{ wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 60, batchSize: 20, productStorageCap: 1000 },
+      { id: 'bofu_lab', productId: 'bofu', inputs: [{ wareId: 'bogas', amount: 10 }, { wareId: 'energy_cells', amount: 15 }], cycleTimeSec: 90, batchSize: 20, productStorageCap: 1000 },
+      { id: 'stott_mixery', productId: 'stott_spices', inputs: [{ wareId: 'plankton', amount: 10 }, { wareId: 'energy_cells', amount: 15 }], cycleTimeSec: 90, batchSize: 20, productStorageCap: 1000 },
+
+      // Teladi: Flowers -> Sun Oil
+      { id: 'sun_oil_refinery', productId: 'sun_oil', inputs: [{ wareId: 'sunrise_flowers', amount: 10 }, { wareId: 'energy_cells', amount: 15 }], cycleTimeSec: 90, batchSize: 20, productStorageCap: 1000 },
+
+      // Split: Scruffin -> Massom Powder | Chelt -> Rastar Oil
+      { id: 'massom_mill', productId: 'massom_powder', inputs: [{ wareId: 'scruffin_fruit', amount: 10 }, { wareId: 'energy_cells', amount: 15 }], cycleTimeSec: 90, batchSize: 20, productStorageCap: 1000 },
+      { id: 'rastar_refinery', productId: 'rastar_oil', inputs: [{ wareId: 'chelt_meat', amount: 10 }, { wareId: 'energy_cells', amount: 15 }], cycleTimeSec: 90, batchSize: 20, productStorageCap: 1000 }, // FIXED: Uses Chelt Meat now
+
+      // Paranid: Soya Beans -> Soya Husk | Snails -> Majaglit
+      { id: 'soyery', productId: 'soya_husk', inputs: [{ wareId: 'soya_beans', amount: 10 }, { wareId: 'energy_cells', amount: 15 }], cycleTimeSec: 90, batchSize: 20, productStorageCap: 1000 },
+      { id: 'majaglit_factory', productId: 'majaglit', inputs: [{ wareId: 'maja_snails', amount: 10 }, { wareId: 'energy_cells', amount: 15 }], cycleTimeSec: 90, batchSize: 20, productStorageCap: 1000 },
+
+      // --- TECH TIER (Crystals & Materials) ---
+      // Race Specific Crystal Fabs!
+      { id: 'crystal_fab_teladi', productId: 'crystals', inputs: [{ wareId: 'silicon_wafers', amount: 5 }, { wareId: 'sun_oil', amount: 10 }, { wareId: 'energy_cells', amount: 60 }], cycleTimeSec: 240, batchSize: 8, productStorageCap: 160 },
+      { id: 'crystal_fab_argon', productId: 'crystals', inputs: [{ wareId: 'silicon_wafers', amount: 5 }, { wareId: 'cahoonas', amount: 10 }, { wareId: 'energy_cells', amount: 60 }], cycleTimeSec: 240, batchSize: 8, productStorageCap: 160 },
+      { id: 'crystal_fab_boron', productId: 'crystals', inputs: [{ wareId: 'silicon_wafers', amount: 5 }, { wareId: 'bofu', amount: 10 }, { wareId: 'energy_cells', amount: 60 }], cycleTimeSec: 240, batchSize: 8, productStorageCap: 160 },
+      { id: 'crystal_fab_split', productId: 'crystals', inputs: [{ wareId: 'silicon_wafers', amount: 5 }, { wareId: 'rastar_oil', amount: 10 }, { wareId: 'energy_cells', amount: 60 }], cycleTimeSec: 240, batchSize: 8, productStorageCap: 160 },
+      { id: 'crystal_fab_paranid', productId: 'crystals', inputs: [{ wareId: 'silicon_wafers', amount: 5 }, { wareId: 'soya_husk', amount: 10 }, { wareId: 'energy_cells', amount: 60 }], cycleTimeSec: 240, batchSize: 8, productStorageCap: 160 },
+
+      // Mines (Generic)
+      { id: 'ore_mine', productId: 'ore', inputs: [{ wareId: 'energy_cells', amount: 6 }], cycleTimeSec: 60, batchSize: 4, productStorageCap: 800 },
+      { id: 'silicon_mine', productId: 'silicon_wafers', inputs: [{ wareId: 'energy_cells', amount: 12 }], cycleTimeSec: 80, batchSize: 2, productStorageCap: 200 },
+
+      // Teladianium (Teladi Specific material, generally uses energy/ore)
+      { id: 'teladianium_foundry', productId: 'teladianium', inputs: [{ wareId: 'ore', amount: 4 }, { wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 90, batchSize: 5, productStorageCap: 500 },
+
+      // Quantum Tubes (Need Food + Silicon + Ore/Teladianium)
+      // Argon Q-Tube
+      { id: 'quantum_tube_argon', productId: 'quantum_tubes', inputs: [{ wareId: 'silicon_wafers', amount: 2 }, { wareId: 'ore', amount: 4 }, { wareId: 'cahoonas', amount: 10 }, { wareId: 'energy_cells', amount: 30 }], cycleTimeSec: 150, batchSize: 2, productStorageCap: 200 },
+      // Teladi Q-Tube (Uses Sun Oil? Or just Energy if low tech? Let's use food for consistency)
+      { id: 'quantum_tube_teladi', productId: 'quantum_tubes', inputs: [{ wareId: 'silicon_wafers', amount: 2 }, { wareId: 'teladianium', amount: 2 }, { wareId: 'sun_oil', amount: 10 }, { wareId: 'energy_cells', amount: 30 }], cycleTimeSec: 150, batchSize: 2, productStorageCap: 200 },
+      // Paranid Q-Tube
+      { id: 'quantum_tube_paranid', productId: 'quantum_tubes', inputs: [{ wareId: 'silicon_wafers', amount: 2 }, { wareId: 'ore', amount: 4 }, { wareId: 'soya_husk', amount: 10 }, { wareId: 'energy_cells', amount: 30 }], cycleTimeSec: 150, batchSize: 2, productStorageCap: 200 },
+
+      // Microchips (High Tech)
+      { id: 'chip_plant_argon', productId: 'microchips', inputs: [{ wareId: 'silicon_wafers', amount: 4 }, { wareId: 'cahoonas', amount: 10 }, { wareId: 'energy_cells', amount: 40 }], cycleTimeSec: 180, batchSize: 2, productStorageCap: 100 },
+      { id: 'chip_plant_boron', productId: 'microchips', inputs: [{ wareId: 'silicon_wafers', amount: 4 }, { wareId: 'bofu', amount: 10 }, { wareId: 'energy_cells', amount: 40 }], cycleTimeSec: 180, batchSize: 2, productStorageCap: 100 },
+      { id: 'chip_plant_split', productId: 'microchips', inputs: [{ wareId: 'silicon_wafers', amount: 4 }, { wareId: 'rastar_oil', amount: 10 }, { wareId: 'energy_cells', amount: 40 }], cycleTimeSec: 180, batchSize: 2, productStorageCap: 100 },
+
       // Computer Plant
-      { id: 'computer_plant', productId: 'computer_components', inputs: [{ wareId: 'microchips', amount: 2 }, { wareId: 'silicon_wafers', amount: 2 }, { wareId: 'energy_cells', amount: 30 }], cycleTimeSec: 150, batchSize: 4, productStorageCap: 400 },
+      { id: 'computer_plant', productId: 'computer_components', inputs: [{ wareId: 'microchips', amount: 2 }, { wareId: 'energy_cells', amount: 20 }], cycleTimeSec: 200, batchSize: 5, productStorageCap: 200 }, // Generic for now
 
-      // Boron Additional
-      { id: 'stott_mixery', productId: 'stott_spices', inputs: [{ wareId: 'plankton', amount: 10 }, { wareId: 'energy_cells', amount: 12 }], cycleTimeSec: 100, batchSize: 20, productStorageCap: 1000 },
+      // --- WEAPONS & SHIELDS ---
+      // Missiles (Swarms)
+      { id: 'missile_factory_mosquito', productId: 'mosquito_missile', inputs: [{ wareId: 'ore', amount: 2 }, { wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 120, batchSize: 10, productStorageCap: 200 },
+      { id: 'missile_factory_wasp', productId: 'wasp_missile', inputs: [{ wareId: 'ore', amount: 4 }, { wareId: 'energy_cells', amount: 20 }], cycleTimeSec: 180, batchSize: 5, productStorageCap: 100 },
+      { id: 'missile_factory_hornet', productId: 'hornet_missile', inputs: [{ wareId: 'ore', amount: 20 }, { wareId: 'silicon_wafers', amount: 5 }, { wareId: 'energy_cells', amount: 100 }], cycleTimeSec: 600, batchSize: 1, productStorageCap: 20 },
 
-      // Split Additional
-      { id: 'chelt_aquarium', productId: 'chelt_meat', inputs: [{ wareId: 'energy_cells', amount: 8 }], cycleTimeSec: 90, batchSize: 10, productStorageCap: 800 },
-      // Rastar Refinery consumes Chelt Meat usually, but for now we mapped it to Scruffin Fruit in old config.
-      // Let's fix Rastar Refinery to use Chelt Meat if we want accuracy, but strict adherence to old code might break simulation if fleets expect scruffin.
-      // But user asked for accuracy. Let's add Massom Mill.
-      { id: 'massom_mill', productId: 'massom_powder', inputs: [{ wareId: 'scruffin_fruit', amount: 10 }, { wareId: 'energy_cells', amount: 12 }], cycleTimeSec: 90, batchSize: 20, productStorageCap: 1000 },
+      // Shields
+      { id: 'shield_prod_1mw', productId: '1mw_shield', inputs: [{ wareId: 'quantum_tubes', amount: 1 }, { wareId: 'energy_cells', amount: 30 }], cycleTimeSec: 200, batchSize: 5, productStorageCap: 50 },
+      { id: 'shield_prod_25mw', productId: '25mw_shield', inputs: [{ wareId: 'quantum_tubes', amount: 5 }, { wareId: 'microchips', amount: 2 }, { wareId: 'energy_cells', amount: 100 }], cycleTimeSec: 600, batchSize: 1, productStorageCap: 20 },
 
-      // Paranid Additional
-      { id: 'snail_ranch', productId: 'maja_snails', inputs: [{ wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 100, batchSize: 10, productStorageCap: 800 },
-      { id: 'soyfarm', productId: 'soya_beans', inputs: [{ wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 80, batchSize: 40, productStorageCap: 2000 },
-      { id: 'soyery', productId: 'soya_husk', inputs: [{ wareId: 'soya_beans', amount: 10 }, { wareId: 'energy_cells', amount: 12 }], cycleTimeSec: 90, batchSize: 15, productStorageCap: 1000 },
-      { id: 'majaglit_factory', productId: 'majaglit', inputs: [{ wareId: 'maja_snails', amount: 10 }, { wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 100, batchSize: 10, productStorageCap: 500 },
-      { id: 'shield_plant', productId: 'hept_laser', inputs: [{ wareId: 'quantum_tubes', amount: 5 }, { wareId: 'energy_cells', amount: 50 }], cycleTimeSec: 300, batchSize: 1, productStorageCap: 20 }, // Placeholder for generic shield
+      // Lasers (Split by race food)
+      // IRE (Puny)
+      { id: 'ire_forge_argon', productId: 'ire_laser', inputs: [{ wareId: 'ore', amount: 5 }, { wareId: 'cahoonas', amount: 10 }, { wareId: 'energy_cells', amount: 50 }], cycleTimeSec: 300, batchSize: 1, productStorageCap: 20 },
+      { id: 'ire_forge_teladi', productId: 'ire_laser', inputs: [{ wareId: 'teladianium', amount: 5 }, { wareId: 'sun_oil', amount: 10 }, { wareId: 'energy_cells', amount: 50 }], cycleTimeSec: 300, batchSize: 1, productStorageCap: 20 },
 
-      // Logistics hubs (trading station / equipment dock)
+      // PAC
+      { id: 'pac_forge_boron', productId: 'pac_laser', inputs: [{ wareId: 'ore', amount: 10 }, { wareId: 'bofu', amount: 20 }, { wareId: 'energy_cells', amount: 100 }], cycleTimeSec: 400, batchSize: 1, productStorageCap: 10 },
+
+      // HEPT (Heavy)
+      { id: 'hept_forge_split', productId: 'hept_laser', inputs: [{ wareId: 'ore', amount: 20 }, { wareId: 'rastar_oil', amount: 30 }, { wareId: 'energy_cells', amount: 200 }], cycleTimeSec: 600, batchSize: 1, productStorageCap: 5 },
+      { id: 'hept_forge_paranid', productId: 'hept_laser', inputs: [{ wareId: 'ore', amount: 20 }, { wareId: 'soya_husk', amount: 30 }, { wareId: 'energy_cells', amount: 200 }], cycleTimeSec: 600, batchSize: 1, productStorageCap: 5 },
+
+      // Pirate
+      { id: 'bliss_place', productId: 'space_weed', inputs: [{ wareId: 'swamp_plant', amount: 10 }, { wareId: 'energy_cells', amount: 20 }], cycleTimeSec: 200, batchSize: 5, productStorageCap: 500 }, // Needs Swamp Plant now
+      { id: 'dream_farm', productId: 'swamp_plant', inputs: [{ wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 100, batchSize: 20, productStorageCap: 1000 }, // Renamed from space fuel producer to swamp plant farm?
+      // Wait, Dream Farm usually produces Swamp Plant (Teladi/Pirate) in X. Bliss Place turns Swamp Plant into Spaceweed.
+      // Space Fuel Distillery (Argon) turns Wheat into Space Fuel.
+      { id: 'space_fuel_distillery', productId: 'space_fuel', inputs: [{ wareId: 'wheat', amount: 20 }, { wareId: 'energy_cells', amount: 20 }], cycleTimeSec: 200, batchSize: 5, productStorageCap: 500 },
+
+      // Logistics
       { id: 'logistics_hub', productId: 'trade_goods', inputs: [], cycleTimeSec: 120, batchSize: 5, productStorageCap: 500 },
-      // Shipyard (produces ship parts to justify inputs)
       { id: 'shipyard', productId: 'ship_parts', inputs: [{ wareId: 'teladianium', amount: 20 }, { wareId: 'ore', amount: 20 }, { wareId: 'energy_cells', amount: 100 }], cycleTimeSec: 240, batchSize: 10, productStorageCap: 500 },
+
+      // --- POPULATION / HABITATION ---
+      // Planetary Hubs (Source of Passengers) - Race specific food inputs
+      { id: 'planetary_hub_argon', productId: 'passengers', inputs: [{ wareId: 'cahoonas', amount: 20 }, { wareId: 'energy_cells', amount: 40 }], cycleTimeSec: 300, batchSize: 50, productStorageCap: 2000 },
+      { id: 'planetary_hub_boron', productId: 'passengers', inputs: [{ wareId: 'bofu', amount: 20 }, { wareId: 'energy_cells', amount: 40 }], cycleTimeSec: 300, batchSize: 50, productStorageCap: 2000 },
+      { id: 'planetary_hub_teladi', productId: 'passengers', inputs: [{ wareId: 'sun_oil', amount: 20 }, { wareId: 'energy_cells', amount: 40 }], cycleTimeSec: 300, batchSize: 50, productStorageCap: 2000 },
+      { id: 'planetary_hub_paranid', productId: 'passengers', inputs: [{ wareId: 'soya_husk', amount: 20 }, { wareId: 'energy_cells', amount: 40 }], cycleTimeSec: 300, batchSize: 50, productStorageCap: 2000 },
+      { id: 'planetary_hub_split', productId: 'passengers', inputs: [{ wareId: 'rastar_oil', amount: 20 }, { wareId: 'energy_cells', amount: 40 }], cycleTimeSec: 300, batchSize: 50, productStorageCap: 2000 },
+
+      // Orbital Habitats (Sink for Passengers & Food)
+      // They produce 'trade_goods' slowly as a proxy for "Economic Output / Labor"
+      { id: 'orbital_habitat_argon', productId: 'trade_goods', inputs: [{ wareId: 'passengers', amount: 10 }, { wareId: 'cahoonas', amount: 20 }, { wareId: 'energy_cells', amount: 20 }], cycleTimeSec: 600, batchSize: 5, productStorageCap: 100 },
+      { id: 'orbital_habitat_teladi', productId: 'trade_goods', inputs: [{ wareId: 'passengers', amount: 10 }, { wareId: 'sun_oil', amount: 20 }, { wareId: 'energy_cells', amount: 20 }], cycleTimeSec: 600, batchSize: 5, productStorageCap: 100 },
+      { id: 'orbital_habitat_boron', productId: 'trade_goods', inputs: [{ wareId: 'passengers', amount: 10 }, { wareId: 'bofu', amount: 20 }, { wareId: 'energy_cells', amount: 20 }], cycleTimeSec: 600, batchSize: 5, productStorageCap: 100 },
+      { id: 'orbital_habitat_paranid', productId: 'trade_goods', inputs: [{ wareId: 'passengers', amount: 10 }, { wareId: 'soya_husk', amount: 20 }, { wareId: 'energy_cells', amount: 20 }], cycleTimeSec: 600, batchSize: 5, productStorageCap: 100 },
+      { id: 'orbital_habitat_split', productId: 'trade_goods', inputs: [{ wareId: 'passengers', amount: 10 }, { wareId: 'rastar_oil', amount: 20 }, { wareId: 'energy_cells', amount: 20 }], cycleTimeSec: 600, batchSize: 5, productStorageCap: 100 },
     ]
     // Load custom stations
     const stations: Station[] = []
@@ -540,40 +618,71 @@ function createUniverse() {
       return s || fallback
     }
 
-    const pickRecipeId = (name: string): string => {
+    const pickRecipeId = (name: string, sectorId: string): string => {
       const n = name.toLowerCase()
-      if (n.includes('solar power')) return 'spp_teladi'
-      if (n.includes('spp')) return 'spp_teladi'
+      // Determine Race from SECTOR
+      let race = 'teladi'
+      if (sectorId.includes('argon') || sectorId.includes('cloudbase') || sectorId.includes('president') || sectorId.includes('home') || sectorId.includes('red') || sectorId.includes('three') || sectorId.includes('power') || sectorId.includes('antigone') || sectorId.includes('herron') || sectorId.includes('hole') || sectorId.includes('wall') || sectorId.includes('ore') || sectorId.includes('light')) race = 'argon'
+      else if (sectorId.includes('kingdom') || sectorId.includes('rolk') || sectorId.includes('que') || sectorId.includes('menelaus') || sectorId.includes('atreus') || sectorId.includes('lucky')) race = 'boron'
+      else if (sectorId.includes('paranid') || sectorId.includes('priest') || sectorId.includes('emp') || sectorId.includes('duke') || sectorId.includes('trinity')) race = 'paranid'
+      else if (sectorId.includes('family') || sectorId.includes('thuruk') || sectorId.includes('chin') || sectorId.includes('cho') || sectorId.includes('rhonkar') || sectorId.includes('ghinn')) race = 'split'
+      else if (sectorId.includes('xenon')) race = 'xenon'
+
+      // Map to Race Specific Recipes
+      if (n.includes('solar power') || n.includes('spp')) return `spp_${race}`
+
+      // Crystal Fabs
+      if (n.includes('crystal')) return `crystal_fab_${race}`
+
+      // High Tech / Weapons
+      if (n.includes('quantum')) return `quantum_tube_${race === 'boron' ? 'boron' : race === 'teladi' ? 'teladi' : 'argon'}` // fallback for now
+      if (n.includes('chip')) return `chip_plant_${race}`
+      if (n.includes('shield')) {
+        if (n.includes('1mw') || n.includes('1 mw')) return 'shield_prod_1mw'
+        if (n.includes('25mw') || n.includes('25 mw')) return 'shield_prod_25mw'
+        return 'shield_prod_25mw' // default
+      }
+
+      // Specific Foods
       if (n.includes('flower')) return 'flower_farm'
-      if (n.includes('dream')) return 'dream_farm'
+      if (n.includes('dream') || n.includes('swamp')) return 'dream_farm'
       if (n.includes('bliss')) return 'bliss_place'
       if (n.includes('sun oil') || n.includes('oil refinery')) return 'sun_oil_refinery'
       if (n.includes('teladianium')) return 'teladianium_foundry'
+
       if (n.includes('ore mine')) return 'ore_mine'
       if (n.includes('silicon')) return 'silicon_mine'
-      if (n.includes('crystal')) return 'crystal_fab'
-      if (n.includes('equipment dock') || n.includes('trading station')) return 'logistics_hub'
-      if (n.includes('shipyard')) return 'shipyard'
-      if (n.includes('cattle ranch') || n.includes('wheat')) return 'argon_farm'
+
+      if (n.includes('cattle') || n.includes('argon farm')) return 'argon_cattle_ranch'
       if (n.includes('cahoona')) return 'cahoona_bakery'
+      if (n.includes('wheat')) return 'argon_farm'
+
       if (n.includes('plankton')) return 'plankton_farm'
       if (n.includes('bogas')) return 'bogas_plant'
       if (n.includes('bofu')) return 'bofu_lab'
-      if (n.includes('scruffin')) return 'scruffin_farm'
-      if (n.includes('rastar')) return 'rastar_refinery'
-      if (n.includes('quantum')) return 'quantum_tube_fab'
-      if (n.includes('chip')) return 'chip_plant'
-      if (n.includes('computer')) return 'computer_plant'
-      if (n.includes('shield')) return 'hept_forge'
-      if (n.includes('ire') || n.includes('laser')) return 'ire_forge'
-      // New mappings
       if (n.includes('stott')) return 'stott_mixery'
-      if (n.includes('soyfarm')) return 'soyfarm'
+
+      if (n.includes('scruffin')) return 'scruffin_farm'
+      if (n.includes('chelt')) return 'chelt_aquarium'
+      if (n.includes('rastar')) return 'rastar_refinery'
+      if (n.includes('massom')) return 'massom_mill'
+
+      if (n.includes('soyfarm') || n.includes('soya')) return 'soyfarm'
       if (n.includes('soyery')) return 'soyery'
       if (n.includes('snail')) return 'snail_ranch'
       if (n.includes('majaglit')) return 'majaglit_factory'
-      if (n.includes('massom')) return 'massom_mill'
-      if (n.includes('chelt')) return 'chelt_aquarium'
+
+      // Lasers
+      if (n.includes('ire') || n.includes('impulse')) return `ire_forge_${race === 'argon' ? 'argon' : 'teladi'}`
+      if (n.includes('pac') || n.includes('particle')) return `pac_forge_${race === 'boron' ? 'boron' : 'boron'}` // Boron known for PACs
+      if (n.includes('hept') || n.includes('plasma')) return `hept_forge_${race === 'split' ? 'split' : 'paranid'}`
+
+      if (n.includes('equipment dock') || n.includes('trading station')) return 'logistics_hub'
+      if (n.includes('shipyard')) return 'shipyard'
+      if (n.includes('missile')) return 'missile_factory_mosquito'
+
+      if (n.includes('planetary') || n.includes('trading post')) return `planetary_hub_${race}`
+      if (n.includes('habitat')) return `orbital_habitat_${race}`
 
       return 'logistics_hub'
     }
@@ -761,7 +870,7 @@ function createUniverse() {
 
         // model path inference?
         let modelPath = st.modelPath
-        const rid = pickRecipeId(st.name)
+        const rid = pickRecipeId(st.name, sector.id)
 
         const station: Station = {
           id,
@@ -798,6 +907,72 @@ function createUniverse() {
           if (corp) corp.stationIds.push(id)
         }
       })
+
+      // 3. Add Population Infrastructure (Planetary Hubs & Habitats)
+      // One Planetary Trading Post per sector (Source)
+      const planetLinkID = `${sector.id}_planetary_hub`
+      if (!existingIds.has(planetLinkID)) {
+        existingIds.add(planetLinkID)
+        const race = pickRecipeId('planetary_hub', sector.id).split('_').pop() || 'teladi'
+
+        const station: Station = {
+          id: planetLinkID,
+          name: `Planetary Trading Post`,
+          recipeId: `planetary_hub_${race}`,
+          sectorId: sector.id,
+          position: [0, -10000, 0], // Deep "planet" location
+          modelPath: '/models/00001.obj', // Trading station model
+          inventory: {},
+          reorderLevel: {},
+          reserveLevel: {},
+          ownerId: undefined, // Independent / Government
+          // Random population: 5M to 100M
+          population: Math.floor(5000000 + Math.random() * 95000000)
+        }
+        // Seed
+        const r = recipes.find(rec => rec.id === station.recipeId)
+        if (r) {
+          r.inputs.forEach(i => { station.inventory[i.wareId] = i.amount * 50; station.reorderLevel[i.wareId] = i.amount * 100 })
+          station.inventory[r.productId] = 0
+          station.reserveLevel[r.productId] = 0 // Sell immediately
+        }
+        stations.push(station)
+      }
+
+      // Random Orbital Habitats (Sink)
+      if (Math.random() < 0.6) { // 60% chance per sector
+        const habId = `${sector.id}_habitat_${genId()}`
+        const race = pickRecipeId('orbital_habitat', sector.id).split('_').pop() || 'teladi'
+        const station: Station = {
+          id: habId,
+          name: `Orbital Habitat ${genId().substring(0, 3).toUpperCase()}`,
+          recipeId: `orbital_habitat_${race}`,
+          sectorId: sector.id,
+          position: randomPos(),
+          modelPath: '/models/00001.obj',
+          inventory: {},
+          reorderLevel: {},
+          reserveLevel: {},
+          ownerId: undefined, // Independent
+          // Random population: 2k to 20k
+          population: Math.floor(2000 + Math.random() * 18000)
+        }
+        // Seed
+        const r = recipes.find(rec => rec.id === station.recipeId)
+        if (r) {
+          r.inputs.forEach(i => { station.inventory[i.wareId] = i.amount * 10; station.reorderLevel[i.wareId] = i.amount * 50 })
+        }
+        stations.push(station)
+
+        // Assign to independent or a corp?
+        const candidates = corporations.filter(c => c.race === race)
+        if (candidates.length > 0 && Math.random() < 0.7) {
+          const c = candidates[Math.floor(Math.random() * candidates.length)]
+          station.ownerId = c.id
+          c.stationIds.push(station.id)
+          station.name = `${c.name.split(' ')[0]} Habitat ${genId().substring(0, 3)}`
+        }
+      }
     }
 
     // Populate sector prices
@@ -1138,14 +1313,36 @@ function createUniverse() {
       if (independentCount < ECONOMY_SETTINGS.MAX_INDEPENDENT_TRADERS && Math.random() < ECONOMY_SETTINGS.TRADER_SPAWN_CHANCE) {
         const spawnSector = pickIndependentStartSector()
 
+        // Randomly pick ship type (mostly Vultures, some TPs)
+        const rand = Math.random()
+        let type = 'Vulture'
+        let model = SHIP_CATALOG.vulture.modelPath
+        let cap = SHIP_CATALOG.vulture.capacity
+        let spd = SHIP_CATALOG.vulture.speed
+
+        if (rand < 0.2) {
+          type = 'Express'
+          model = SHIP_CATALOG.express.modelPath
+          cap = SHIP_CATALOG.express.capacity
+          spd = SHIP_CATALOG.express.speed
+        } else if (rand < 0.4) {
+          type = 'Toucan'
+          model = SHIP_CATALOG.toucan.modelPath
+          cap = SHIP_CATALOG.toucan.capacity
+          spd = SHIP_CATALOG.toucan.speed
+        } else {
+          // Vulture default
+          // Small chance of Albatross for heavy haulers? No, TLs are special.
+        }
+
         const newTrader: NPCFleet = {
           id: `fleet_${genId()}`,
           name: `Independent ${genId().substring(0, 4)}`,
-          shipType: 'Vulture',
-          modelPath: SHIP_CATALOG.vulture.modelPath,
+          shipType: type,
+          modelPath: model,
           race: 'teladi',
-          capacity: SHIP_CATALOG.vulture.capacity,
-          speed: 0.9 + Math.random() * 0.2, // Slight variation
+          capacity: cap,
+          speed: spd * (0.9 + Math.random() * 0.2), // Slight variation
           homeSectorId: spawnSector,
           ownerId: null,
           ownerType: 'independent',
