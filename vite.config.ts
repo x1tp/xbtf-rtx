@@ -2,9 +2,10 @@ import { defineConfig } from 'vite'
 import type { ViteDevServer } from 'vite'
 import type { IncomingMessage, ServerResponse } from 'http'
 import react from '@vitejs/plugin-react'
-import { INITIAL_CORPORATIONS, INITIAL_FLEETS, STATION_OWNERSHIP } from './src/types/simulation'
+import { INITIAL_CORPORATIONS, INITIAL_FLEETS } from './src/types/simulation'
 import { UNIVERSE_SECTORS_XBTF } from './src/config/universe_xbtf'
 import { getSectorLayoutById } from './src/config/sector'
+import { CUSTOM_STATIONS } from './src/config/stations_custom'
 // fs and path are already imported at the top
 
 type Ware = { id: string; name: string; category: 'primary' | 'food' | 'intermediate' | 'end'; basePrice: number; volume: number }
@@ -195,19 +196,102 @@ function createUniverse() {
     IDLE_RETHINK_TIME: 30,
   }
 
-  // Sector adjacency for routing - MUST match universe_xbtf.ts neighbors (using sector IDs)
-  const SECTOR_GRAPH: Record<string, string[]> = {
-    'seizewell': ['teladi_gain', 'greater_profit', 'profit_share'],
-    'teladi_gain': ['ceo_s_buckzoid', 'family_whi', 'seizewell'],
-    'profit_share': ['ceo_s_buckzoid', 'spaceweed_drift', 'seizewell'],
-    'greater_profit': ['seizewell', 'spaceweed_drift', 'blue_profit'],
-    'spaceweed_drift': ['profit_share', 'greater_profit'],
-    'blue_profit': ['greater_profit', 'ceo_s_sprite'],
-    'ceo_s_sprite': ['blue_profit', 'company_pride'],
-    'company_pride': ['ceo_s_sprite', 'thuruks_beard'],
-    'ceo_s_buckzoid': ['menelaus_frontier', 'teladi_gain', 'profit_share'],
-    // Add more sectors as needed
+  // Sector adjacency for routing - derived from universe_xbtf.ts neighbors (using sector IDs)
+  const SECTOR_GRAPH: Record<string, string[]> = (() => {
+    const idByName = new Map(UNIVERSE_SECTORS_XBTF.map(s => [s.name.toLowerCase(), s.id]))
+    const graph: Record<string, string[]> = {}
+    UNIVERSE_SECTORS_XBTF.forEach(sector => {
+      graph[sector.id] = (sector.neighbors || [])
+        .map(n => idByName.get(n.toLowerCase()))
+        .filter((id): id is string => Boolean(id))
+    })
+    return graph
+  })()
+
+  // Legacy station ID mapping (older save/game configs) -> current procedural IDs
+  // This keeps fleets with old homeStationIds working after the station ID cleanup.
+  const LEGACY_STATION_ID_MAP: Record<string, string[]> = {
+    sz_spp_b: ['seizewell_solar_power_plant_b', 'seizewell_solar_power_plant_b_2'],
+    sz_spp_d: ['seizewell_solar_power_plant_delta', 'seizewell_solar_power_plant_delta_2'],
+    ps_spp: ['profit_share_solar_power_plant_m', 'profit_share_solar_power_plant_m_2'],
+    sz_oil: ['seizewell_sun_oil_refinery_beta', 'seizewell_sun_oil_refinery_beta_2'],
+    sz_ire: ['seizewell_beta_i_r_e_laser_forge_alpha', 'seizewell_beta_i_r_e_laser_forge_alpha_2'],
+    gp_dream: ['greater_profit_dream_farm_m', 'greater_profit_dream_farm_m_2'],
   }
+
+  const remapLegacyStations = () => {
+    const stationIdSet = new Set(state.stations.map(s => s.id))
+    const resolveStationId = (id?: string) => {
+      if (!id) return undefined
+      if (stationIdSet.has(id)) return id
+      const mapped = LEGACY_STATION_ID_MAP[id]?.find(c => stationIdSet.has(c))
+      return mapped
+    }
+
+    for (const fleet of state.fleets) {
+      // Fix home station references first
+      if (fleet.homeStationId && !stationIdSet.has(fleet.homeStationId)) {
+        const mapped = resolveStationId(fleet.homeStationId)
+        if (mapped) {
+          console.log(`[Universe] Remapped home station ${fleet.homeStationId} -> ${mapped} for ${fleet.name}`)
+          fleet.homeStationId = mapped
+        } else {
+          console.warn(`[Universe] Home station ${fleet.homeStationId} missing for ${fleet.name}, switching to freelance`)
+          fleet.homeStationId = undefined
+          if (fleet.behavior === 'station-supply' || fleet.behavior === 'station-distribute') {
+            fleet.behavior = 'freelance'
+          }
+        }
+      }
+
+      // Patch any queued commands/orders that pointed at legacy IDs
+      fleet.commandQueue = fleet.commandQueue.map(cmd => {
+        if (cmd.targetStationId) {
+          const mapped = resolveStationId(cmd.targetStationId)
+          if (mapped) cmd.targetStationId = mapped
+        }
+        return cmd
+      })
+
+      if (fleet.currentOrder) {
+        const order = fleet.currentOrder
+        order.buyStationId = resolveStationId(order.buyStationId) || order.buyStationId
+        order.sellStationId = resolveStationId(order.sellStationId) || order.sellStationId
+      }
+    }
+  }
+
+  // Preferred starting hubs per race (used when a fleet lacks an explicit home sector)
+  const RACE_HOME_SECTOR: Record<RaceType, string> = {
+    teladi: 'seizewell',
+    argon: 'argon_prime',
+    boron: 'kingdom_end',
+    split: 'thuruks_pride',
+    paranid: 'paranid_prime',
+    pirate: 'company_pride',
+    xenon: 'xenon_sector_3',
+  }
+
+  // Keep independents distributed across the map instead of dog-piling Seizewell
+  const INDEPENDENT_START_SECTORS = [
+    'seizewell',
+    'profit_share',
+    'teladi_gain',
+    'argon_prime',
+    'home_of_light',
+    'kingdom_end',
+    'family_whi',
+    'paranid_prime',
+    'company_pride',
+  ]
+  let independentStartCursor = Math.floor(Math.random() * INDEPENDENT_START_SECTORS.length)
+  const pickIndependentStartSector = () => {
+    const sector = INDEPENDENT_START_SECTORS[independentStartCursor % INDEPENDENT_START_SECTORS.length]
+    independentStartCursor += 1
+    return sector
+  }
+
+  const getRaceHub = (race?: RaceType) => (race ? RACE_HOME_SECTOR[race] : null) || 'seizewell'
 
   // BFS pathfinding for multi-hop sector navigation
   const findSectorPath = (fromSectorId: string, toSectorId: string): string[] | null => {
@@ -249,6 +333,27 @@ function createUniverse() {
     (Math.random() - 0.5) * 600,   // Y: -300 to +300
     (Math.random() - 0.5) * 8000   // Z: -4000 to +4000
   ]
+
+  // Normalize fleet start positions to their intended home space
+  const rehomeFleet = (fleet: NPCFleet) => {
+    if (fleet.ownerType === 'independent') {
+      const startSector = pickIndependentStartSector()
+      fleet.homeSectorId = startSector
+      fleet.currentSectorId = startSector
+      fleet.destinationSectorId = undefined
+      fleet.commandQueue = []
+      fleet.position = randomPos()
+      return
+    }
+
+    const home = fleet.homeSectorId || getRaceHub(fleet.race)
+    if (!home) return
+    fleet.homeSectorId = home
+    fleet.currentSectorId = home
+    fleet.destinationSectorId = undefined
+    fleet.commandQueue = []
+    fleet.position = randomPos()
+  }
 
   // Helper: Get ware name
   const getWareName = (wareId: string) => state.wares.find(w => w.id === wareId)?.name || wareId
@@ -298,6 +403,7 @@ function createUniverse() {
         state.corporations = loadedState.corporations
         state.fleets = loadedState.fleets
         state.tradeLog = loadedState.tradeLog || []
+        remapLegacyStations()
         console.log(`[Universe] State restored! ${state.stations.length} stations, ${state.fleets.length} fleets.`)
         return
       }
@@ -346,6 +452,16 @@ function createUniverse() {
       { id: 'pac_laser', name: 'PAC Laser', category: 'end', basePrice: 40000, volume: 6 },
       { id: 'ship_parts', name: 'Ship Parts', category: 'end', basePrice: 800, volume: 4 },
       { id: 'trade_goods', name: 'Trade Goods', category: 'end', basePrice: 200, volume: 1 },
+      // Boron / Split / Paranid Wares
+      { id: 'stott_spices', name: 'Stott Spices', category: 'food', basePrice: 72, volume: 1 },
+      { id: 'soya_beans', name: 'Soya Beans', category: 'food', basePrice: 14, volume: 1 },
+      { id: 'soya_husk', name: 'Soya Husk', category: 'food', basePrice: 364, volume: 1 },
+      { id: 'maja_snails', name: 'Maja Snails', category: 'food', basePrice: 80, volume: 1 },
+      { id: 'majaglit', name: 'Majaglit', category: 'end', basePrice: 50, volume: 1 }, // Actually intermediate/end
+      { id: 'massom_powder', name: 'Massom Powder', category: 'food', basePrice: 50, volume: 1 },
+      { id: 'chelt_meat', name: 'Chelt Meat', category: 'food', basePrice: 104, volume: 1 },
+      { id: 'nostrop_oil', name: 'Nostrop Oil', category: 'food', basePrice: 72, volume: 1 }, // Teladi secondary food?
+      { id: 'swamp_plant', name: 'Swamp Plant', category: 'food', basePrice: 154, volume: 1 }, // Space weed ingredient usually
     ]
     // Recipes for Teladi stations
     const recipes: Recipe[] = [
@@ -393,47 +509,37 @@ function createUniverse() {
       { id: 'chip_plant', productId: 'microchips', inputs: [{ wareId: 'silicon_wafers', amount: 4 }, { wareId: 'quantum_tubes', amount: 1 }, { wareId: 'energy_cells', amount: 30 }], cycleTimeSec: 160, batchSize: 2, productStorageCap: 200 },
       // Computer Plant
       { id: 'computer_plant', productId: 'computer_components', inputs: [{ wareId: 'microchips', amount: 2 }, { wareId: 'silicon_wafers', amount: 2 }, { wareId: 'energy_cells', amount: 30 }], cycleTimeSec: 150, batchSize: 4, productStorageCap: 400 },
+
+      // Boron Additional
+      { id: 'stott_mixery', productId: 'stott_spices', inputs: [{ wareId: 'plankton', amount: 10 }, { wareId: 'energy_cells', amount: 12 }], cycleTimeSec: 100, batchSize: 20, productStorageCap: 1000 },
+
+      // Split Additional
+      { id: 'chelt_aquarium', productId: 'chelt_meat', inputs: [{ wareId: 'energy_cells', amount: 8 }], cycleTimeSec: 90, batchSize: 10, productStorageCap: 800 },
+      // Rastar Refinery consumes Chelt Meat usually, but for now we mapped it to Scruffin Fruit in old config.
+      // Let's fix Rastar Refinery to use Chelt Meat if we want accuracy, but strict adherence to old code might break simulation if fleets expect scruffin.
+      // But user asked for accuracy. Let's add Massom Mill.
+      { id: 'massom_mill', productId: 'massom_powder', inputs: [{ wareId: 'scruffin_fruit', amount: 10 }, { wareId: 'energy_cells', amount: 12 }], cycleTimeSec: 90, batchSize: 20, productStorageCap: 1000 },
+
+      // Paranid Additional
+      { id: 'snail_ranch', productId: 'maja_snails', inputs: [{ wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 100, batchSize: 10, productStorageCap: 800 },
+      { id: 'soyfarm', productId: 'soya_beans', inputs: [{ wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 80, batchSize: 40, productStorageCap: 2000 },
+      { id: 'soyery', productId: 'soya_husk', inputs: [{ wareId: 'soya_beans', amount: 10 }, { wareId: 'energy_cells', amount: 12 }], cycleTimeSec: 90, batchSize: 15, productStorageCap: 1000 },
+      { id: 'majaglit_factory', productId: 'majaglit', inputs: [{ wareId: 'maja_snails', amount: 10 }, { wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 100, batchSize: 10, productStorageCap: 500 },
+      { id: 'shield_plant', productId: 'hept_laser', inputs: [{ wareId: 'quantum_tubes', amount: 5 }, { wareId: 'energy_cells', amount: 50 }], cycleTimeSec: 300, batchSize: 1, productStorageCap: 20 }, // Placeholder for generic shield
+
       // Logistics hubs (trading station / equipment dock)
       { id: 'logistics_hub', productId: 'trade_goods', inputs: [], cycleTimeSec: 120, batchSize: 5, productStorageCap: 500 },
       // Shipyard (produces ship parts to justify inputs)
       { id: 'shipyard', productId: 'ship_parts', inputs: [{ wareId: 'teladianium', amount: 20 }, { wareId: 'ore', amount: 20 }, { wareId: 'energy_cells', amount: 100 }], cycleTimeSec: 240, batchSize: 10, productStorageCap: 500 },
     ]
-    // Stations matching the 4 Teladi sectors
-    const stations: Station[] = [
-      // === SEIZEWELL ===
-      { id: 'sz_spp_b', name: 'Solar Power Plant (b)', recipeId: 'spp_teladi', sectorId: 'seizewell', inventory: { energy_cells: 500, crystals: 20 }, reorderLevel: { crystals: 40 }, reserveLevel: { energy_cells: 150 } },
-      { id: 'sz_spp_d', name: 'Solar Power Plant (delta)', recipeId: 'spp_teladi', sectorId: 'seizewell', inventory: { energy_cells: 400, crystals: 15 }, reorderLevel: { crystals: 35 }, reserveLevel: { energy_cells: 150 } },
-      { id: 'sz_oil', name: 'Sun Oil Refinery (beta)', recipeId: 'sun_oil_refinery', sectorId: 'seizewell', inventory: { sun_oil: 50, sunrise_flowers: 40, energy_cells: 100 }, reorderLevel: { sunrise_flowers: 120, energy_cells: 150 }, reserveLevel: { sun_oil: 20 } },
-      { id: 'sz_flower_b', name: 'Flower Farm (beta)', recipeId: 'flower_farm', sectorId: 'seizewell', inventory: { sunrise_flowers: 100, energy_cells: 80 }, reorderLevel: { energy_cells: 140 }, reserveLevel: { sunrise_flowers: 50 } },
-      { id: 'sz_flower_g', name: 'Flower Farm (gamma)', recipeId: 'flower_farm', sectorId: 'seizewell', inventory: { sunrise_flowers: 120, energy_cells: 70 }, reorderLevel: { energy_cells: 140 }, reserveLevel: { sunrise_flowers: 50 } },
-      { id: 'sz_flower_d', name: 'Flower Farm (delta)', recipeId: 'flower_farm', sectorId: 'seizewell', inventory: { sunrise_flowers: 80, energy_cells: 90 }, reorderLevel: { energy_cells: 140 }, reserveLevel: { sunrise_flowers: 50 } },
-      { id: 'sz_ire', name: 'Beta I.R.E. Laser Forge (alpha)', recipeId: 'ire_forge', sectorId: 'seizewell', inventory: { ire_laser: 2, teladianium: 10, energy_cells: 200 }, reorderLevel: { teladianium: 30, energy_cells: 240 }, reserveLevel: { ire_laser: 1 } },
-
-      // === TELADI GAIN ===
-      { id: 'tg_bliss', name: 'Bliss Place (M)', recipeId: 'bliss_place', sectorId: 'teladi_gain', inventory: { space_weed: 30, sunrise_flowers: 60, energy_cells: 120 }, reorderLevel: { sunrise_flowers: 160, energy_cells: 180 }, reserveLevel: { space_weed: 30 } },
-      { id: 'tg_oil', name: 'Sun Oil Refinery (M)', recipeId: 'sun_oil_refinery', sectorId: 'teladi_gain', inventory: { sun_oil: 40, sunrise_flowers: 30, energy_cells: 80 }, reorderLevel: { sunrise_flowers: 120, energy_cells: 150 }, reserveLevel: { sun_oil: 20 } },
-      { id: 'tg_flower', name: 'Flower Farm (M)', recipeId: 'flower_farm', sectorId: 'teladi_gain', inventory: { sunrise_flowers: 150, energy_cells: 100 }, reorderLevel: { energy_cells: 140 }, reserveLevel: { sunrise_flowers: 60 } },
-
-      // === PROFIT SHARE ===
-      { id: 'ps_spp', name: 'Solar Power Plant (M)', recipeId: 'spp_teladi', sectorId: 'profit_share', inventory: { energy_cells: 600, crystals: 25 }, reorderLevel: { crystals: 50 }, reserveLevel: { energy_cells: 200 } },
-      { id: 'ps_foundry', name: 'Teladianium Foundry (L)', recipeId: 'teladianium_foundry', sectorId: 'profit_share', inventory: { teladianium: 40, ore: 50, energy_cells: 150 }, reorderLevel: { ore: 120, energy_cells: 200 }, reserveLevel: { teladianium: 20 } },
-
-      // === GREATER PROFIT ===
-      { id: 'gp_dream', name: 'Dream Farm (M)', recipeId: 'dream_farm', sectorId: 'greater_profit', inventory: { space_fuel: 20, space_weed: 30, energy_cells: 100 }, reorderLevel: { space_weed: 80, energy_cells: 160 }, reserveLevel: { space_fuel: 10 } },
-      { id: 'gp_bliss', name: 'Bliss Place (L)', recipeId: 'bliss_place', sectorId: 'greater_profit', inventory: { space_weed: 50, sunrise_flowers: 80, energy_cells: 150 }, reorderLevel: { sunrise_flowers: 180, energy_cells: 200 }, reserveLevel: { space_weed: 30 } },
-      { id: 'gp_crystal', name: 'Crystal Fab (M)', recipeId: 'crystal_fab', sectorId: 'greater_profit', inventory: { crystals: 20, silicon_wafers: 40, sun_oil: 60, energy_cells: 200 }, reorderLevel: { silicon_wafers: 120, sun_oil: 120, energy_cells: 200 }, reserveLevel: { crystals: 10 } },
-
-      // === COMPANY PRIDE ===
-      { id: 'cp_silicon', name: 'Silicon Mine (M)', recipeId: 'silicon_mine', sectorId: 'company_pride', inventory: { silicon_wafers: 10, energy_cells: 100 }, reorderLevel: { energy_cells: 150 }, reserveLevel: { silicon_wafers: 10 } },
-    ]
-
-    // Also register stations from all sector blueprints so the economy admin reflects the whole universe
+    // Load custom stations
+    const stations: Station[] = []
     const spacing = 30
     const slug = (name: string, fallback: string) => {
       const s = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
       return s || fallback
     }
-    const existingIds = new Set(stations.map(s => s.id))
+
     const pickRecipeId = (name: string): string => {
       const n = name.toLowerCase()
       if (n.includes('solar power')) return 'spp_teladi'
@@ -460,9 +566,188 @@ function createUniverse() {
       if (n.includes('computer')) return 'computer_plant'
       if (n.includes('shield')) return 'hept_forge'
       if (n.includes('ire') || n.includes('laser')) return 'ire_forge'
+      // New mappings
+      if (n.includes('stott')) return 'stott_mixery'
+      if (n.includes('soyfarm')) return 'soyfarm'
+      if (n.includes('soyery')) return 'soyery'
+      if (n.includes('snail')) return 'snail_ranch'
+      if (n.includes('majaglit')) return 'majaglit_factory'
+      if (n.includes('massom')) return 'massom_mill'
+      if (n.includes('chelt')) return 'chelt_aquarium'
+
       return 'logistics_hub'
     }
 
+    // 1. Process CUSTOM_STATIONS to assign positions and merge with layout
+    const existingIds = new Set<string>()
+
+    // Helper to find layout position
+    const getLayoutPos = (sectorId: string, stationName: string): [number, number, number] | undefined => {
+      const layout = getSectorLayoutById(sectorId)
+      if (layout) {
+        // Try precise match
+        let found = layout.stations.find(s => s.name === stationName)
+        if (found) return [found.position[0] * spacing, found.position[1] * spacing, found.position[2] * spacing]
+        // Try fuzzy match if needed?
+      }
+      return undefined
+    }
+
+    // Initialize corporations for lookup
+    // Initialize corporations for lookup
+    const corporations: Corporation[] = INITIAL_CORPORATIONS.map((c) => ({
+      ...c,
+      stationIds: [...c.stationIds],
+      fleetIds: [...c.fleetIds],
+    })) as unknown as Corporation[]
+
+    // Helper for ownership
+    // Shipyards / Equipment Docks / Trading Stations -> State (or specific race gov/tech corp)
+    // Factories -> 30% Independent, 70% Corp (Distributed)
+    const assignOwner = (st: any): { ownerId: string | null; ownerType: OwnershipType } => {
+      const name = st.name.toLowerCase()
+      const sectorId = st.sectorId
+
+      // State Infrastructure
+      if (name.includes('shipyard') || name.includes('equipment dock') || name.includes('trading station') || name.includes('wharf')) {
+        // Find state corp for this sector's race
+        // We know sector owner from universe data but let's infer from sectorId prefix or hardcode
+        let race: RaceType = 'teladi'
+        if (sectorId.includes('argon') || sectorId.includes('cloudbase') || sectorId.includes('president') || sectorId.includes('home') || sectorId.includes('red') || sectorId.includes('three') || sectorId.includes('power') || sectorId.includes('antigone') || sectorId.includes('herron') || sectorId.includes('hole') || sectorId.includes('wall') || sectorId.includes('ore')) race = 'argon'
+        else if (sectorId.includes('kingdom') || sectorId.includes('rolk') || sectorId.includes('que') || sectorId.includes('menelaus') || sectorId.includes('atreus')) race = 'boron'
+        else if (sectorId.includes('paranid') || sectorId.includes('priest') || sectorId.includes('emp') || sectorId.includes('duke') || sectorId.includes('trinity')) race = 'paranid'
+        else if (sectorId.includes('family') || sectorId.includes('thuruk') || sectorId.includes('chin') || sectorId.includes('cho')) race = 'split'
+        else if (sectorId.includes('xenon')) race = 'xenon'
+
+        if (race === 'xenon') return { ownerId: 'xenon_collective', ownerType: 'state' }
+
+        // Find a 'state' corporation for this race
+        const stateCorp = corporations.find(c => c.race === race && c.type === 'state')
+        if (stateCorp) return { ownerId: stateCorp.id, ownerType: 'state' }
+        // Fallback
+        return { ownerId: null, ownerType: 'independent' }
+      }
+
+      // Pirate Bases
+      if (name.includes('pirate')) {
+        const pirateCorp = corporations.find(c => c.id === 'pirate_clans')
+        return { ownerId: pirateCorp ? pirateCorp.id : null, ownerType: 'guild' }
+      }
+
+      // Factories
+      if (Math.random() < 0.3) {
+        return { ownerId: null, ownerType: 'independent' }
+      } else {
+        // Assign to corporation
+        // Find corps of the sector's race? Or any race?
+        // Let's stick to sector race mainly, or Teladi everywhere?
+        // Let's check sector owner first.
+        let race: RaceType = 'teladi' // Default
+        if (sectorId.includes('argon') || sectorId.includes('cloudbase') || sectorId.includes('president') || sectorId.includes('home') || sectorId.includes('red') || sectorId.includes('three') || sectorId.includes('power') || sectorId.includes('antigone') || sectorId.includes('herron') || sectorId.includes('hole') || sectorId.includes('wall') || sectorId.includes('ore')) race = 'argon'
+        else if (sectorId.includes('kingdom') || sectorId.includes('rolk') || sectorId.includes('que') || sectorId.includes('menelaus') || sectorId.includes('atreus')) race = 'boron'
+        else if (sectorId.includes('paranid') || sectorId.includes('priest') || sectorId.includes('emp') || sectorId.includes('duke') || sectorId.includes('trinity')) race = 'paranid'
+        else if (sectorId.includes('family') || sectorId.includes('thuruk') || sectorId.includes('chin') || sectorId.includes('cho')) race = 'split'
+        else if (sectorId.includes('xenon')) race = 'xenon'
+
+        // Filter suitable corps (not state, unless they run factories too? Usually separate)
+        const candidates = corporations.filter(c => c.race === race && c.type !== 'state')
+        if (candidates.length > 0) {
+          const c = candidates[Math.floor(Math.random() * candidates.length)]
+          return { ownerId: c.id, ownerType: c.type }
+        } else {
+          // Fallback to Teladi corps or Independent
+          const teladi = corporations.filter(c => c.race === 'teladi' && c.type !== 'state')
+          if (teladi.length > 0 && Math.random() < 0.5) {
+            const c = teladi[Math.floor(Math.random() * teladi.length)]
+            return { ownerId: c.id, ownerType: c.type }
+          }
+          return { ownerId: null, ownerType: 'independent' }
+        }
+      }
+    }
+
+    // Load CUSTOM_STATIONS
+    CUSTOM_STATIONS.forEach(cs => {
+      // Check ID uniqueness
+      let finalId = cs.id
+      if (existingIds.has(finalId)) {
+        let k = 2
+        while (existingIds.has(`${finalId}_${k}`)) k++
+        finalId = `${finalId}_${k}`
+      }
+      existingIds.add(finalId)
+
+      // Position
+      // Position
+      let pos = (cs as any).position || getLayoutPos(cs.sectorId, cs.name) || randomPos()
+
+      const ownership = assignOwner(cs)
+
+      const st: Station = {
+        id: finalId,
+        name: cs.name,
+        recipeId: cs.recipeId,
+        sectorId: cs.sectorId,
+        inventory: cs.inventory as Record<string, number>,
+        reorderLevel: cs.reorderLevel,
+        reserveLevel: cs.reserveLevel,
+        position: pos,
+        modelPath: '/models/00001.obj', // Default, should ideally lookup blueprint
+        ownerId: ownership.ownerId || undefined
+      }
+
+      // Try lookup model from layout
+      const layout = getSectorLayoutById(cs.sectorId)
+      if (layout) {
+        const bp = layout.stations.find(s => s.name === cs.name)
+        if (bp) st.modelPath = bp.modelPath
+      }
+      // If still default, try naive mapping based on recipe
+      if (st.modelPath === '/models/00001.obj') {
+        if (st.recipeId === 'spp_teladi') st.modelPath = '/models/00285.obj'
+        else if (st.recipeId === 'shipyard') st.modelPath = '/models/00444.obj'
+        else if (st.recipeId === 'logistics_hub') st.modelPath = '/models/00448.obj'
+        // ... add more if needed
+      }
+
+
+      // Seed if inventory empty
+      // Processing both seeded custom stations (if they were 0) and procedural ones
+      const recipe = recipes.find(r => r.id === st.recipeId)
+      if (recipe) {
+        const hasInventory = Object.keys(st.inventory).length > 0
+
+        if (!hasInventory) {
+          // Seed inputs (enough for ~20-50 cycles)
+          recipe.inputs.forEach(i => {
+            st.inventory[i.wareId] = Math.max(1, Math.floor(i.amount * (20 + Math.random() * 30)))
+          })
+          // Seed output (some small starting stock, 10-30% of cap)
+          if (recipe.productStorageCap > 0) {
+            st.inventory[recipe.productId] = Math.max(1, Math.floor(recipe.productStorageCap * (0.1 + Math.random() * 0.2)))
+          }
+        }
+
+        // Ensure reorder/reserve levels are set
+        if (Object.keys(st.reorderLevel).length === 0) {
+          recipe.inputs.forEach(i => st.reorderLevel[i.wareId] = i.amount * 20)
+        }
+        if (Object.keys(st.reserveLevel).length === 0 && recipe.productStorageCap > 0) {
+          st.reserveLevel[recipe.productId] = recipe.productStorageCap * 0.2
+        }
+      }
+
+      stations.push(st)
+
+      // Add to corp assets
+      if (ownership.ownerId) {
+        const corp = corporations.find(c => c.id === ownership.ownerId)
+        if (corp) corp.stationIds.push(finalId)
+      }
+    })
+
+    // 2. Add remaining stations from sector layouts (procedural / blueprint based)
+    // capable of handling stations not in the custom list
     for (const sector of UNIVERSE_SECTORS_XBTF) {
       const layout = getSectorLayoutById(sector.id)
       if (!layout) continue
@@ -470,38 +755,59 @@ function createUniverse() {
         const id = `${sector.id}_${slug(st.name, String(idx))}`
         if (existingIds.has(id)) return
         existingIds.add(id)
-        stations.push({
+
+        // ownership
+        const ownership = assignOwner({ name: st.name, sectorId: sector.id })
+
+        // model path inference?
+        let modelPath = st.modelPath
+        const rid = pickRecipeId(st.name)
+
+        const station: Station = {
           id,
           name: st.name,
-          recipeId: pickRecipeId(st.name),
+          recipeId: rid,
           sectorId: sector.id,
           position: [st.position[0] * spacing, st.position[1] * spacing, st.position[2] * spacing],
-          modelPath: st.modelPath,
-          inventory: {},
+          modelPath: modelPath,
+          inventory: {}, // Start empty or seeded?
           reorderLevel: {},
           reserveLevel: {},
-        })
+          ownerId: ownership.ownerId || undefined
+        }
+
+        // Seed resources if empty
+        const recipe = recipes.find(r => r.id === rid)
+        if (recipe) {
+          recipe.inputs.forEach(i => {
+            station.inventory[i.wareId] = Math.max(1, Math.floor(i.amount * (20 + Math.random() * 30)))
+            // Init reorder level
+            station.reorderLevel[i.wareId] = i.amount * 20
+          })
+          if (recipe.productStorageCap > 0) {
+            station.inventory[recipe.productId] = Math.max(1, Math.floor(recipe.productStorageCap * (0.1 + Math.random() * 0.2)))
+            // Init reserve level
+            station.reserveLevel[recipe.productId] = recipe.productStorageCap * 0.2
+          }
+        }
+
+        stations.push(station)
+
+        if (ownership.ownerId) {
+          const corp = corporations.find(c => c.id === ownership.ownerId)
+          if (corp) corp.stationIds.push(id)
+        }
       })
     }
+
+    // Populate sector prices
     state.wares = wares
     state.recipes = recipes
     state.stations = stations
     state.sectorPrices = computeSectorPrices(stations, recipes, wares)
 
-    // Initialize corporations (multi-race)
-    const corporations: Corporation[] = INITIAL_CORPORATIONS.map((c) => ({
-      ...c,
-      stationIds: [...c.stationIds],
-      fleetIds: [...c.fleetIds],
-    }))
-
-    // Apply station ownership mapping for existing seeded stations
-    Object.entries(STATION_OWNERSHIP).forEach(([stationId, ownerId]) => {
-      const corp = corporations.find((c) => c.id === ownerId)
-      if (corp && !corp.stationIds.includes(stationId)) {
-        corp.stationIds.push(stationId)
-      }
-    })
+    // Corporations already initialized above, but we need to assign the updated list to state
+    // But we copied INITIAL_CORPORATIONS, so we're good.
 
     // Initial fleet spawn configs
     const fleetConfigs = [
@@ -517,7 +823,7 @@ function createUniverse() {
 
     // Spawn fleets
     const fleets: NPCFleet[] = fleetConfigs.map((cfg, i) => {
-      let modelPath = cfg.modelPath || '/models/00007.obj'
+      let modelPath = (cfg as any).modelPath || '/models/00007.obj'
       if (cfg.shipType === 'Phoenix') modelPath = '/models/00140.obj'
       else if (cfg.shipType === 'Albatross') modelPath = '/models/00187.obj'
       else if (cfg.shipType === 'Osprey') modelPath = '/models/00141.obj'
@@ -527,13 +833,13 @@ function createUniverse() {
         name: `${cfg.shipType} ${cfg.ownerId ? corporations.find(c => c.id === cfg.ownerId)?.name?.split(' ')[0] || '' : 'Independent'}-${i + 1}`,
         shipType: cfg.shipType,
         modelPath: modelPath,
-        race: cfg.race || 'teladi',
+        race: (cfg as any).race || 'teladi',
         capacity: cfg.capacity,
         speed: cfg.speed,
         homeSectorId: cfg.homeSectorId,
         ownerId: cfg.ownerId,
         ownerType: cfg.ownerType,
-        homeStationId: cfg.homeStationId,
+        homeStationId: (cfg as any).homeStationId,
         behavior: cfg.behavior,
         autonomy: cfg.autonomy,
         profitShare: cfg.profitShare,
@@ -555,8 +861,12 @@ function createUniverse() {
       return fleet
     })
 
+    // Ensure fleets actually start in their home sectors (and spread independents)
+    fleets.forEach(rehomeFleet)
+
     state.corporations = corporations
     state.fleets = fleets
+    remapLegacyStations()
     state.tradeLog = []
     state.acc = 0
     state.elapsedTimeSec = 0
@@ -581,7 +891,7 @@ function createUniverse() {
         if (job.status === 'planning') {
           // Hire TL
           const tlId = `tl_${corp.id}_${genId()}`
-          const spawnSector = 'seizewell' // Default shipyard
+          const spawnSector = getRaceHub(corp.race) // Default to corp/race home sector
 
           const tl: NPCFleet = {
             id: tlId,
@@ -778,7 +1088,7 @@ function createUniverse() {
 
       if (corpFleets.length < desiredFleetSize && corp.credits > SHIP_CATALOG.vulture.cost + ECONOMY_SETTINGS.CORP_MIN_CREDITS_TO_BUY_SHIP) {
         // Purchase new trader
-        const shipyard = 'seizewell' // Teladi shipyard
+        const shipyard = getRaceHub(corp.race)
         const newFleet: NPCFleet = {
           id: `fleet_${genId()}`,
           name: `${corp.name.split(' ')[0]} Trader ${genId().substring(0, 4)}`,
@@ -826,8 +1136,7 @@ function createUniverse() {
       // Cap total independents
       const independentCount = state.fleets.filter(f => f.ownerType === 'independent').length
       if (independentCount < ECONOMY_SETTINGS.MAX_INDEPENDENT_TRADERS && Math.random() < ECONOMY_SETTINGS.TRADER_SPAWN_CHANCE) {
-        const spawnSectors = ['seizewell', 'profit_share', 'teladi_gain', 'greater_profit']
-        const spawnSector = spawnSectors[Math.floor(Math.random() * spawnSectors.length)]
+        const spawnSector = pickIndependentStartSector()
 
         const newTrader: NPCFleet = {
           id: `fleet_${genId()}`,
@@ -1125,7 +1434,7 @@ function createUniverse() {
         }
 
         // Hard rescue: if a sell command has been running for a long time, settle the trade to unblock the economy
-      if (cmd.type === 'trade-sell' && now - (fleet.stateStartTime || now) > 300000) { // 5 minutes grace
+        if (cmd.type === 'trade-sell' && now - (fleet.stateStartTime || now) > 300000) { // 5 minutes grace
           const station = state.stations.find(s => s.id === cmd.targetStationId)
           const wareId = cmd.wareId
           const amount = Math.min(cmd.amount || 0, wareId ? (fleet.cargo[wareId] || 0) : 0)
@@ -1189,44 +1498,44 @@ function createUniverse() {
 
             // Only rescue if we have significant cargo (ignoring trace amounts < 10)
             if (totalCargo > 10) {
-            // Find a storage station for this fleet
-            let storageStation: Station | null = null
+              // Find a storage station for this fleet
+              let storageStation: Station | null = null
 
-            if (fleet.ownerId) {
-              // Corporation-owned ship: find owner's nearest station
-              const corp = state.corporations.find(c => c.id === fleet.ownerId)
-              if (corp && corp.stationIds.length > 0) {
-                // Prefer station in current sector, then any corp station
-                const corpStations = state.stations.filter(s => corp.stationIds.includes(s.id))
-                storageStation = corpStations.find(s => s.sectorId === fleet.currentSectorId)
-                  || corpStations[0] || null
+              if (fleet.ownerId) {
+                // Corporation-owned ship: find owner's nearest station
+                const corp = state.corporations.find(c => c.id === fleet.ownerId)
+                if (corp && corp.stationIds.length > 0) {
+                  // Prefer station in current sector, then any corp station
+                  const corpStations = state.stations.filter(s => corp.stationIds.includes(s.id))
+                  storageStation = corpStations.find(s => s.sectorId === fleet.currentSectorId)
+                    || corpStations[0] || null
+                }
               }
-            }
 
-            if (!storageStation) {
-              // Independent or no corp station found: use Trading Station (rental storage)
-              // Find nearest Trading Station
-              const tradingStations = state.stations.filter(s =>
-                s.recipeId === 'trading_station' || s.name.toLowerCase().includes('trading')
-              )
-              storageStation = tradingStations.find(s => s.sectorId === fleet.currentSectorId)
-                || tradingStations[0] || null
-            }
+              if (!storageStation) {
+                // Independent or no corp station found: use Trading Station (rental storage)
+                // Find nearest Trading Station
+                const tradingStations = state.stations.filter(s =>
+                  s.recipeId === 'trading_station' || s.name.toLowerCase().includes('trading')
+                )
+                storageStation = tradingStations.find(s => s.sectorId === fleet.currentSectorId)
+                  || tradingStations[0] || null
+              }
 
-            if (!storageStation) {
-              // Fallback: any station in current sector
-              storageStation = state.stations.find(s => s.sectorId === fleet.currentSectorId) || null
-            }
+              if (!storageStation) {
+                // Fallback: any station in current sector
+                storageStation = state.stations.find(s => s.sectorId === fleet.currentSectorId) || null
+              }
 
-            if (storageStation) {
-              const isRental = !fleet.ownerId || !state.corporations.find(c => c.id === fleet.ownerId)?.stationIds.includes(storageStation!.id)
-              console.log(`[Universe] Storing stuck cargo for ${fleet.name} at ${storageStation.name}${isRental ? ' (rental)' : ' (corp storage)'}`)
+              if (storageStation) {
+                const isRental = !fleet.ownerId || !state.corporations.find(c => c.id === fleet.ownerId)?.stationIds.includes(storageStation!.id)
+                console.log(`[Universe] Storing stuck cargo for ${fleet.name} at ${storageStation.name}${isRental ? ' (rental)' : ' (corp storage)'}`)
 
-              // Issue commands: goto -> dock -> store-cargo -> undock
-              issueCommand(fleet.id, {
-                type: 'goto-station',
-                targetStationId: storageStation.id,
-                targetSectorId: storageStation.sectorId
+                // Issue commands: goto -> dock -> store-cargo -> undock
+                issueCommand(fleet.id, {
+                  type: 'goto-station',
+                  targetStationId: storageStation.id,
+                  targetSectorId: storageStation.sectorId
                 })
                 issueCommand(fleet.id, {
                   type: 'dock',
@@ -1611,6 +1920,7 @@ function createUniverse() {
         fleet.commandQueue = []
         fleet.currentOrder = undefined
         fleet.state = 'idle'
+        fleet.destinationSectorId = undefined
         break
 
       case 'arrived-at-gate':
@@ -1618,41 +1928,37 @@ function createUniverse() {
         break
 
       case 'entered-sector':
-        if (report.stationId) {
-          fleet.currentSectorId = report.stationId
-          fleet.destinationSectorId = undefined
-          fleet.state = 'idle'
+        // Sector arrival: trust sectorId, drop consumed gate hops so we don't loop
+        fleet.currentSectorId = report.sectorId
+        fleet.destinationSectorId = undefined
+        fleet.state = 'idle'
+        fleet.stateStartTime = report.timestamp || Date.now()
 
-          // Use the position provided in the report (calculated by frontend with correct scale)
-          if (report.position) {
-            fleet.position = report.position
-          } else {
-            // Fallback: Calculate spawn position based on arrival gate
-            // Standard gate positions in frontend are scaled by 30 (5000 * 30 = 150000)
-            // N: [0,0,-150000], S: [0,0,150000], W: [-150000,0,0], E: [150000,0,0]
+        if (report.position) {
+          fleet.position = report.position
+        } else {
+          // Fallback spawn near expected entry gate
+          let spawnPos: [number, number, number] = [0, 0, 0]
+          const offset = 2000 // Distance from gate center
+          const GATE_DIST = 150000
 
-            let spawnPos: [number, number, number] = [0, 0, 0]
-            const offset = 2000 // Distance from gate center
-            const GATE_DIST = 150000
+          if (report.gateType === 'N') spawnPos = [0, 0, GATE_DIST - offset]       // arrived from south
+          else if (report.gateType === 'S') spawnPos = [0, 0, -GATE_DIST + offset]  // arrived from north
+          else if (report.gateType === 'W') spawnPos = [GATE_DIST - offset, 0, 0]   // arrived from east
+          else if (report.gateType === 'E') spawnPos = [-GATE_DIST + offset, 0, 0]  // arrived from west
+          else spawnPos = randomPos()
 
-            if (report.gateType === 'N') {
-              // Arrive at South Gate
-              spawnPos = [0, 0, GATE_DIST - offset]
-            } else if (report.gateType === 'S') {
-              // Arrive at North Gate
-              spawnPos = [0, 0, -GATE_DIST + offset]
-            } else if (report.gateType === 'W') {
-              // Arrive at East Gate
-              spawnPos = [GATE_DIST - offset, 0, 0]
-            } else if (report.gateType === 'E') {
-              // Arrive at West Gate
-              spawnPos = [-GATE_DIST + offset, 0, 0]
-            } else {
-              spawnPos = randomPos()
-            }
+          fleet.position = spawnPos
+        }
 
-            fleet.position = spawnPos
+        // Trim any leading gate commands targeting the sector we just entered
+        while (fleet.commandQueue.length > 0) {
+          const cmd = fleet.commandQueue[0]
+          if ((cmd.type === 'goto-gate' || cmd.type === 'use-gate') && cmd.targetSectorId === fleet.currentSectorId) {
+            fleet.commandQueue.shift()
+            continue
           }
+          break
         }
         break
 

@@ -82,7 +82,6 @@ function App() {
   const path = window.location.pathname;
   const setNavObjects = useGameStore((s) => s.setNavObjects);
   const currentSectorId = useGameStore((s) => s.currentSectorId);
-  const setCurrentSectorId = useGameStore((s) => s.setCurrentSectorId);
 
   useEffect(() => {
     // Debug code removed

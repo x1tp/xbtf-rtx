@@ -334,8 +334,14 @@ export class FleetSimulator {
         for (const fleet of fleets) {
             const state = this.ensureState(fleet);
 
-            // Skip if gone
-            if (state.localState === 'gone') continue;
+            // Reset old "gone" marker (legacy when ships left sector)
+            if (state.localState === 'gone') {
+                state.localState = 'idle';
+                state.path = [];
+                state.pathIndex = 0;
+                state.dockAnchor = null;
+                state.dockStationId = undefined;
+            }
 
             // Reset if sector changed externally
             if (fleet.currentSectorId !== ((state as any)._lastSectorId)) {
@@ -743,9 +749,21 @@ export class FleetSimulator {
 
         this.report(fleet, state, 'entered-sector', { sectorIdOverride: targetSectorId, gateType: exitGateType, position: destPos });
 
-        // Update fleet immediately
+        // Update fleet immediately and keep simulating in new sector
         fleet.currentSectorId = targetSectorId;
         fleet.position = destPos;
-        state.localState = 'gone';
+        state.velocity.set(0, 0, 0);
+        state.path = [];
+        state.pathIndex = 0;
+        state.dockAnchor = null;
+        state.dockStationId = undefined;
+        state.localState = 'idle';
+
+        // Skip past the gate commands we just fulfilled so we don't loop
+        this.advanceCommand(fleet, state, true); // consume current gate command
+        const nextCmd = fleet.commandQueue[state.currentCommandIndex];
+        if (nextCmd && (nextCmd.type === 'use-gate' || nextCmd.type === 'goto-gate') && nextCmd.targetSectorId === targetSectorId) {
+            this.advanceCommand(fleet, state, true); // consume the paired gate command too
+        }
     }
 }

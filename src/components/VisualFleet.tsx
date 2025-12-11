@@ -123,7 +123,7 @@ export const VisualFleet: FC<VisualFleetProps> = ({ fleet }) => {
     // We use a ref to track the last seen fleet ID to handle pooling/swapping if needed, 
     // though generally key={fleet.id} prevents this.
 
-    useFrame((state, delta) => {
+    useFrame((_, delta) => {
         if (!groupRef.current) return;
 
         // Direct read from Simulator state first (most up to date)

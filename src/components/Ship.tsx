@@ -71,7 +71,11 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
                 }
             }
             if (e.code === 'KeyM') {
-                useGameStore.getState().toggleSectorMap();
+                const state = useGameStore.getState();
+                if (!state.sectorMapOpen) {
+                    state.setSelectedSectorId(null);
+                }
+                state.toggleSectorMap();
             }
             if (e.code === 'KeyU') {
                 useGameStore.getState().toggleUniverseMap();
