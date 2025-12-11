@@ -31,6 +31,8 @@ import { EconomyTicker } from './components/EconomyTicker';
 import { getAllPresets } from './config/plumes';
 import { StationInfo } from './components/StationInfo';
 import { FleetSimulator } from './simulation/FleetSimulator';
+import { getStationPriceMap } from './services/stationPricing';
+import { SimpleLineChart } from './components/SimpleLineChart';
 
 
 
@@ -810,7 +812,9 @@ function EconomyAdmin() {
   const elapsedTimeSec = useGameStore((s) => s.elapsedTimeSec)
   const syncEconomy = useGameStore((s) => s.syncEconomy)
   const [sectorFilter, setSectorFilter] = useState('all')
-  const [activeTab, setActiveTab] = useState<'economy' | 'fleets' | 'corporations' | 'characters'>('economy')
+  const [activeTab, setActiveTab] = useState<'economy' | 'fleets' | 'corporations' | 'characters' | 'graphs'>('economy')
+  const [graphWareId, setGraphWareId] = useState<string>('all')
+  const economyHistory = useGameStore((s) => s.economyHistory)
   const sectorList = Array.from(new Set<string>([...stations.map((st) => st.sectorId), ...Object.keys(sectorPrices)])).sort()
   const wareMap = new Map<string, string>(wares.map((w) => [w.id, w.name]))
   const warePriceMap = new Map<string, number>(wares.map((w) => [w.id, w.basePrice]))
@@ -887,7 +891,7 @@ function EconomyAdmin() {
           }} style={{ padding: '6px 10px', border: '1px solid #ff4444', background: '#0f2230', color: '#ff4444', cursor: 'pointer', fontWeight: 'bold' }}>New Game</button>
           <button onClick={() => initEconomy()} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff', cursor: 'pointer' }}>Init</button>
           <button onClick={() => tickEconomy(10)} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff', cursor: 'pointer' }}>Tick +10s</button>
-          <button onClick={() => setTimeScale(timeScale === 1 ? 10 : 1)} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff', cursor: 'pointer' }}>Time {timeScale.toFixed(1)}x</button>
+          <button onClick={() => setTimeScale(timeScale === 1 ? 30 : 1)} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff', cursor: 'pointer' }}>Time {timeScale.toFixed(1)}x</button>
           <button onClick={() => { window.location.assign('/admin'); }} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff', cursor: 'pointer' }}>Back</button>
         </div>
       </div>
@@ -939,6 +943,17 @@ function EconomyAdmin() {
               borderRadius: '4px 4px 0 0'
             }}
           >Characters</button>
+          <button
+            onClick={() => setActiveTab('graphs')}
+            style={{
+              padding: '6px 16px',
+              border: activeTab === 'graphs' ? '1px solid #aa88ff' : '1px solid #184b6a',
+              background: activeTab === 'graphs' ? '#2a203a' : '#0f2230',
+              color: activeTab === 'graphs' ? '#aa88ff' : '#8ab6d6',
+              cursor: 'pointer',
+              borderRadius: '4px 4px 0 0'
+            }}
+          >Graphs</button>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span>Sector</span>
@@ -1007,7 +1022,26 @@ function EconomyAdmin() {
                   visibleStations.map((st) => {
                     const r = recipeMap.get(st.recipeId)
                     const prodName = r ? (wareMap.get(r.productId) || r.productId) : st.recipeId
-                    const inv = Object.entries(st.inventory)
+                    const stationPrices = getStationPriceMap(st, r, wares)
+                    const combinedWares = r
+                      ? Array.from(new Set<string>([
+                        ...Object.keys(st.inventory),
+                        ...r.inputs.map((i) => i.wareId),
+                        r.productId,
+                      ]))
+                      : Object.keys(st.inventory)
+                    const inv = combinedWares.map((wid) => {
+                      const qty = st.inventory[wid] || 0
+                      const price =
+                        stationPrices[wid] ??
+                        (sectorPrices[st.sectorId]?.[wid] !== undefined
+                          ? Math.round(sectorPrices[st.sectorId]?.[wid] || 0)
+                          : warePriceMap.get(wid))
+                      const mode = r
+                        ? (r.productId === wid ? 'sell' : r.inputs.some((i) => i.wareId === wid) ? 'buy' : 'store')
+                        : 'store'
+                      return { wid, qty, price, mode }
+                    })
                     return (
                       <div key={st.id} style={{ border: '1px solid #184b6a', borderRadius: 6, padding: 8 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
@@ -1018,11 +1052,23 @@ function EconomyAdmin() {
                         {inv.length === 0 ? (
                           <div style={{ color: '#6090a0' }}>empty</div>
                         ) : (
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 4 }}>
-                            {inv.map(([wid, qty]) => (
-                              <Fragment key={wid}>
-                                <div style={{ color: '#c3e7ff' }}>{wareMap.get(wid) || wid}</div>
-                                <div style={{ color: '#ffaa44', textAlign: 'right' }}>{Math.round(qty)}</div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 4 }}>
+                            {inv.map((row) => (
+                              <Fragment key={row.wid}>
+                                <div style={{ color: '#c3e7ff' }}>{wareMap.get(row.wid) || row.wid}</div>
+                                <div style={{ color: row.mode === 'sell' ? '#88cc44' : '#ffaa44', textAlign: 'right' }}>
+                                  {Math.round(row.qty)}
+                                </div>
+                                <div style={{ color: row.mode === 'buy' ? '#66ffcc' : '#c3e7ff', textAlign: 'right' }}>
+                                  {row.price ? (
+                                    <>
+                                      {row.mode === 'buy' ? 'Bid ' : 'Ask '}
+                                      {Math.round(row.price)}
+                                    </>
+                                  ) : (
+                                    <span style={{ color: '#3a4b5c' }}>n/a</span>
+                                  )}
+                                </div>
                               </Fragment>
                             ))}
                           </div>
@@ -1448,10 +1494,78 @@ function EconomyAdmin() {
               </div>
             </div>
           </div>
+        ) : activeTab === 'graphs' ? (
+          <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 20, height: '100%' }}>
+            {/* Chart Controls */}
+            <div style={{ display: 'flex', gap: 16, alignItems: 'center', background: '#0f2230', padding: 12, borderRadius: 6, border: '1px solid #184b6a' }}>
+              <span style={{ color: '#c3e7ff' }}>Ware Selection:</span>
+              <select
+                value={graphWareId}
+                onChange={(e) => setGraphWareId(e.target.value)}
+                style={{ padding: '6px 10px', background: '#0a1520', border: '1px solid #3fb6ff', color: '#c3e7ff', borderRadius: 4 }}
+              >
+                <option value="all">All Wares (Aggregate)</option>
+                {wares.map(w => (
+                  <option key={w.id} value={w.id}>{w.name}</option>
+                ))}
+              </select>
+              <span style={{ color: '#8ab6d6', fontSize: 13 }}>
+                History: {economyHistory.length} snapshots ({((economyHistory.length * 10) / 60).toFixed(1)} min)
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+              {/* Stock Level Chart */}
+              <div style={{ flex: 1, minWidth: 400 }}>
+                <SimpleLineChart
+                  title={`Universe Stock Levels: ${graphWareId === 'all' ? 'All Wares' : (wareMap.get(graphWareId) || graphWareId)}`}
+                  data={economyHistory.map(h => {
+                    const date = new Date(h.timestamp);
+                    const label = `${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`;
+                    let value = 0;
+                    if (graphWareId === 'all') {
+                      value = Object.values(h.totalStock).reduce((a, b) => a + b, 0);
+                    } else {
+                      value = h.totalStock[graphWareId] || 0;
+                    }
+                    return { label, value };
+                  })}
+                  width={500}
+                  height={300}
+                  color="#ffaa44"
+                  yLabel="Units"
+                />
+              </div>
+
+              {/* Price Chart */}
+              <div style={{ flex: 1, minWidth: 400 }}>
+                <SimpleLineChart
+                  title={`Average Price: ${graphWareId === 'all' ? 'Price Index' : (wareMap.get(graphWareId) || graphWareId)}`}
+                  data={economyHistory.map(h => {
+                    const date = new Date(h.timestamp);
+                    const label = `${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`;
+                    let value = 0;
+                    if (graphWareId === 'all') {
+                      // Simple average of all averages
+                      const prices = Object.values(h.avgPrices);
+                      value = prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : 0;
+                    } else {
+                      value = h.avgPrices[graphWareId] || 0;
+                    }
+                    return { label, value };
+                  })}
+                  width={500}
+                  height={300}
+                  color="#88cc44"
+                  yLabel="Credits"
+                />
+              </div>
+            </div>
+          </div>
         ) : null}
       </div>
     </div>
-  );
+  )
 }
 
 function PerfOverlay({ glRef, sceneRef }: { glRef: React.RefObject<WebGLRenderer | null>; sceneRef: React.RefObject<ThreeScene | null> }) {

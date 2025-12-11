@@ -86,6 +86,32 @@ const assignStationOwnership = (stations: Station[], corporations: Corporation[]
   })
 }
 
+// Fill in missing stocks and thresholds for all stations with known recipes
+const normalizeStationStock = (stations: Station[], recipes: Recipe[]) => {
+  const recipeMap = new Map<string, Recipe>(recipes.map((r) => [r.id, r]))
+  stations.forEach((st) => {
+    const recipe = recipeMap.get(st.recipeId)
+    if (!recipe) return
+    // Seed product if missing
+    if ((st.inventory[recipe.productId] || 0) <= 0 && recipe.productStorageCap > 0) {
+      st.inventory[recipe.productId] = Math.max(st.inventory[recipe.productId] || 0, Math.round(recipe.productStorageCap * 0.4) || recipe.batchSize)
+    }
+    // Seed inputs if missing
+    recipe.inputs.forEach((inp) => {
+      if ((st.inventory[inp.wareId] || 0) <= 0) {
+        st.inventory[inp.wareId] = Math.max(st.inventory[inp.wareId] || 0, Math.max(inp.amount * 3, 50))
+      }
+      if ((st.reorderLevel[inp.wareId] || 0) <= 0) {
+        st.reorderLevel[inp.wareId] = inp.amount * 20
+      }
+    })
+    // Ensure reserve for product
+    if ((st.reserveLevel[recipe.productId] || 0) <= 0 && recipe.productStorageCap > 0) {
+      st.reserveLevel[recipe.productId] = recipe.productStorageCap * 0.2
+    }
+  })
+}
+
 interface UniverseState {
   wares: Ware[]
   recipes: Recipe[]
@@ -122,6 +148,23 @@ const DEFAULT_WARES: Ware[] = [
   { id: 'energy_cells', name: 'Energy Cells', category: 'primary', basePrice: 16, volume: 1 },
   { id: 'ore', name: 'Ore', category: 'intermediate', basePrice: 128, volume: 3 },
   { id: 'silicon', name: 'Silicon Wafers', category: 'intermediate', basePrice: 504, volume: 5 },
+  { id: 'wheat', name: 'Wheat', category: 'primary', basePrice: 28, volume: 1 },
+  { id: 'cahoonas', name: 'Cahoonas', category: 'food', basePrice: 72, volume: 1 },
+  { id: 'plankton', name: 'Plankton', category: 'primary', basePrice: 22, volume: 1 },
+  { id: 'stott_spices', name: 'Stott Spices', category: 'food', basePrice: 64, volume: 1 },
+  { id: 'scruffin_fruit', name: 'Scruffin Fruit', category: 'primary', basePrice: 36, volume: 1 },
+  { id: 'chelt_meat', name: 'Chelt Meat', category: 'food', basePrice: 70, volume: 1 },
+  { id: 'soya_beans', name: 'Soya Beans', category: 'primary', basePrice: 30, volume: 1 },
+  { id: 'soja_husk', name: 'Soja Husk', category: 'food', basePrice: 72, volume: 1 },
+  { id: 'massom_powder', name: 'Massom Powder', category: 'food', basePrice: 40, volume: 1 },
+  { id: 'maja_snails', name: 'Maja Snails', category: 'primary', basePrice: 26, volume: 1 },
+  { id: 'swamp_plant', name: 'Swamp Plant', category: 'primary', basePrice: 90, volume: 1 },
+  { id: 'majaglit', name: 'Majaglit', category: 'primary', basePrice: 80, volume: 1 },
+  { id: 'rastar_oil', name: 'Rastar Oil', category: 'food', basePrice: 140, volume: 1 },
+  { id: 'quantum_tubes', name: 'Quantum Tubes', category: 'end', basePrice: 7500, volume: 2 },
+  { id: 'microchips', name: 'Microchips', category: 'end', basePrice: 13500, volume: 1 },
+  { id: 'shield_1mw', name: '1MW Shield', category: 'end', basePrice: 3000, volume: 2 },
+  { id: 'hept_laser', name: 'Gamma HEPT', category: 'end', basePrice: 320000, volume: 12 },
   { id: 'teladianium', name: 'Teladianium', category: 'food', basePrice: 72, volume: 2 },
   { id: 'sunflowers', name: 'Sunflowers', category: 'primary', basePrice: 40, volume: 2 },
   { id: 'nostrop_oil', name: 'Nostrop Oil', category: 'food', basePrice: 120, volume: 2 },
@@ -136,13 +179,35 @@ const DEFAULT_WARES: Ware[] = [
 
 const DEFAULT_RECIPES: Recipe[] = [
   { id: 'spp_cycle', productId: 'energy_cells', inputs: [], cycleTimeSec: 60, batchSize: 500, productStorageCap: 5000 },
+  { id: 'spp_teladi', productId: 'energy_cells', inputs: [{ wareId: 'crystals', amount: 1 }], cycleTimeSec: 60, batchSize: 120, productStorageCap: 6000 },
   { id: 'mine_ore', productId: 'ore', inputs: [], cycleTimeSec: 90, batchSize: 200, productStorageCap: 2000 },
+  { id: 'ore_mine', productId: 'ore', inputs: [], cycleTimeSec: 90, batchSize: 200, productStorageCap: 2000 },
   { id: 'mine_silicon', productId: 'silicon', inputs: [], cycleTimeSec: 120, batchSize: 120, productStorageCap: 1200 },
+  { id: 'silicon_mine', productId: 'silicon', inputs: [], cycleTimeSec: 120, batchSize: 120, productStorageCap: 1200 },
+  { id: 'argon_farm', productId: 'wheat', inputs: [{ wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 60, batchSize: 30, productStorageCap: 1500 },
+  { id: 'cahoona_bakery', productId: 'cahoonas', inputs: [{ wareId: 'wheat', amount: 10 }, { wareId: 'energy_cells', amount: 15 }], cycleTimeSec: 90, batchSize: 20, productStorageCap: 1000 },
+  { id: 'plankton_farm', productId: 'plankton', inputs: [{ wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 60, batchSize: 30, productStorageCap: 1500 },
+  { id: 'stott_mixery', productId: 'stott_spices', inputs: [{ wareId: 'plankton', amount: 10 }, { wareId: 'energy_cells', amount: 15 }], cycleTimeSec: 90, batchSize: 20, productStorageCap: 1000 },
+  { id: 'scruffin_farm', productId: 'scruffin_fruit', inputs: [{ wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 60, batchSize: 30, productStorageCap: 1500 },
+  { id: 'chelt_aquarium', productId: 'chelt_meat', inputs: [{ wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 60, batchSize: 30, productStorageCap: 1500 },
+  { id: 'soyfarm', productId: 'soya_beans', inputs: [{ wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 60, batchSize: 30, productStorageCap: 1500 },
+  { id: 'soyery', productId: 'soja_husk', inputs: [{ wareId: 'soya_beans', amount: 10 }, { wareId: 'energy_cells', amount: 15 }], cycleTimeSec: 90, batchSize: 20, productStorageCap: 1000 },
+  { id: 'massom_mill', productId: 'massom_powder', inputs: [{ wareId: 'energy_cells', amount: 20 }], cycleTimeSec: 70, batchSize: 40, productStorageCap: 1200 },
+  { id: 'snail_ranch', productId: 'maja_snails', inputs: [{ wareId: 'energy_cells', amount: 10 }], cycleTimeSec: 60, batchSize: 30, productStorageCap: 1500 },
   { id: 'flower_farm', productId: 'sunflowers', inputs: [{ wareId: 'energy_cells', amount: 60 }], cycleTimeSec: 80, batchSize: 240, productStorageCap: 2400 },
   { id: 'oil_refinery', productId: 'nostrop_oil', inputs: [{ wareId: 'sunflowers', amount: 160 }, { wareId: 'energy_cells', amount: 80 }], cycleTimeSec: 120, batchSize: 180, productStorageCap: 1800 },
+  { id: 'sun_oil_refinery', productId: 'nostrop_oil', inputs: [{ wareId: 'sunflowers', amount: 160 }, { wareId: 'energy_cells', amount: 80 }], cycleTimeSec: 120, batchSize: 180, productStorageCap: 1800 },
   { id: 'teladianium_foundry', productId: 'teladianium', inputs: [{ wareId: 'ore', amount: 120 }, { wareId: 'energy_cells', amount: 120 }], cycleTimeSec: 150, batchSize: 160, productStorageCap: 1600 },
   { id: 'ire_forge', productId: 'ire_laser', inputs: [{ wareId: 'nostrop_oil', amount: 120 }, { wareId: 'ore', amount: 60 }, { wareId: 'silicon', amount: 30 }, { wareId: 'energy_cells', amount: 240 }], cycleTimeSec: 240, batchSize: 2, productStorageCap: 6 },
+  { id: 'hept_forge', productId: 'hept_laser', inputs: [{ wareId: 'nostrop_oil', amount: 160 }, { wareId: 'ore', amount: 80 }, { wareId: 'silicon', amount: 40 }, { wareId: 'energy_cells', amount: 280 }], cycleTimeSec: 260, batchSize: 1, productStorageCap: 4 },
+  { id: 'shield_plant', productId: 'shield_1mw', inputs: [{ wareId: 'ore', amount: 40 }, { wareId: 'teladianium', amount: 40 }, { wareId: 'energy_cells', amount: 120 }], cycleTimeSec: 180, batchSize: 4, productStorageCap: 40 },
+  { id: 'quantum_tube_fab', productId: 'quantum_tubes', inputs: [{ wareId: 'ore', amount: 60 }, { wareId: 'energy_cells', amount: 120 }], cycleTimeSec: 160, batchSize: 40, productStorageCap: 800 },
+  { id: 'chip_plant', productId: 'microchips', inputs: [{ wareId: 'silicon', amount: 80 }, { wareId: 'energy_cells', amount: 150 }], cycleTimeSec: 160, batchSize: 30, productStorageCap: 600 },
   { id: 'spaceweed_cycle', productId: 'spaceweed', inputs: [{ wareId: 'sunflowers', amount: 140 }, { wareId: 'energy_cells', amount: 120 }], cycleTimeSec: 200, batchSize: 60, productStorageCap: 600 },
+  { id: 'dream_farm', productId: 'swamp_plant', inputs: [{ wareId: 'energy_cells', amount: 20 }], cycleTimeSec: 70, batchSize: 40, productStorageCap: 1200 },
+  { id: 'bliss_place', productId: 'spaceweed', inputs: [{ wareId: 'swamp_plant', amount: 40 }, { wareId: 'energy_cells', amount: 40 }], cycleTimeSec: 120, batchSize: 50, productStorageCap: 800 },
+  { id: 'majaglit_factory', productId: 'majaglit', inputs: [{ wareId: 'energy_cells', amount: 20 }], cycleTimeSec: 80, batchSize: 60, productStorageCap: 1200 },
+  { id: 'rastar_refinery', productId: 'rastar_oil', inputs: [{ wareId: 'chelt_meat', amount: 20 }, { wareId: 'energy_cells', amount: 20 }], cycleTimeSec: 100, batchSize: 60, productStorageCap: 1000 },
   { id: 'bogas_plant', productId: 'bogas', inputs: [{ wareId: 'energy_cells', amount: 80 }], cycleTimeSec: 90, batchSize: 220, productStorageCap: 1800 },
   { id: 'bofu_lab', productId: 'bofu', inputs: [{ wareId: 'bogas', amount: 160 }, { wareId: 'energy_cells', amount: 80 }], cycleTimeSec: 120, batchSize: 180, productStorageCap: 1600 },
   { id: 'crystal_fab', productId: 'crystals', inputs: [{ wareId: 'silicon', amount: 80 }, { wareId: 'energy_cells', amount: 150 }], cycleTimeSec: 150, batchSize: 40, productStorageCap: 600 },
@@ -252,6 +317,7 @@ function createInitialState(): UniverseState {
 
   // Seed station inventories/resources
   seedStationInventory(DEFAULT_STATIONS, DEFAULT_RECIPES)
+  normalizeStationStock(DEFAULT_STATIONS, DEFAULT_RECIPES)
 
   return {
     wares: DEFAULT_WARES,
@@ -292,10 +358,30 @@ const productionStep = (stations: Station[], recipes: Recipe[], deltaSec: number
   })
 }
 
+const BASE_JUMP_TIME = 120 // seconds per inter-sector hop (rough)
+const DOCK_TIME = 30
+const TRANSFER_TIME_PER_1000 = 60 // seconds per 1000 volume
+
+const estimateTradeSeconds = (
+  from: Station,
+  to: Station,
+  amount: number,
+  wareVolume: number,
+  fleetSpeed: number,
+) => {
+  const hops = from.sectorId === to.sectorId ? 0 : 1 // coarse; we don't have graph here
+  const transit = (hops * BASE_JUMP_TIME) / Math.max(0.1, fleetSpeed)
+  const transfer = (amount * wareVolume / 1000) * TRANSFER_TIME_PER_1000
+  const dockCycle = DOCK_TIME * 2 // dock + undock on both ends
+  return transit + transfer + dockCycle
+}
+
 const pickTrade = (
+  fleet: NPCFleet,
   stations: Station[],
   wares: Ware[],
   sectorPrices: Record<string, Record<string, number>>,
+  blocked: Set<string>,
 ): { wareId: string; from: Station; to: Station; amount: number; buyPrice: number; sellPrice: number } | null => {
   const wareMap = new Map<string, Ware>(wares.map((w) => [w.id, w]))
   let best: any = null
@@ -310,13 +396,19 @@ const pickTrade = (
         if (to.id === from.id) return
         const need = (to.inventory[wareId] || 0) < 200
         if (!need) return
-        const buyPrice = sectorPrices[from.sectorId]?.[wareId] ?? wareMap.get(wareId)?.basePrice ?? 100
+        const basePrice = wareMap.get(wareId)?.basePrice ?? 100
+        const buyPrice = sectorPrices[from.sectorId]?.[wareId] ?? basePrice
         const sellPrice = sectorPrices[to.sectorId]?.[wareId] ?? buyPrice
-        const profit = sellPrice - buyPrice
-        if (profit <= 0) return
+        const profitPerUnit = sellPrice - buyPrice
+        if (profitPerUnit <= 0) return
         const amount = Math.min(surplus * 0.6, 800)
-        if (!best || profit * amount > best.score) {
-          best = { wareId, from, to, amount, buyPrice, sellPrice, score: profit * amount }
+        const volume = wareMap.get(wareId)?.volume ?? 1
+        const eta = estimateTradeSeconds(from, to, amount, volume, fleet.speed || 1)
+        const score = (profitPerUnit * amount) / Math.max(1, eta)
+        const key = `${from.id}-${to.id}-${wareId}`
+        if (blocked.has(key)) return
+        if (!best || score > best.score) {
+          best = { wareId, from, to, amount, buyPrice, sellPrice, score }
         }
       })
     })
@@ -331,6 +423,118 @@ const pickTrade = (
     buyPrice: best.buyPrice,
     sellPrice: best.sellPrice,
   }
+}
+
+/**
+ * Corp-focused picker: try to source inputs for the owner's stations first.
+ * If nothing is needed, fall back to a profitable sell of the corp's products.
+ */
+const pickCorpTrade = (
+  fleet: NPCFleet,
+  ownerId: string,
+  stations: Station[],
+  wares: Ware[],
+  recipes: Recipe[],
+  sectorPrices: Record<string, Record<string, number>>,
+  blocked: Set<string>,
+): { wareId: string; from: Station; to: Station; amount: number; buyPrice: number; sellPrice: number } | null => {
+  const recipeMap = new Map<string, Recipe>(recipes.map((r) => [r.id, r]))
+  const wareMap = new Map<string, Ware>(wares.map((w) => [w.id, w]))
+  const corpStations = stations.filter((s) => s.ownerId === ownerId)
+  if (corpStations.length === 0) return null
+
+  // 1) Supply shortages for corp-owned stations (inputs below reorder)
+  let best: any = null
+  for (const dest of corpStations) {
+    const r = recipeMap.get(dest.recipeId)
+    if (!r) continue
+    for (const inp of r.inputs) {
+      const have = dest.inventory[inp.wareId] || 0
+      const reorder = dest.reorderLevel[inp.wareId] || inp.amount * 20
+      const deficit = Math.max(0, reorder - have)
+      if (deficit <= 0) continue
+
+      // Search suppliers (prefer corp first)
+      const suppliers = [
+        ...stations.filter((s) => s.ownerId === ownerId),
+        ...stations.filter((s) => s.ownerId !== ownerId),
+      ]
+      for (const src of suppliers) {
+        if (src.id === dest.id) continue
+        const available = src.inventory[inp.wareId] || 0
+        const reserve = src.reserveLevel[inp.wareId] || 0
+        const surplus = Math.max(0, available - reserve)
+        if (surplus < inp.amount) continue
+
+        const buyPrice = sectorPrices[src.sectorId]?.[inp.wareId] ?? wareMap.get(inp.wareId)?.basePrice ?? 100
+        const sellPrice = sectorPrices[dest.sectorId]?.[inp.wareId] ?? buyPrice
+        const amount = Math.max(10, Math.min(surplus * 0.5, deficit * 0.8, 800))
+        const volume = wareMap.get(inp.wareId)?.volume ?? 1
+        const eta = estimateTradeSeconds(src, dest, amount, volume, fleet.speed || 1)
+        // Shortage-weighted profit per second
+        const profitPerSec = ((sellPrice - buyPrice) * amount) / Math.max(1, eta)
+        const score = profitPerSec + deficit * 0.001 // slight bias to fill shortages
+        const key = `${src.id}-${dest.id}-${inp.wareId}`
+        if (blocked.has(key)) continue
+
+        if (!best || score > best.score) {
+          best = { wareId: inp.wareId, from: src, to: dest, amount, buyPrice, sellPrice, score }
+        }
+      }
+    }
+  }
+  if (best) {
+    return {
+      wareId: best.wareId,
+      from: best.from,
+      to: best.to,
+      amount: Math.max(10, Math.floor(best.amount)),
+      buyPrice: best.buyPrice,
+      sellPrice: best.sellPrice,
+    }
+  }
+
+  // 2) If no shortages, try to sell corp-produced goods with profit preference (corp-owned producers -> external buyers)
+  let sellBest: any = null
+  const producerStations = corpStations
+  producerStations.forEach((from) => {
+    Object.entries(from.inventory).forEach(([wareId, qty]) => {
+      if (qty <= 0) return
+      const surplus = qty - (from.reserveLevel[wareId] || 0)
+      if (surplus <= 0) return
+
+      stations.forEach((to) => {
+        if (to.id === from.id) return
+        const need = (to.inventory[wareId] || 0) < 200
+        if (!need) return
+        const buyPrice = sectorPrices[from.sectorId]?.[wareId] ?? wareMap.get(wareId)?.basePrice ?? 100
+        const sellPrice = sectorPrices[to.sectorId]?.[wareId] ?? buyPrice
+        const profit = sellPrice - buyPrice
+        if (profit <= 0) return
+        const amount = Math.min(surplus * 0.6, 800)
+        const volume = wareMap.get(wareId)?.volume ?? 1
+        const eta = estimateTradeSeconds(from, to, amount, volume, fleet.speed || 1)
+        const score = (profit * amount) / Math.max(1, eta)
+        const key = `${from.id}-${to.id}-${wareId}`
+        if (blocked.has(key)) return
+        if (!sellBest || score > sellBest.score) {
+          sellBest = { wareId, from, to, amount, buyPrice, sellPrice, score }
+        }
+      })
+    })
+  })
+  if (sellBest) {
+    return {
+      wareId: sellBest.wareId,
+      from: sellBest.from,
+      to: sellBest.to,
+      amount: Math.max(10, Math.floor(sellBest.amount)),
+      buyPrice: sellBest.buyPrice,
+      sellPrice: sellBest.sellPrice,
+    }
+  }
+
+  return null
 }
 
 const buildTradeCommands = (_fleet: NPCFleet, plan: ReturnType<typeof pickTrade>): ShipCommand[] => {
@@ -443,12 +647,29 @@ export class UniverseService {
   }
 
   private assignTrades() {
+    const reservedTrades = new Set<string>() // prevent dog-piling the exact same leg
     this.state.fleets.forEach((fleet) => {
       if (fleet.commandQueue && fleet.commandQueue.length > 0) return
       if (Object.values(fleet.cargo).some((v) => v > 0)) return
 
-      const plan = pickTrade(this.state.stations, this.state.wares, this.state.sectorPrices)
+      // Behavior-aware assignment: corp-owned logistics first, else global freelance
+      const wantsCorpJob = fleet.ownerId && (fleet.behavior === 'station-supply' || fleet.behavior === 'station-distribute' || fleet.behavior === 'corp-logistics')
+      const corpPlan = wantsCorpJob
+        ? pickCorpTrade(fleet, fleet.ownerId as string, this.state.stations, this.state.wares, this.state.recipes, this.state.sectorPrices, reservedTrades)
+        : null
+
+      let plan = corpPlan || pickTrade(fleet, this.state.stations, this.state.wares, this.state.sectorPrices, reservedTrades)
       if (!plan) return
+
+      // If plan is blocked, try to find an alternative once
+      let key = `${plan.from.id}-${plan.to.id}-${plan.wareId}`
+      if (reservedTrades.has(key)) {
+        plan = pickTrade(fleet, this.state.stations, this.state.wares, this.state.sectorPrices, reservedTrades)
+        if (!plan) return
+        key = `${plan.from.id}-${plan.to.id}-${plan.wareId}`
+        if (reservedTrades.has(key)) return
+      }
+      reservedTrades.add(key)
 
       const capacity = Math.max(100, fleet.capacity)
       const ware = this.state.wares.find((w) => w.id === plan.wareId)

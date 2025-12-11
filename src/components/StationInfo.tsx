@@ -1,16 +1,40 @@
 import React from 'react';
 import { useGameStore, type GameState, type Station } from '../store/gameStore';
+import { getStationPriceMap } from '../services/stationPricing';
 
 export const StationInfo: React.FC = () => {
     const open = useGameStore((state: GameState) => state.stationInfoOpen);
     const target = useGameStore((state: GameState) => state.selectedTarget);
     const stations = useGameStore((state: GameState) => state.stations);
+    const wares = useGameStore((state: GameState) => state.wares);
+    const recipes = useGameStore((state: GameState) => state.recipes);
     const setOpen = useGameStore((state: GameState) => state.setStationInfoOpen);
 
     if (!open || !target || target.type !== 'station') return null;
 
     // Try to find detailed station info
     const stationData = stations.find((s: Station) => s.name === target.name);
+    const recipe = stationData ? recipes.find((r) => r.id === stationData.recipeId) : undefined;
+    const priceMap = stationData ? getStationPriceMap(stationData, recipe, wares) : {};
+    const wareNameMap = new Map(wares.map((w) => [w.id, w.name]));
+    const warePriceMap = new Map(wares.map((w) => [w.id, w.basePrice]));
+    const combinedWares = stationData
+        ? (recipe
+            ? Array.from(new Set<string>([
+                ...Object.keys(stationData.inventory),
+                ...recipe.inputs.map((i) => i.wareId),
+                recipe.productId,
+            ]))
+            : Object.keys(stationData.inventory))
+        : [];
+    const rows = combinedWares.map((wid) => {
+        const qty = stationData?.inventory[wid] || 0;
+        const price = priceMap[wid] ?? warePriceMap.get(wid);
+        const mode = recipe
+            ? (recipe.productId === wid ? 'sell' : recipe.inputs.some((i) => i.wareId === wid) ? 'buy' : 'store')
+            : 'store';
+        return { wid, qty, price, mode };
+    });
 
     return (
         <div style={{
@@ -92,19 +116,28 @@ export const StationInfo: React.FC = () => {
 
                         <h3 style={{ fontSize: '14px', borderBottom: '1px solid #004466', paddingBottom: '5px', marginBottom: '10px' }}>PRODUCTION INFO</h3>
                         {/* If we had recipe info, we could show it here. For now, show inventory if available */}
-                        {stationData.inventory && Object.keys(stationData.inventory).length > 0 ? (
+                        {rows.length > 0 ? (
                             <table style={{ width: '100%', fontSize: '14px' }}>
                                 <thead>
                                     <tr style={{ color: '#006699', textAlign: 'left' }}>
                                         <th>WARE</th>
                                         <th style={{ textAlign: 'right' }}>STOCK</th>
+                                        <th style={{ textAlign: 'right' }}>PRICE</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {Object.entries(stationData.inventory).map(([ware, amount]) => (
-                                        <tr key={ware}>
-                                            <td>{ware}</td>
-                                            <td style={{ textAlign: 'right' }}>{(amount as number).toString()}</td>
+                                    {rows.map((row) => (
+                                        <tr key={row.wid}>
+                                            <td>{wareNameMap.get(row.wid) || row.wid}</td>
+                                            <td style={{ textAlign: 'right' }}>{Math.round(row.qty).toString()}</td>
+                                            <td style={{ textAlign: 'right', color: row.mode === 'buy' ? '#00ffcc' : '#88cc44' }}>
+                                                {row.price ? (
+                                                    <>
+                                                        {row.mode === 'buy' ? 'Bid ' : 'Ask '}
+                                                        {Math.round(row.price)} Cr
+                                                    </>
+                                                ) : 'n/a'}
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>

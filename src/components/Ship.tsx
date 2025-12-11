@@ -89,7 +89,7 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
             if (e.code === 'KeyJ') {
                 const current = useGameStore.getState().timeScale;
                 // Toggle between 1x and 10x
-                useGameStore.getState().setTimeScale(current === 1.0 ? 10.0 : 1.0);
+                useGameStore.getState().setTimeScale(current === 1.0 ? 30.0 : 1.0);
             }
             if (e.code === 'Backspace') {
                 e.preventDefault();

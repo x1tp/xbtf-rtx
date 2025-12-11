@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { SHIP_STATS } from '../config/ships';
-import type { NPCFleet, SectorEvent, TradeLogEntry, SectorViewData, Corporation } from '../types/simulation';
+import type { NPCFleet, SectorEvent, TradeLogEntry, SectorViewData, Corporation, EconomyHistoryEntry } from '../types/simulation';
 
 export interface NavTarget {
   name: string;
@@ -99,6 +99,10 @@ export interface GameState {
   syncFleets: () => Promise<void>;
   getSectorView: (sectorId: string) => SectorViewData | null;
   getCorporation: (id: string) => Corporation | undefined;
+
+  // History
+  economyHistory: EconomyHistoryEntry[];
+  lastSnapshotTime: number;
 
   // Ship autonomy - reports from frontend ships to backend
   reportShipAction: (fleetId: string, type: string, data: {
@@ -253,6 +257,74 @@ export const useGameStore = create<GameState>((set, get) => ({
           tradeLog: data.tradeLog || [],
         }
       })
+
+      // Economy Snapshot Logic (Frontend Side)
+      const now = Date.now();
+      const s = get();
+      if (now - s.lastSnapshotTime > 10000) { // Every 10s
+        const historyEntry: EconomyHistoryEntry = {
+          timestamp: now,
+          totalStock: {},
+          avgPrices: {},
+          totalCredits: 0,
+          totalAssetValue: 0
+        };
+
+        // 1. Total Stock & Asset Value
+        const wares = s.wares;
+        const stations = s.stations;
+        const fleets = s.fleets;
+
+        // Init maps
+        wares.forEach(w => {
+          historyEntry.totalStock[w.id] = 0;
+          historyEntry.avgPrices[w.id] = 0;
+        });
+
+        // Sum station stock
+        stations.forEach(st => {
+          Object.entries(st.inventory).forEach(([wid, qty]) => {
+            if (historyEntry.totalStock[wid] !== undefined) {
+              historyEntry.totalStock[wid] += qty;
+            }
+          });
+        });
+
+        // Sum fleet cargo
+        fleets.forEach(result => {
+          Object.entries(result.cargo).forEach(([wid, qty]) => {
+            if (historyEntry.totalStock[wid] !== undefined) {
+              historyEntry.totalStock[wid] += qty;
+            }
+          });
+          historyEntry.totalCredits += result.credits; // Fleet credits (if any)
+        });
+
+        // 2. Average Prices
+        const priceCounts: Record<string, number> = {};
+        Object.values(s.sectorPrices).forEach(sectorPriceMap => {
+          Object.entries(sectorPriceMap).forEach(([wid, price]) => {
+            if (historyEntry.avgPrices[wid] !== undefined) {
+              historyEntry.avgPrices[wid] += price;
+              priceCounts[wid] = (priceCounts[wid] || 0) + 1;
+            }
+          });
+        });
+
+        // Finalize averages
+        wares.forEach(w => {
+          if (priceCounts[w.id] > 0) {
+            historyEntry.avgPrices[w.id] /= priceCounts[w.id];
+          } else {
+            historyEntry.avgPrices[w.id] = w.basePrice; // Default to base if no data
+          }
+        });
+
+        set(state => ({
+          economyHistory: [...state.economyHistory, historyEntry],
+          lastSnapshotTime: now
+        }));
+      }
     } catch {
       set(() => ({}))
     }
@@ -263,6 +335,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   fleets: [],
   activeEvents: [],
   tradeLog: [],
+  economyHistory: [],
+  lastSnapshotTime: 0,
 
   syncFleets: async () => {
     try {

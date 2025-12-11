@@ -137,6 +137,7 @@ export interface NPCFleet {
   // Backend only sets commands, frontend executes and reports back
   state: FleetState             // Current state (reported by frontend)
   stateStartTime: number        // When current state began
+  lastReportAt?: number         // Last heartbeat/report from the client sim
 
   // Command queue (set by backend, executed by frontend)
   commandQueue: ShipCommand[]   // Commands to execute in order
@@ -304,6 +305,20 @@ export interface TradeRoute {
   profit: number
   profitPerVolume: number
   jumpDistance: number
+}
+
+// ============================================================================
+// Economy History Types
+// ============================================================================
+
+export interface EconomyHistoryEntry {
+  timestamp: number
+  // Aggregated totals
+  totalStock: Record<string, number> // wareId -> total quantity (stations + fleets)
+  avgPrices: Record<string, number>  // wareId -> average sector price
+  // Raw values for normalizing if needed
+  totalCredits: number
+  totalAssetValue: number
 }
 
 // ============================================================================
@@ -768,4 +783,32 @@ export const FLEET_CONSTANTS = {
 
   /** Fleet position update interval for remote viewing (ms) */
   POSITION_UPDATE_INTERVAL: 500,
+}
+
+// ============================================================================
+// Economy Types
+// ============================================================================
+
+export type WareCategory = 'primary' | 'food' | 'intermediate' | 'end' | 'misc'
+
+export interface Ware {
+  id: string
+  name: string
+  category: WareCategory
+  basePrice: number
+  volume: number
+}
+
+export interface RecipeInput {
+  wareId: string
+  amount: number
+}
+
+export interface Recipe {
+  id: string
+  productId: string
+  inputs: RecipeInput[]
+  cycleTimeSec: number
+  batchSize: number
+  productStorageCap: number
 }
