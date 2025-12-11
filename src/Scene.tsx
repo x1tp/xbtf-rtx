@@ -13,6 +13,7 @@ import { Gate } from './components/Gate';
 import { Sun } from './components/Sun';
 import { Dust } from './components/Dust';
 import { NavigationIndicator } from './components/NavigationIndicator';
+import { ShipCrosshair } from './components/ShipCrosshair';
 import { StarfieldSky } from './components/StarfieldSky';
 
 import * as THREE from 'three';
@@ -250,11 +251,12 @@ export const Scene: React.FC<SceneProps> = ({ hdr = false }) => {
                 )}
             <Dust key={`dust-${currentSectorId}`} count={5000} range={10000} center={[0, 0, 0]} color="#aaccff" size={0.8} opacity={0.15} />
 
+            {/* Crosshair aligned to the player's forward direction */}
+            <ShipCrosshair />
+
             {/* Navigation indicator for selected target */}
             <NavigationIndicator />
 
         </>
     );
 };
-
-

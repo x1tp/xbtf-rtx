@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { Vector3, Group, MathUtils, Quaternion, Box3, Quaternion as TQuaternion, Mesh, BufferGeometry, Matrix4 } from 'three';
+import { Vector3, Group, MathUtils, Quaternion, Box3, Quaternion as TQuaternion, Mesh, BufferGeometry, Matrix4, Raycaster } from 'three';
 import { ensureRapier, getWorld, getWorldSync } from '../physics/RapierWorld';
 import type RAPIERType from '@dimforge/rapier3d-compat';
 type RapierExports = { ColliderDesc: { convexHull: (arr: Float32Array) => unknown } };
@@ -41,6 +41,7 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
     const brakeRef = useRef(false);
     const isTargetViewRef = useRef(false);
     const targetOrbitRef = useRef({ yaw: 0, pitch: 0.2, distance: 800 });
+    const raycasterRef = useRef(new Raycaster());
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -115,6 +116,59 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
         };
         const handleMouseDown = (e: MouseEvent) => {
             if (e.button === 0) lmbDownRef.current = true;
+            if (e.button === 1) {
+                e.preventDefault();
+                // First try precise raycast for ships
+                const ndc = new Vector3(
+                    (e.clientX / window.innerWidth) * 2 - 1,
+                    -(e.clientY / window.innerHeight) * 2 + 1,
+                    0.5
+                );
+                const rc = raycasterRef.current;
+                rc.setFromCamera({ x: ndc.x, y: ndc.y }, camera);
+                const hits = rc.intersectObjects(scene.children, true);
+                let pickedShip: { name: string; position: [number, number, number] } | null = null;
+                for (const h of hits) {
+                    const n = h.object?.name || '';
+                    if (n.includes('Ship')) {
+                        const p = new Vector3();
+                        h.object.getWorldPosition(p);
+                        pickedShip = { name: n, position: [p.x, p.y, p.z] };
+                        break;
+                    }
+                }
+                if (pickedShip) {
+                    useGameStore.getState().setSelectedTarget({
+                        name: pickedShip.name,
+                        position: pickedShip.position,
+                        type: 'ship',
+                    });
+                    return;
+                }
+
+                // Fallback: pick closest nav object under cursor
+                const navObjects = useGameStore.getState().navObjects;
+                const currentSectorId = useGameStore.getState().currentSectorId;
+                const sx = e.clientX;
+                const sy = e.clientY;
+                let best: { obj: typeof navObjects[number]; d: number } | null = null;
+                for (const obj of navObjects) {
+                    if (obj.targetSectorId && obj.targetSectorId !== currentSectorId) continue;
+                    const v = new Vector3(obj.position[0], obj.position[1], obj.position[2]);
+                    const projected = v.project(camera);
+                    const px = (projected.x * 0.5 + 0.5) * window.innerWidth;
+                    const py = (1 - (projected.y * 0.5 + 0.5)) * window.innerHeight;
+                    const dx = px - sx;
+                    const dy = py - sy;
+                    const dist = Math.hypot(dx, dy);
+                    if (best === null || dist < best.d) {
+                        best = { obj, d: dist };
+                    }
+                }
+                if (best && best.d < 120) { // only select if reasonably close to cursor
+                    useGameStore.getState().setSelectedTarget(best.obj);
+                }
+            }
         };
         const handleMouseUp = (e: MouseEvent) => {
             if (e.button === 0) lmbDownRef.current = false;

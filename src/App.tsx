@@ -22,6 +22,7 @@ import { ModelGrid } from './components/ModelGrid';
 
 import { SectorMap2D } from './components/SectorMap2D';
 import { OffScreenArrow } from './components/NavigationIndicator';
+import { ShipControlCursor } from './components/ShipControlCursor';
 import { getSectorLayoutById } from './config/sector';
 import { UNIVERSE_SECTORS_XBTF } from './config/universe_xbtf';
 import { useGameStore } from './store/gameStore';
@@ -236,6 +237,7 @@ function App() {
         </Suspense>
       </Canvas>
       <OverExposureOverlay />
+      <ShipControlCursor />
       <SmartLoader />
       <HUD />
       <StationInfo />
