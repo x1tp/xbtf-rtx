@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { Vector3, Group, MathUtils, Quaternion, Box3, Quaternion as TQuaternion, Mesh, BufferGeometry, Matrix4, Raycaster } from 'three';
+import { Vector3, Vector2, Group, MathUtils, Quaternion, Box3, Quaternion as TQuaternion, Mesh, BufferGeometry, Matrix4, Raycaster } from 'three';
 import { ensureRapier, getWorld, getWorldSync } from '../physics/RapierWorld';
 import type RAPIERType from '@dimforge/rapier3d-compat';
 type RapierExports = { ColliderDesc: { convexHull: (arr: Float32Array) => unknown } };
@@ -24,6 +24,7 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
     const timeScale = useGameStore((state) => state.timeScale);
     const setTimeScale = useGameStore((state) => state.setTimeScale);
     const velocityRef = useRef(new Vector3());
+    const cameraShakeRef = useRef({ elapsed: 0, duration: 0, magnitude: 0 });
     const planetRadiusRef = useRef(0);
     const stationRadiusRef = useRef(0);
     const shipHalfExtentsRef = useRef(new Vector3(1, 1, 1));
@@ -125,7 +126,7 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
                     0.5
                 );
                 const rc = raycasterRef.current;
-                rc.setFromCamera({ x: ndc.x, y: ndc.y }, camera);
+                rc.setFromCamera(new Vector2(ndc.x, ndc.y), camera);
                 const hits = rc.intersectObjects(scene.children, true);
                 let pickedShip: { name: string; position: [number, number, number] } | null = null;
                 for (const h of hits) {
@@ -302,6 +303,34 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
         const ship = shipRef.current;
         const velocity = velocityRef.current;
         const orbit = orbitRef.current;
+        const now = state.clock.elapsedTime;
+
+        const applyCameraShake = (camPos: Vector3, camTarget: Vector3) => {
+            const shake = cameraShakeRef.current;
+            if (shake.duration <= 0) return;
+            shake.elapsed += delta;
+            const t = Math.min(shake.elapsed / shake.duration, 1);
+            const fade = 1 - t;
+            const amp = shake.magnitude * fade;
+            const wobble = now * 40;
+            const offset = new Vector3(
+                (Math.sin(wobble) + Math.sin(wobble * 1.3)) * 0.5 * amp,
+                (Math.cos(wobble * 0.8) + Math.sin(wobble * 1.1)) * 0.5 * amp,
+                Math.sin(wobble * 1.7) * 0.4 * amp
+            );
+            camPos.add(offset);
+            camTarget.add(offset.clone().multiplyScalar(0.35));
+            if (t >= 1) {
+                shake.duration = 0;
+                shake.elapsed = 0;
+            }
+        };
+
+        const registerImpact = (duration = 0.55, magnitude = 1.6) => {
+            cameraShakeRef.current = { elapsed: 0, duration, magnitude };
+            velocity.set(0, 0, 0);
+            setThrottle(0);
+        };
 
         // Helper to compute camera follow (recalculates vectors from current quaternion)
         const updateCameraFollow = () => {
@@ -316,6 +345,7 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
             const lookTarget = orbit.target === 'center'
                 ? ship.position.clone()
                 : ship.position.clone().add(fwd.clone().multiplyScalar(50));
+            applyCameraShake(desired, lookTarget);
             const t = 1 - Math.exp(-5 * delta);
             if (!initializedRef.current) {
                 camera.position.copy(desired);
@@ -500,24 +530,39 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
             }
 
             if (result.x !== 0 || result.y !== 0 || result.z !== 0) {
-                const newPos = origin.clone().add(new Vector3(result.x, result.y, result.z));
+                const desiredVec = new Vector3(move.x, move.y, move.z);
+                const resultVec = new Vector3(result.x, result.y, result.z);
+                const newPos = origin.clone().add(resultVec);
                 ship.position.copy(newPos);
 
                 // Check if we were obstructed (result differs from intended move)
                 collided = (Math.abs(result.x - move.x) + Math.abs(result.y - move.y) + Math.abs(result.z - move.z)) > 1e-4;
 
                 if (collided) {
-                    // Update local velocity to match the actual World Space movement
-                    // This prevents "pushing" - if we stopped, our velocity should become 0
-                    const actualMove = new Vector3(result.x, result.y, result.z);
-                    const actualVel = actualMove.divideScalar(delta); // World space velocity
-
-                    // Project back to local space
-                    velocity.x = actualVel.dot(right);
-                    velocity.y = actualVel.dot(up);
-                    velocity.z = actualVel.dot(forward);
-
-                    // console.log('Collision corrected velocity:', velocity);
+                const desiredLen = desiredVec.length();
+                const resultLen = resultVec.length();
+                const progress = desiredLen > 1e-5 ? resultLen / desiredLen : 0;
+                const diff = desiredVec.clone().sub(resultVec);
+                const alignment = desiredLen > 1e-5 && resultLen > 1e-5
+                    ? resultVec.dot(desiredVec) / (desiredLen * resultLen)
+                    : 1;
+                    const desiredSpeed = desiredLen / Math.max(delta, 1e-4); // approximate world speed
+                    // Treat only very aligned, mostly-unblocked moves as a glancing blow.
+                    if (progress > 0.6 && alignment > 0.85) {
+                        const normal = diff.lengthSq() > 1e-8 ? diff.clone().normalize().negate() : new Vector3(0, 1, 0);
+                        const pushStrength = MathUtils.clamp(desiredSpeed * 0.05, 0.5, 12);
+                        ship.position.add(normal.multiplyScalar(pushStrength));
+                        velocity.multiplyScalar(0.6);
+                        setThrottle(MathUtils.clamp(throttle * 0.6, -1, 1));
+                        cameraShakeRef.current = { elapsed: 0, duration: 0.35, magnitude: 0.9 };
+                    } else {
+                        // On hard collision, stop the ship, pull it back a bit, and add camera shake feedback
+                        if (diff.lengthSq() > 1e-8) {
+                            const pushBack = diff.clone().normalize().negate().multiplyScalar(MathUtils.clamp(desiredSpeed * 0.08, 0.5, 10));
+                            ship.position.add(pushBack);
+                        }
+                        registerImpact();
+                    }
                 }
             }
         }
@@ -541,7 +586,7 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
                 const he = shipHalfExtentsRef.current;
                 const support = Math.abs(nLocal.x) * he.x + Math.abs(nLocal.y) * he.y + Math.abs(nLocal.z) * he.z;
                 ship.position.copy(c.clone().add(n.multiplyScalar(r + support)));
-                velocity.multiplyScalar(0.5);
+                registerImpact(0.7, 1.8);
             }
         }
 
