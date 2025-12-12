@@ -50,8 +50,10 @@ export interface GameState {
 
   // Time / SETA
   timeScale: number;
-  setTimeScale: (scale: number) => void;
+  setTimeScale: (scale: number, opts?: { bypassSafety?: boolean }) => void;
   elapsedTimeSec: number;
+  setaMessage: string | null;
+  showSetaMessage: (message: string, durationMs?: number) => void;
 
   // Navigation/Sector map
   sectorMapOpen: boolean;
@@ -103,7 +105,9 @@ export interface GameState {
 
   // History
   economyHistory: EconomyHistoryEntry[];
+  economyHistorySessionId: string | null;
   lastSnapshotTime: number;
+  syncEconomyHistory: (opts?: { limit?: number }) => Promise<void>;
 
   // Ship autonomy - reports from frontend ships to backend
   reportShipAction: (fleetId: string, type: string, data: {
@@ -114,10 +118,28 @@ export interface GameState {
     amount?: number;
   }) => Promise<void>;
 
+  // Visual impact event bus (for shields, etc.)
+  lastImpact: {
+    position: [number, number, number];
+    dir: [number, number, number];
+    strength: number;
+    timestamp: number;
+    source: 'player' | 'npc' | 'other';
+  } | null;
+  emitImpact: (impact: {
+    position: [number, number, number];
+    dir: [number, number, number];
+    strength: number;
+    source?: 'player' | 'npc' | 'other';
+  }) => void;
+
   player: {
     credits: number;
   };
 }
+
+const SETA_PROXIMITY_BLOCK_DIST = 2000;
+let setaMessageTimeout: number | null = null;
 
 export const useGameStore = create<GameState>((set, get) => ({
   speed: 0,
@@ -137,7 +159,38 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   timeScale: 1.0,
   elapsedTimeSec: 0,
-  setTimeScale: (scale) => {
+  setaMessage: null,
+  showSetaMessage: (message, durationMs = 2000) => {
+    if (setaMessageTimeout) window.clearTimeout(setaMessageTimeout);
+    set({ setaMessage: message });
+    setaMessageTimeout = window.setTimeout(() => {
+      set({ setaMessage: null });
+      setaMessageTimeout = null;
+    }, Math.max(250, durationMs));
+  },
+  setTimeScale: (scale, opts) => {
+    const bypassSafety = opts?.bypassSafety === true
+    if (!bypassSafety && scale > 1.0) {
+      const state = get();
+      const currentSectorId = state.currentSectorId;
+      if (currentSectorId) {
+        const shipPos = state.position;
+        let nearestDist = Infinity;
+        for (const st of state.stations) {
+          if (st.sectorId !== currentSectorId) continue;
+          const dx = shipPos.x - st.position[0];
+          const dy = shipPos.y - st.position[1];
+          const dz = shipPos.z - st.position[2];
+          const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+          if (d < nearestDist) nearestDist = d;
+        }
+        if (nearestDist < SETA_PROXIMITY_BLOCK_DIST) {
+          get().showSetaMessage('SETA unavailable: too close to an object');
+          return;
+        }
+      }
+    }
+
     set({ timeScale: scale })
     fetch(`/__universe/time-scale?value=${encodeURIComponent(scale)}`, { method: 'POST' })
   },
@@ -267,76 +320,31 @@ export const useGameStore = create<GameState>((set, get) => ({
           tradeLog: data.tradeLog || [],
         }
       })
-
-      // Economy Snapshot Logic (Frontend Side)
-      const now = Date.now();
-      const s = get();
-      if (now - s.lastSnapshotTime > 10000) { // Every 10s
-        const historyEntry: EconomyHistoryEntry = {
-          timestamp: now,
-          totalStock: {},
-          avgPrices: {},
-          totalCredits: 0,
-          totalAssetValue: 0
-        };
-
-        // 1. Total Stock & Asset Value
-        const wares = s.wares;
-        const stations = s.stations;
-        const fleets = s.fleets;
-
-        // Init maps
-        wares.forEach(w => {
-          historyEntry.totalStock[w.id] = 0;
-          historyEntry.avgPrices[w.id] = 0;
-        });
-
-        // Sum station stock
-        stations.forEach(st => {
-          Object.entries(st.inventory).forEach(([wid, qty]) => {
-            if (historyEntry.totalStock[wid] !== undefined) {
-              historyEntry.totalStock[wid] += qty;
-            }
-          });
-        });
-
-        // Sum fleet cargo
-        fleets.forEach(result => {
-          Object.entries(result.cargo).forEach(([wid, qty]) => {
-            if (historyEntry.totalStock[wid] !== undefined) {
-              historyEntry.totalStock[wid] += qty;
-            }
-          });
-          historyEntry.totalCredits += result.credits; // Fleet credits (if any)
-        });
-
-        // 2. Average Prices
-        const priceCounts: Record<string, number> = {};
-        Object.values(s.sectorPrices).forEach(sectorPriceMap => {
-          Object.entries(sectorPriceMap).forEach(([wid, price]) => {
-            if (historyEntry.avgPrices[wid] !== undefined) {
-              historyEntry.avgPrices[wid] += price;
-              priceCounts[wid] = (priceCounts[wid] || 0) + 1;
-            }
-          });
-        });
-
-        // Finalize averages
-        wares.forEach(w => {
-          if (priceCounts[w.id] > 0) {
-            historyEntry.avgPrices[w.id] /= priceCounts[w.id];
-          } else {
-            historyEntry.avgPrices[w.id] = w.basePrice; // Default to base if no data
-          }
-        });
-
-        set(state => ({
-          economyHistory: [...state.economyHistory, historyEntry],
-          lastSnapshotTime: now
-        }));
-      }
     } catch {
       set(() => ({}))
+    }
+  },
+
+  syncEconomyHistory: async (opts) => {
+    try {
+      const state = get()
+      const since = state.economyHistory.length > 0 ? state.economyHistory[state.economyHistory.length - 1].timestamp : 0
+      const limit = opts?.limit ? `&limit=${encodeURIComponent(opts.limit)}` : ''
+      const res = await fetch(`/__universe/economy-history?since=${encodeURIComponent(since)}${limit}`)
+      const data = await res.json()
+      const incomingSessionId = typeof data.sessionId === 'string' ? data.sessionId : null
+      const incomingEntries = Array.isArray(data.economyHistory) ? data.economyHistory as EconomyHistoryEntry[] : []
+      set((s) => {
+        if (incomingSessionId && s.economyHistorySessionId && incomingSessionId !== s.economyHistorySessionId) {
+          return { economyHistorySessionId: incomingSessionId, economyHistory: incomingEntries }
+        }
+        if (incomingSessionId && !s.economyHistorySessionId) {
+          return { economyHistorySessionId: incomingSessionId, economyHistory: since > 0 ? [...s.economyHistory, ...incomingEntries] : incomingEntries }
+        }
+        return { economyHistory: since > 0 ? [...s.economyHistory, ...incomingEntries] : incomingEntries }
+      })
+    } catch {
+      // history not available yet
     }
   },
 
@@ -346,6 +354,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   activeEvents: [],
   tradeLog: [],
   economyHistory: [],
+  economyHistorySessionId: null,
   lastSnapshotTime: 0,
 
   syncFleets: async () => {
@@ -482,5 +491,19 @@ export const useGameStore = create<GameState>((set, get) => ({
     } catch (err) {
       console.warn('[gameStore] Failed to report ship action:', err)
     }
+  },
+
+  lastImpact: null,
+  emitImpact: (impact) => {
+    const now = Date.now()
+    set({
+      lastImpact: {
+        position: impact.position,
+        dir: impact.dir,
+        strength: impact.strength,
+        timestamp: now,
+        source: impact.source ?? 'other',
+      },
+    })
   },
 }));

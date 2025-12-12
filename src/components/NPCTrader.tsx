@@ -228,11 +228,11 @@ export const NPCTrader: FC<NPCTraderProps> = ({
     };
 
     // Emit detailed console log for visibility
-    const station = stationId || 'unknown';
-    const ware = extra?.wareId || 'n/a';
-    const amt = typeof extra?.amount === 'number' ? extra.amount : 'n/a';
-    const tgtSector = currentCommand?.targetSectorId || extra?.sectorIdOverride || fleet.destinationSectorId || 'n/a';
-    const stepInfo = `${type} | pos=(${pos.map(v => v.toFixed(1)).join(',')}) | station=${station} | sector=${sectorId} -> ${tgtSector} | ware=${ware} | amt=${amt}`;
+    // const station = stationId || 'unknown';
+    // const ware = extra?.wareId || 'n/a';
+    // const amt = typeof extra?.amount === 'number' ? extra.amount : 'n/a';
+    // const tgtSector = currentCommand?.targetSectorId || extra?.sectorIdOverride || fleet.destinationSectorId || 'n/a';
+    // const stepInfo = `${type} | pos=(${pos.map(v => v.toFixed(1)).join(',')}) | station=${station} | sector=${sectorId} -> ${tgtSector} | ware=${ware} | amt=${amt}`;
     // console.log(`[NPCTrader] ${fleet.name} ${stepInfo}`);
 
     onReport(fleet.id, type, payload);

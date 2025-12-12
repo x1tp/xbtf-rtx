@@ -200,6 +200,14 @@ type TradeLogEntry = {
   buyStationName: string; sellStationName: string
 }
 
+type EconomyHistoryEntry = {
+  timestamp: number
+  totalStock: Record<string, number>
+  avgPrices: Record<string, number>
+  totalCredits: number
+  totalAssetValue: number
+}
+
 type UniverseState = {
   wares: Ware[]; recipes: Recipe[]; stations: Station[]; sectorPrices: Record<string, Record<string, number>>; timeScale: number; acc: number; elapsedTimeSec: number
   // Fleet simulation
@@ -212,6 +220,13 @@ type UniverseState = {
 const computeSectorPrices = (stations: Station[], recipes: Recipe[], wares: Ware[]) => {
   const recipeById = new Map(recipes.map((r) => [r.id, r]))
   const priceMap: Record<string, Record<string, number>> = {}
+  const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v))
+  const getModRange = (wareId: string) => {
+    // Energy Cells are intentionally less volatile: they are a ubiquitous utility ware and
+    // extreme price swings cause the trade AI to over-focus on them.
+    if (wareId === 'energy_cells') return { min: 0.85, max: 1.25 }
+    return { min: 0.5, max: 2.0 }
+  }
 
   for (const st of stations) {
     const r = recipeById.get(st.recipeId)
@@ -223,7 +238,8 @@ const computeSectorPrices = (stations: Station[], recipes: Recipe[], wares: Ware
       const base = wares.find((w) => w.id === x.wareId)?.basePrice || 1
       const stock = st.inventory[x.wareId] || 0
       const rl = st.reorderLevel[x.wareId] || 0
-      const mod = Math.max(0.5, Math.min(2.0, rl <= 0 ? 1 : 1 + (rl - stock) / Math.max(rl, 1)))
+      const { min, max } = getModRange(x.wareId)
+      const mod = clamp(rl <= 0 ? 1 : 1 + (rl - stock) / Math.max(rl, 1), min, max)
       sp[x.wareId] = base * mod
     }
 
@@ -231,7 +247,8 @@ const computeSectorPrices = (stations: Station[], recipes: Recipe[], wares: Ware
     const baseProd = wares.find((w) => w.id === r.productId)?.basePrice || 1
     const prodStock = st.inventory[r.productId] || 0
     const reserve = st.reserveLevel[r.productId] || 0
-    const modProd = Math.max(0.5, Math.min(2.0, reserve <= 0 ? 1 : 1 + (reserve - prodStock) / Math.max(reserve, 1)))
+    const { min: minProd, max: maxProd } = getModRange(r.productId)
+    const modProd = clamp(reserve <= 0 ? 1 : 1 + (reserve - prodStock) / Math.max(reserve, 1), minProd, maxProd)
     sp[r.productId] = baseProd * modProd
 
     priceMap[st.sectorId] = sp
@@ -443,6 +460,92 @@ function createUniverse() {
 
   // Helper: Get station by ID
   const getStation = (stationId: string) => state.stations.find(s => s.id === stationId)
+
+  // Economy history (kept out of `state` to avoid bloating autosaves)
+  const ECONOMY_SNAPSHOT_INTERVAL_MS = 10_000
+  const ECONOMY_HISTORY_LIMIT = 2160 // 6h @ 10s
+  const economyHistory: EconomyHistoryEntry[] = []
+  let economyHistorySessionId = genId()
+  let lastEconomySnapshotAt = 0
+
+  const captureEconomySnapshot = (nowMs: number): EconomyHistoryEntry => {
+    const entry: EconomyHistoryEntry = {
+      timestamp: nowMs,
+      totalStock: {},
+      avgPrices: {},
+      totalCredits: 0,
+      totalAssetValue: 0,
+    }
+
+    // Init maps
+    for (const w of state.wares) {
+      entry.totalStock[w.id] = 0
+      entry.avgPrices[w.id] = 0
+    }
+
+    // Sum station stock
+    for (const st of state.stations) {
+      for (const [wid, qty] of Object.entries(st.inventory)) {
+        if (typeof entry.totalStock[wid] === 'number') entry.totalStock[wid] += qty
+      }
+    }
+
+    // Sum fleet cargo + credits
+    for (const fleet of state.fleets) {
+      for (const [wid, qty] of Object.entries(fleet.cargo)) {
+        if (typeof entry.totalStock[wid] === 'number') entry.totalStock[wid] += qty
+      }
+      entry.totalCredits += fleet.credits || 0
+    }
+
+    // Average prices across all sectors
+    const priceCounts: Record<string, number> = {}
+    for (const sectorPriceMap of Object.values(state.sectorPrices)) {
+      for (const [wid, price] of Object.entries(sectorPriceMap)) {
+        if (typeof entry.avgPrices[wid] === 'number') {
+          entry.avgPrices[wid] += price
+          priceCounts[wid] = (priceCounts[wid] || 0) + 1
+        }
+      }
+    }
+
+    for (const w of state.wares) {
+      if ((priceCounts[w.id] || 0) > 0) entry.avgPrices[w.id] /= priceCounts[w.id]
+      else entry.avgPrices[w.id] = w.basePrice
+    }
+
+    let stockValue = 0
+    for (const w of state.wares) {
+      stockValue += (entry.totalStock[w.id] || 0) * (entry.avgPrices[w.id] || 0)
+    }
+    entry.totalAssetValue = stockValue + entry.totalCredits
+
+    return entry
+  }
+
+  const resetEconomyHistory = () => {
+    economyHistory.length = 0
+    economyHistorySessionId = genId()
+    lastEconomySnapshotAt = 0
+  }
+
+  const maybeSnapshotEconomy = (nowMs = Date.now()) => {
+    if (nowMs - lastEconomySnapshotAt < ECONOMY_SNAPSHOT_INTERVAL_MS) return
+    lastEconomySnapshotAt = nowMs
+    economyHistory.push(captureEconomySnapshot(nowMs))
+    if (economyHistory.length > ECONOMY_HISTORY_LIMIT) {
+      economyHistory.splice(0, economyHistory.length - ECONOMY_HISTORY_LIMIT)
+    }
+  }
+
+  const getEconomyHistory = (opts?: { since?: number; limit?: number }) => {
+    const since = opts?.since || 0
+    const limit = opts?.limit || 0
+    let entries = since > 0 ? economyHistory.filter(e => e.timestamp > since) : economyHistory
+    if (limit > 0 && entries.length > limit) entries = entries.slice(entries.length - limit)
+    return { sessionId: economyHistorySessionId, economyHistory: entries }
+  }
+
   // Helper: Try to load the latest autosave
   const tryLoadLatestSave = (): UniverseState | null => {
     try {
@@ -471,6 +574,8 @@ function createUniverse() {
   }
 
   const init = (options?: { fresh?: boolean }) => {
+    resetEconomyHistory()
+
     // Try loading save first (unless fresh start requested)
     if (!options?.fresh) {
       const loadedState = tryLoadLatestSave()
@@ -520,6 +625,7 @@ function createUniverse() {
         });
 
         console.log(`[Universe] State restored! ${state.stations.length} stations, ${state.fleets.length} fleets.`)
+        maybeSnapshotEconomy(Date.now())
         return
       }
     } else {
@@ -1043,6 +1149,7 @@ function createUniverse() {
     state.acc = 0
     state.elapsedTimeSec = 0
     state.lastTickTime = Date.now()
+    maybeSnapshotEconomy(Date.now())
   }
 
   // ============ Corporation AI Logic ============
@@ -1526,9 +1633,21 @@ function createUniverse() {
     // ============ Fleet Tick Logic ============
     const now = Date.now()
 
-    // Helper: Find best trade route for a fleet
-    const findBestTradeRoute = (fleet: NPCFleet): TradeOrder | null => {
-      const routes: { buyStation: Station; sellStation: Station; wareId: string; profit: number; qty: number }[] = []
+    // Prevent dog-piling: reserve supply/demand as orders are assigned this tick.
+    // This avoids many traders selecting the exact same best route simultaneously.
+    const reservedSupply = new Map<string, number>() // key: stationId:wareId -> reserved export qty
+    const reservedDemand = new Map<string, number>() // key: stationId:wareId -> reserved import qty
+    const resKey = (stationId: string, wareId: string) => `${stationId}:${wareId}`
+    const getRes = (m: Map<string, number>, k: string) => m.get(k) || 0
+    const addRes = (m: Map<string, number>, stationId: string, wareId: string, qty: number) => {
+      if (!Number.isFinite(qty) || qty <= 0) return
+      const k = resKey(stationId, wareId)
+      m.set(k, getRes(m, k) + qty)
+    }
+
+  // Helper: Find best trade route for a fleet
+  const findBestTradeRoute = (fleet: NPCFleet): TradeOrder | null => {
+      const routes: { buyStation: Station; sellStation: Station; wareId: string; profit: number; qty: number; score: number; buyPrice: number; sellPrice: number }[] = []
 
       // Allow stations to trade a slice of their current stock even if they're below their ideal reserve.
       // This prevents newly-seeded stations with large reserve targets from never exporting anything.
@@ -1536,6 +1655,46 @@ function createUniverse() {
         if (stock <= 0) return 0
         const softReserve = Math.min(reserve || 0, stock * 0.5)
         return Math.max(0, stock - softReserve)
+      }
+
+      const getWare = (wareId: string) => state.wares.find(w => w.id === wareId)
+      const getAvailableAdjusted = (st: Station, wareId: string) => {
+        const stock = st.inventory[wareId] || 0
+        const reserve = st.reserveLevel[wareId] || 0
+        const raw = getAvailable(stock, reserve)
+        return Math.max(0, raw - getRes(reservedSupply, resKey(st.id, wareId)))
+      }
+      const getNeedAdjusted = (st: Station, wareId: string) => {
+        const need = (st.reorderLevel[wareId] || 0) - (st.inventory[wareId] || 0)
+        return Math.max(0, need - getRes(reservedDemand, resKey(st.id, wareId)))
+      }
+
+      const getStationOwner = (st: Station) => st.ownerId || null
+      const isSameOwner = (a: string | null, b: string | null) => Boolean(a) && a === b
+      const applyExternalMargin = (seller: Station, buyer: Station, wareId: string, buyPrice: number, sellPrice: number) => {
+        // Ensure a minimum profit margin on non-internal trades so traders don't perform "free work"
+        // when sector prices happen to be equal.
+        const sellerOwner = getStationOwner(seller)
+        const buyerOwner = getStationOwner(buyer)
+        if (isSameOwner(sellerOwner, buyerOwner)) return { sellPrice, profitPerUnit: sellPrice - buyPrice }
+
+        if (sellPrice <= buyPrice) {
+          const base = getWare(wareId)?.basePrice || 100
+          const minAbs = Math.max(1, base * 0.02) // at least 1 Cr or 2% of base
+          sellPrice = buyPrice + minAbs
+        }
+        return { sellPrice, profitPerUnit: sellPrice - buyPrice }
+      }
+
+      const estimateTradeSeconds = (fromSectorId: string, toSectorId: string, qty: number, wareVolume: number) => {
+        const path = findSectorPath(fromSectorId, toSectorId)
+        if (path === null) return Infinity
+        const hops = path.length
+        const speed = Math.max(0.1, fleet.speed || 1)
+        const transit = (hops * FLEET_CONSTANTS.BASE_JUMP_TIME) / speed
+        const transfer = ((qty * Math.max(1, wareVolume)) / 1000) * FLEET_CONSTANTS.TRANSFER_TIME_PER_1000
+        const dockCycle = FLEET_CONSTANTS.DOCK_TIME * 2
+        return transit + transfer + dockCycle
       }
 
       // For station-supply behavior: find wares the home station needs
@@ -1548,7 +1707,7 @@ function createUniverse() {
         if (fleet.behavior === 'station-supply') {
           // Find stations selling inputs that home station needs
           for (const input of recipe.inputs) {
-            const need = (homeSt.reorderLevel[input.wareId] || 0) - (homeSt.inventory[input.wareId] || 0)
+            const need = getNeedAdjusted(homeSt, input.wareId)
             if (need <= 0) continue
 
             // Find selling stations
@@ -1556,22 +1715,29 @@ function createUniverse() {
               if (seller.id === homeSt.id) continue
               const sellerRecipe = recipeById.get(seller.recipeId)
               if (!sellerRecipe || sellerRecipe.productId !== input.wareId) continue
-              const available = getAvailable(seller.inventory[input.wareId] || 0, seller.reserveLevel[input.wareId] || 0)
+              const available = getAvailableAdjusted(seller, input.wareId)
               if (available <= 0) continue
 
-              const qty = Math.min(available, need, fleet.capacity)
+              const ware = getWare(input.wareId)
+              const maxQtyByVolume = Math.max(0, Math.floor((fleet.capacity || 0) / Math.max(1, ware?.volume || 1)))
+              const qty = Math.min(available, need, maxQtyByVolume)
+              if (qty <= 0) continue
               const buyPrice = (state.sectorPrices[seller.sectorId]?.[input.wareId] || state.wares.find(w => w.id === input.wareId)?.basePrice || 100)
-              const sellPrice = buyPrice * 1.1 // Internal transfer markup
-              const profit = (sellPrice - buyPrice) * qty
+              let sellPrice = buyPrice * 1.1 // Supply markup (service fee)
+              const adjusted = applyExternalMargin(seller, homeSt, input.wareId, buyPrice, sellPrice)
+              sellPrice = adjusted.sellPrice
+              const profit = adjusted.profitPerUnit * qty
               if (profit > FLEET_CONSTANTS.MIN_PROFIT_MARGIN) {
-                routes.push({ buyStation: seller, sellStation: homeSt, wareId: input.wareId, profit, qty })
+                const eta = estimateTradeSeconds(seller.sectorId, homeSt.sectorId, qty, ware?.volume || 1)
+                const score = profit / Math.max(1, eta)
+                routes.push({ buyStation: seller, sellStation: homeSt, wareId: input.wareId, profit, qty, score, buyPrice, sellPrice })
               }
             }
           }
         } else {
           // station-distribute: sell home station's products
           const productId = recipe.productId
-          const available = getAvailable(homeSt.inventory[productId] || 0, homeSt.reserveLevel[productId] || 0)
+          const available = getAvailableAdjusted(homeSt, productId)
           if (available > 0) {
             // Find buyers
             for (const buyer of state.stations) {
@@ -1580,15 +1746,23 @@ function createUniverse() {
               if (!buyerRecipe) continue
               const needsProduct = buyerRecipe.inputs.some(i => i.wareId === productId)
               if (!needsProduct) continue
-              const buyerNeed = (buyer.reorderLevel[productId] || 0) - (buyer.inventory[productId] || 0)
+              const buyerNeed = getNeedAdjusted(buyer, productId)
               if (buyerNeed <= 0) continue
 
-              const qty = Math.min(available, buyerNeed, fleet.capacity)
+              const ware = getWare(productId)
+              const maxQtyByVolume = Math.max(0, Math.floor((fleet.capacity || 0) / Math.max(1, ware?.volume || 1)))
+              const qty = Math.min(available, buyerNeed, maxQtyByVolume)
+              if (qty <= 0) continue
               const sellPrice = (state.sectorPrices[buyer.sectorId]?.[productId] || state.wares.find(w => w.id === productId)?.basePrice || 100)
-              const buyPrice = sellPrice * 0.9
-              const profit = (sellPrice - buyPrice) * qty
+              let buyPrice = sellPrice * 0.9
+              // For distribution routes, the "seller" is home station and the buyer is the destination.
+              // Apply a minimum external margin so we don't do free deliveries.
+              const adjusted = applyExternalMargin(homeSt, buyer, productId, buyPrice, sellPrice)
+              const profit = adjusted.profitPerUnit * qty
               if (profit > FLEET_CONSTANTS.MIN_PROFIT_MARGIN) {
-                routes.push({ buyStation: homeSt, sellStation: buyer, wareId: productId, profit, qty })
+                const eta = estimateTradeSeconds(homeSt.sectorId, buyer.sectorId, qty, ware?.volume || 1)
+                const score = profit / Math.max(1, eta)
+                routes.push({ buyStation: homeSt, sellStation: buyer, wareId: productId, profit, qty, score, buyPrice, sellPrice: adjusted.sellPrice })
               }
             }
           }
@@ -1600,7 +1774,7 @@ function createUniverse() {
           const sellers = state.stations.filter(st => {
             const r = recipeById.get(st.recipeId)
             if (!r || r.productId !== ware.id) return false
-            const available = getAvailable(st.inventory[ware.id] || 0, st.reserveLevel[ware.id] || 0)
+            const available = getAvailableAdjusted(st, ware.id)
             return available > 0
           })
 
@@ -1610,23 +1784,30 @@ function createUniverse() {
             if (!r) return false
             const needsWare = r.inputs.some(i => i.wareId === ware.id)
             if (!needsWare) return false
-            const need = (st.reorderLevel[ware.id] || 0) - (st.inventory[ware.id] || 0)
+            const need = getNeedAdjusted(st, ware.id)
             return need > 0
           })
 
           for (const seller of sellers) {
             for (const buyer of buyers) {
               if (seller.id === buyer.id) continue
-              const available = (seller.inventory[ware.id] || 0) - (seller.reserveLevel[ware.id] || 0)
-              const need = (buyer.reorderLevel[ware.id] || 0) - (buyer.inventory[ware.id] || 0)
-              const qty = Math.min(available, need, fleet.capacity)
+              const available = getAvailableAdjusted(seller, ware.id)
+              const need = getNeedAdjusted(buyer, ware.id)
+              const maxQtyByVolume = Math.max(0, Math.floor((fleet.capacity || 0) / Math.max(1, ware.volume || 1)))
+              const qty = Math.min(available, need, maxQtyByVolume)
               if (qty <= 0) continue
 
               const buyPrice = state.sectorPrices[seller.sectorId]?.[ware.id] || ware.basePrice
-              const sellPrice = state.sectorPrices[buyer.sectorId]?.[ware.id] || ware.basePrice
-              const profit = (sellPrice - buyPrice) * qty
+              let sellPrice = state.sectorPrices[buyer.sectorId]?.[ware.id] || ware.basePrice
+              const adjusted = applyExternalMargin(seller, buyer, ware.id, buyPrice, sellPrice)
+              sellPrice = adjusted.sellPrice
+              const profit = adjusted.profitPerUnit * qty
               if (profit > FLEET_CONSTANTS.MIN_PROFIT_MARGIN) {
-                routes.push({ buyStation: seller, sellStation: buyer, wareId: ware.id, profit, qty })
+                const eta = estimateTradeSeconds(seller.sectorId, buyer.sectorId, qty, ware.volume || 1)
+                const score = profit / Math.max(1, eta)
+                if (Number.isFinite(score) && score > 0) {
+                  routes.push({ buyStation: seller, sellStation: buyer, wareId: ware.id, profit, qty, score, buyPrice, sellPrice })
+                }
               }
             }
           }
@@ -1638,8 +1819,10 @@ function createUniverse() {
         return null
       }
 
-      // Pick best route (highest profit, with some randomness for variety)
-      routes.sort((a, b) => b.profit - a.profit)
+      // Pick best route (profit per second, with some randomness for variety)
+      // Tiny jitter to avoid deterministic ties producing identical orders across fleets.
+      // (Reservations handle most dog-piling; this just breaks exact score ties.)
+      routes.sort((a, b) => (b.score + Math.random() * 1e-6) - (a.score + Math.random() * 1e-6))
       const pick = routes[Math.floor(Math.random() * Math.min(3, routes.length))]
 
       return {
@@ -1650,14 +1833,14 @@ function createUniverse() {
         buyWareId: pick.wareId,
         buyWareName: getWareName(pick.wareId),
         buyQty: pick.qty,
-        buyPrice: state.sectorPrices[pick.buyStation.sectorId]?.[pick.wareId] || 100,
+        buyPrice: pick.buyPrice,
         sellStationId: pick.sellStation.id,
         sellStationName: pick.sellStation.name,
         sellSectorId: pick.sellStation.sectorId,
         sellWareId: pick.wareId,
         sellWareName: getWareName(pick.wareId),
         sellQty: pick.qty,
-        sellPrice: state.sectorPrices[pick.sellStation.sectorId]?.[pick.wareId] || 100,
+        sellPrice: pick.sellPrice,
         expectedProfit: pick.profit,
         createdAt: now,
       }
@@ -1756,10 +1939,20 @@ function createUniverse() {
             fleet.cargo[wareId] = Math.max(0, (fleet.cargo[wareId] || 0) - amount)
             station.inventory[wareId] = (station.inventory[wareId] || 0) + amount
 
-            // Credit revenue
+            const sellerOwner = fleet.ownerId ? String(fleet.ownerId) : null
+            const buyerOwner = station.ownerId || null
+            const isInternalSale = Boolean(sellerOwner) && sellerOwner === buyerOwner
+
+            // Credit revenue (transaction-based)
             const sellPrice = state.sectorPrices[station.sectorId]?.[wareId] || state.wares.find(w => w.id === wareId)?.basePrice || 0
             const revenue = amount * sellPrice
-            fleet.credits += revenue
+            if (!isInternalSale && revenue > 0) {
+              const buyerCorp = buyerOwner ? state.corporations.find(c => c.id === buyerOwner) : undefined
+              const sellerCorp = sellerOwner ? state.corporations.find(c => c.id === sellerOwner) : undefined
+              if (buyerCorp && buyerOwner !== sellerOwner) buyerCorp.credits -= revenue
+              if (sellerCorp) sellerCorp.credits += revenue
+              else fleet.credits += revenue
+            }
 
             // Log trade for visibility
             state.tradeLog.unshift({
@@ -1772,7 +1965,7 @@ function createUniverse() {
               quantity: amount,
               buyPrice: 0,
               sellPrice,
-              profit: revenue,
+              profit: isInternalSale ? 0 : revenue,
               buySectorId: fleet.currentSectorId,
               sellSectorId: station.sectorId,
               buyStationName: fleet.targetStationId || 'unknown',
@@ -1987,6 +2180,10 @@ function createUniverse() {
             if (order) {
               fleet.currentOrder = order
 
+              // Reserve supply/demand so later fleets this tick don't pick the identical leg.
+              addRes(reservedSupply, order.buyStationId, order.buyWareId, order.buyQty)
+              addRes(reservedDemand, order.sellStationId, order.sellWareId, order.sellQty)
+
               // Helper: Issue path commands
               const issuePathCommands = (fromSector: string, toSector: string) => {
                 if (fromSector === toSector) return
@@ -2112,6 +2309,7 @@ function createUniverse() {
   const loop = () => {
     const delta = 1 * Math.max(0.1, state.timeScale)
     advanceTime(delta)
+    maybeSnapshotEconomy(Date.now())
   }
   const setTimeScale = (v: number) => { state.timeScale = v }
 
@@ -2131,31 +2329,49 @@ function createUniverse() {
     const order = fleet.currentOrder
     if (!order) return false
     const station = state.stations.find(s => s.id === order.sellStationId)
+    const buyStation = state.stations.find(s => s.id === order.buyStationId)
     const wareId = order.sellWareId
     const carry = fleet.cargo[wareId] || 0
-    if (!station || carry <= 0) return false
+    if (!station || !buyStation || carry <= 0) return false
+
+    const getCorp = (id?: string | null) => (id ? state.corporations.find(c => c.id === id) : undefined)
+    const isTrackedCorp = (id: string | null) => Boolean(id) && Boolean(getCorp(id))
+    const sellerOwner = fleet.ownerId ? String(fleet.ownerId) : null
+    const buyerOwner = station.ownerId || null
+    const isInternalSale = Boolean(sellerOwner) && sellerOwner === buyerOwner
 
     const amount = Math.min(carry, order.sellQty)
     const sellPrice = state.sectorPrices[station.sectorId]?.[wareId] || order.sellPrice || (state.wares.find(w => w.id === wareId)?.basePrice || 0)
     const buyPrice = order.buyPrice || 0
     const revenue = amount * sellPrice
     const cost = amount * buyPrice
-    const profit = revenue - cost
+    const trackedBuyCost = Number((order as any)._buyCost || cost)
+    const netForSellerOwner = isInternalSale ? 0 : (revenue - trackedBuyCost)
 
     fleet.cargo[wareId] = Math.max(0, carry - amount)
     station.inventory[wareId] = (station.inventory[wareId] || 0) + amount
 
-    fleet.credits += revenue
-    fleet.totalProfit += profit
+    if (!isInternalSale && revenue > 0) {
+      // If the buyer is a tracked corp, it pays; seller receives (corp or fleet).
+      if (isTrackedCorp(buyerOwner) && buyerOwner !== sellerOwner) {
+        const corp = getCorp(buyerOwner)
+        if (corp) corp.credits -= revenue
+      }
+      if (sellerOwner) {
+        const corp = getCorp(sellerOwner)
+        if (corp) corp.credits += revenue
+      } else {
+        fleet.credits += revenue
+        fleet.totalProfit += netForSellerOwner
+      }
+    }
     fleet.tripsCompleted++
 
     if (fleet.ownerId) {
       const corp = state.corporations.find(c => c.id === fleet.ownerId)
       if (corp) {
-        const share = profit * (1 - fleet.profitShare)
-        corp.credits += share
-        corp.lifetimeProfit += share
         corp.lifetimeTrades++
+        corp.lifetimeProfit += netForSellerOwner
       }
     }
 
@@ -2169,7 +2385,7 @@ function createUniverse() {
       quantity: amount,
       buyPrice,
       sellPrice,
-      profit,
+      profit: netForSellerOwner,
       buySectorId: order.buySectorId,
       sellSectorId: station.sectorId,
       buyStationName: order.buyStationName,
@@ -2200,6 +2416,24 @@ function createUniverse() {
   }) => {
     const fleet = state.fleets.find(f => f.id === report.fleetId)
     if (!fleet) return
+
+    const getCorp = (id?: string | null) => (id ? state.corporations.find(c => c.id === id) : undefined)
+    const getOwnerIdForFleet = (f: NPCFleet) => (f.ownerId ? String(f.ownerId) : null)
+    const isTrackedCorp = (id: string | null) => Boolean(id) && Boolean(getCorp(id))
+    const applyCashDelta = (ownerId: string | null, delta: number) => {
+      if (!Number.isFinite(delta) || delta === 0) return
+      if (ownerId) {
+        const corp = getCorp(ownerId)
+        if (corp) corp.credits += delta
+        return
+      }
+      // Independent trader cash
+      fleet.credits += delta
+    }
+    const creditCorpIfTracked = (ownerId: string | null, amount: number) => {
+      if (!Number.isFinite(amount) || amount <= 0) return
+      if (isTrackedCorp(ownerId)) applyCashDelta(ownerId, amount)
+    }
 
     fleet.lastReportAt = report.timestamp || Date.now()
     // Update fleet position from frontend
@@ -2293,7 +2527,22 @@ function createUniverse() {
             fleet.cargo[report.wareId] = (fleet.cargo[report.wareId] || 0) + actualAmount
 
             if (order) {
-              fleet.credits -= actualAmount * order.buyPrice
+              const buyerOwner = getOwnerIdForFleet(fleet) // null => independent, non-null => corp pays
+              const sellerOwner = station.ownerId || null
+              const isInternalPurchase = Boolean(buyerOwner) && buyerOwner === sellerOwner
+              const unitPrice = order.buyPrice || 0
+              const cost = actualAmount * unitPrice
+
+              // Track order cost to compute net later at sale/consumption time
+              ;(order as any)._buyCost = ((order as any)._buyCost || 0) + (isInternalPurchase ? 0 : cost)
+              ;(order as any)._buyQtyActual = ((order as any)._buyQtyActual || 0) + actualAmount
+
+              if (!isInternalPurchase && cost > 0) {
+                // Buyer pays, seller (if corp-owned) receives.
+                applyCashDelta(buyerOwner, -cost)
+                // Credit the station owner if it's a tracked corp (e.g., corp-to-corp trade)
+                if (sellerOwner !== buyerOwner) creditCorpIfTracked(sellerOwner, cost)
+              }
             }
 
             // Do NOT clear queue or issue new commands. The queue has the next steps (undock -> fly -> dock -> sell).
@@ -2319,12 +2568,27 @@ function createUniverse() {
             const sellPrice = order ? order.sellPrice : (state.sectorPrices[station.sectorId]?.[report.wareId] || 0)
             const buyPrice = order ? order.buyPrice : 0 // We don't track buy price for lost orders/rescues
 
+            const sellerOwner = getOwnerIdForFleet(fleet)
+            const buyerOwner = station.ownerId || null
+            const isInternalSale = Boolean(sellerOwner) && sellerOwner === buyerOwner
+
             const revenue = report.amount * sellPrice
             const cost = report.amount * buyPrice
-            const profit = revenue - cost
 
-            fleet.credits += revenue
-            fleet.totalProfit += profit
+            // What did the seller (fleet owner) actually pay on the buy transaction(s)?
+            const trackedBuyCost = order ? Number((order as any)._buyCost || 0) : cost
+            const netForSellerOwner = isInternalSale ? 0 : (revenue - trackedBuyCost)
+
+            if (!isInternalSale && revenue > 0) {
+              // Buyer pays (if tracked corp-owned station), seller receives (corp or independent).
+              if (isTrackedCorp(buyerOwner) && buyerOwner !== sellerOwner) applyCashDelta(buyerOwner, -revenue)
+              applyCashDelta(sellerOwner, revenue)
+            }
+
+            // Profit tracking is only meaningful for independent fleets.
+            if (!sellerOwner) {
+              fleet.totalProfit += netForSellerOwner
+            }
             fleet.tripsCompleted++
 
             // Log trade
@@ -2338,7 +2602,7 @@ function createUniverse() {
               quantity: report.amount,
               buyPrice: buyPrice,
               sellPrice: sellPrice,
-              profit,
+              profit: netForSellerOwner,
               buySectorId: order ? order.buySectorId : 'unknown',
               sellSectorId: order ? order.sellSectorId : station.sectorId,
               buyStationName: order ? order.buyStationName : 'unknown',
@@ -2350,10 +2614,10 @@ function createUniverse() {
             if (fleet.ownerId) {
               const corp = state.corporations.find(c => c.id === fleet.ownerId)
               if (corp) {
-                const share = profit * (1 - fleet.profitShare)
-                corp.credits += share
-                corp.lifetimeProfit += share
                 corp.lifetimeTrades++
+                // Corp accounting is transaction-based; lifetimeProfit tracks net deltas from trade log for corp-owned fleets.
+                // (Independent fleets don't have a corp.)
+                corp.lifetimeProfit += netForSellerOwner
               }
             }
 
@@ -2403,7 +2667,7 @@ function createUniverse() {
     }
   }
 
-  return { state, init, tick, loop, setTimeScale, handleShipReport, issueCommand, advanceTime }
+  return { state, init, tick, loop, setTimeScale, handleShipReport, issueCommand, advanceTime, getEconomyHistory }
 }
 
 function universePlugin() {
@@ -2416,6 +2680,14 @@ function universePlugin() {
       server.httpServer?.on('close', () => clearInterval(i))
       server.middlewares.use((req: IncomingMessage, res: ServerResponse, next: () => void) => {
         const url = req.url || ''
+        if (req.method === 'GET' && url.startsWith('/__universe/economy-history')) {
+          const full = new URL(url, 'http://localhost')
+          const since = Number(full.searchParams.get('since') || '0')
+          const limit = Number(full.searchParams.get('limit') || '0')
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify(u.getEconomyHistory({ since, limit })))
+          return
+        }
         if (req.method === 'GET' && url.startsWith('/__universe/state')) {
           res.setHeader('content-type', 'application/json')
           res.end(JSON.stringify({

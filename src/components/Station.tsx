@@ -1,12 +1,14 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
 import type { GLTF } from 'three-stdlib';
 import { OBJLoader } from 'three-stdlib';
 import { MTLLoader } from 'three-stdlib';
-import { Group, MeshStandardMaterial, MeshBasicMaterial, Mesh, SRGBColorSpace, LinearSRGBColorSpace, DoubleSide, Box3, Vector3, TextureLoader, BufferGeometry, Float32BufferAttribute, Texture, RepeatWrapping, Matrix4, Quaternion, LinearMipmapLinearFilter, LinearFilter } from 'three';
+import { Group, MeshStandardMaterial, MeshBasicMaterial, Mesh, SRGBColorSpace, LinearSRGBColorSpace, DoubleSide, Box3, Vector3, TextureLoader, BufferGeometry, Float32BufferAttribute, Texture, RepeatWrapping, Matrix4, Quaternion, LinearMipmapLinearFilter, LinearFilter, MathUtils, type Object3D } from 'three';
 import { ensureRapier, getWorld, getWorldSync } from '../physics/RapierWorld';
 import type RAPIERType from '@dimforge/rapier3d-compat';
+import { useGameStore } from '../store/gameStore';
+import { ShieldWrapEffect, type ShieldWrapEffectHandle } from './ShieldWrapEffect';
 
 interface StationProps {
     position: [number, number, number];
@@ -718,6 +720,49 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
         };
     }, [collisions, gltf, gl, isBod, isObj, modelPath]);
 
+    const shieldRef = useRef<ShieldWrapEffectHandle | null>(null);
+    const [shieldThickness, setShieldThickness] = useState(0.25);
+    const [shieldTarget, setShieldTarget] = useState<Object3D | null>(null);
+    const lastImpactSeenRef = useRef(0);
+    const boundsReadyRef = useRef(false);
+
+    useEffect(() => {
+        if (!stationRef.current) return;
+        setShieldTarget(stationRef.current);
+        boundsReadyRef.current = false;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [gltf, modelPath]);
+
+    useFrame(() => {
+        const impact = useGameStore.getState().lastImpact;
+        const st = stationRef.current;
+        if (!impact || !st || !shieldRef.current) return;
+        if (impact.timestamp <= lastImpactSeenRef.current) return;
+        if (Date.now() - impact.timestamp > 700) return;
+
+        const impactPos = new Vector3(impact.position[0], impact.position[1], impact.position[2]);
+
+        // Compute bounds on demand; stations are irregular so center distance is unreliable.
+        const box = new Box3().setFromObject(st);
+        const sphere = { center: new Vector3(), radius: 0 };
+        box.getBoundingSphere(sphere as any);
+        const dist = sphere.center.distanceTo(impactPos);
+        const margin = Math.max(40, sphere.radius * 0.08);
+        if (dist > sphere.radius + margin) return;
+
+        // Once bounds exist, adjust thickness to fit scale.
+        if (!boundsReadyRef.current && sphere.radius > 1) {
+            boundsReadyRef.current = true;
+            setShieldThickness(MathUtils.clamp(sphere.radius * 0.003, 0.18, 0.8));
+        }
+
+        lastImpactSeenRef.current = impact.timestamp;
+        const hitDirWorld = new Vector3(impact.dir[0], impact.dir[1], impact.dir[2]).normalize();
+        const invQ = st.quaternion.clone().invert();
+        const hitDirLocal = hitDirWorld.applyQuaternion(invQ).normalize();
+        shieldRef.current.trigger(hitDirLocal, impact.strength);
+    });
+
     const navSize = typeof navRadius === 'number' ? navRadius : scale * 1.2;
     return (
         <group
@@ -729,6 +774,7 @@ export const Station: React.FC<StationProps> = ({ position, rotate = true, showL
             userData={{ navRadius: navSize }}
         >
             {!isBod && !isObj && <primitive object={gltf.scene} />}
+            <ShieldWrapEffect ref={shieldRef} target={shieldTarget} thickness={shieldThickness} />
             {showLights && <pointLight position={[0, 10, 0]} intensity={2} color="cyan" distance={50} />}
             {showLights && <pointLight position={[0, -10, 0]} intensity={2} color="cyan" distance={50} />}
         </group>

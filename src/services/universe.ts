@@ -376,6 +376,22 @@ const estimateTradeSeconds = (
   return transit + transfer + dockCycle
 }
 
+// Enforce a minimum margin on external sales so traders don't move wares for free.
+const applyExternalMargin = (
+  from: Station,
+  to: Station,
+  basePrice: number,
+  buyPrice: number,
+  sellPrice: number,
+) => {
+  const sameOwner = !!from.ownerId && from.ownerId === to.ownerId
+  if (!sameOwner && sellPrice <= buyPrice) {
+    const minAbs = Math.max(1, basePrice * 0.02) // at least 1 Cr or 2% of base
+    sellPrice = buyPrice + minAbs
+  }
+  return { sellPrice, profitPerUnit: sellPrice - buyPrice }
+}
+
 const pickTrade = (
   fleet: NPCFleet,
   stations: Station[],
@@ -398,8 +414,8 @@ const pickTrade = (
         if (!need) return
         const basePrice = wareMap.get(wareId)?.basePrice ?? 100
         const buyPrice = sectorPrices[from.sectorId]?.[wareId] ?? basePrice
-        const sellPrice = sectorPrices[to.sectorId]?.[wareId] ?? buyPrice
-        const profitPerUnit = sellPrice - buyPrice
+        const rawSellPrice = sectorPrices[to.sectorId]?.[wareId] ?? buyPrice
+        const { sellPrice, profitPerUnit } = applyExternalMargin(from, to, basePrice, buyPrice, rawSellPrice)
         if (profitPerUnit <= 0) return
         const amount = Math.min(surplus * 0.6, 800)
         const volume = wareMap.get(wareId)?.volume ?? 1
@@ -503,18 +519,19 @@ const pickCorpTrade = (
       const surplus = qty - (from.reserveLevel[wareId] || 0)
       if (surplus <= 0) return
 
-      stations.forEach((to) => {
-        if (to.id === from.id) return
-        const need = (to.inventory[wareId] || 0) < 200
-        if (!need) return
-        const buyPrice = sectorPrices[from.sectorId]?.[wareId] ?? wareMap.get(wareId)?.basePrice ?? 100
-        const sellPrice = sectorPrices[to.sectorId]?.[wareId] ?? buyPrice
-        const profit = sellPrice - buyPrice
-        if (profit <= 0) return
-        const amount = Math.min(surplus * 0.6, 800)
-        const volume = wareMap.get(wareId)?.volume ?? 1
-        const eta = estimateTradeSeconds(from, to, amount, volume, fleet.speed || 1)
-        const score = (profit * amount) / Math.max(1, eta)
+        stations.forEach((to) => {
+          if (to.id === from.id) return
+          const need = (to.inventory[wareId] || 0) < 200
+          if (!need) return
+          const basePrice = wareMap.get(wareId)?.basePrice ?? 100
+          const buyPrice = sectorPrices[from.sectorId]?.[wareId] ?? basePrice
+          const rawSellPrice = sectorPrices[to.sectorId]?.[wareId] ?? buyPrice
+          const { sellPrice, profitPerUnit: profit } = applyExternalMargin(from, to, basePrice, buyPrice, rawSellPrice)
+          if (profit <= 0) return
+          const amount = Math.min(surplus * 0.6, 800)
+          const volume = wareMap.get(wareId)?.volume ?? 1
+          const eta = estimateTradeSeconds(from, to, amount, volume, fleet.speed || 1)
+          const score = (profit * amount) / Math.max(1, eta)
         const key = `${from.id}-${to.id}-${wareId}`
         if (blocked.has(key)) return
         if (!sellBest || score > sellBest.score) {

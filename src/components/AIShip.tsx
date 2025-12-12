@@ -1,7 +1,7 @@
 import type { FC } from 'react';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Box3, Group, MathUtils, Quaternion, Vector3 } from 'three';
+import { Box3, Group, MathUtils, Quaternion, Vector3, type Object3D } from 'three';
 import { ShipModel } from './ShipModel';
 import { findPath } from '../ai/navigation';
 import type { NavGraph, NavObstacle } from '../ai/navigation';
@@ -9,6 +9,7 @@ import { useGameStore, type GameState } from '../store/gameStore';
 import { getShipStats } from '../config/ships';
 import { ensureRapier, getWorld, getWorldSync } from '../physics/RapierWorld';
 import type RAPIERType from '@dimforge/rapier3d-compat';
+import { ShieldWrapEffect, type ShieldWrapEffectHandle } from './ShieldWrapEffect';
 
 interface AIShipProps {
   name: string;
@@ -36,6 +37,10 @@ export const AIShip: FC<AIShipProps> = ({ name, modelPath, position, navGraph, o
   const colliderRef = useRef<RAPIERType.Collider | null>(null);
   const controllerRef = useRef<RAPIERType.KinematicCharacterController | null>(null);
   const colliderHalfExtentsRef = useRef(new Vector3(8, 3, 12));
+  const shieldRef = useRef<ShieldWrapEffectHandle | null>(null);
+  const [shieldThickness, setShieldThickness] = useState(MathUtils.clamp(size * 0.0035, 0.12, 0.35));
+  const lastShieldAtRef = useRef(0);
+  const [shieldTarget, setShieldTarget] = useState<Object3D | null>(null);
 
   const stats = useMemo(() => getShipStats(modelPath || name), [modelPath, name]);
 
@@ -85,6 +90,7 @@ export const AIShip: FC<AIShipProps> = ({ name, modelPath, position, navGraph, o
 
     const refreshColliderSize = () => {
       if (!shipRef.current) return;
+      if (!shieldTarget) setShieldTarget(shipRef.current);
       const box = new Box3().setFromObject(shipRef.current);
       const s = box.getSize(new Vector3());
       const he = colliderHalfExtentsRef.current;
@@ -93,6 +99,8 @@ export const AIShip: FC<AIShipProps> = ({ name, modelPath, position, navGraph, o
         Math.max(2, s.y * 0.45, size * 0.2),
         Math.max(6, s.z * 0.45, size * 0.5),
       );
+      const r = Math.max(s.x, s.y, s.z);
+      if (r > 1) setShieldThickness(MathUtils.clamp(r * 0.0035, 0.12, 0.35));
     };
 
     const cleanup = () => {
@@ -133,7 +141,6 @@ export const AIShip: FC<AIShipProps> = ({ name, modelPath, position, navGraph, o
         const collider = world.createCollider(colliderDesc, body);
         const controller = world.createCharacterController(0.4);
         controller.setApplyImpulsesToDynamicBodies(true);
-        controller.setAutostep({ enable: false, maxHeight: 0, minWidth: 0 });
         controller.setSlideEnabled(true);
 
         if (cancelled) {
@@ -250,6 +257,17 @@ export const AIShip: FC<AIShipProps> = ({ name, modelPath, position, navGraph, o
 
     ship.position.add(moveStep);
 
+    if (collided && shieldRef.current) {
+      const nowMs = performance.now();
+      if (nowMs - lastShieldAtRef.current > 180) {
+        lastShieldAtRef.current = nowMs;
+        const hitDirWorld = moveStep.lengthSq() > 1e-6 ? moveStep.clone().normalize().negate() : new Vector3(0, 0, 1);
+        const invQ = ship.quaternion.clone().invert();
+        const hitDirLocal = hitDirWorld.applyQuaternion(invQ).normalize();
+        shieldRef.current.trigger(hitDirLocal, 0.9);
+      }
+    }
+
     if (bodyRef.current) {
       const p = ship.position;
       const q = ship.quaternion;
@@ -307,6 +325,7 @@ export const AIShip: FC<AIShipProps> = ({ name, modelPath, position, navGraph, o
   return (
     <group ref={shipRef} name={name} userData={{ navRadius: size * 1.4 }}>
       <ShipModel name={name} modelPath={modelPath} enableLights={false} throttle={1.0} />
+      <ShieldWrapEffect ref={shieldRef} target={shieldTarget} thickness={shieldThickness} />
     </group>
   );
 };

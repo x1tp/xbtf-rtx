@@ -813,9 +813,13 @@ function EconomyAdmin() {
   const setTimeScale = useGameStore((s) => s.setTimeScale)
   const elapsedTimeSec = useGameStore((s) => s.elapsedTimeSec)
   const syncEconomy = useGameStore((s) => s.syncEconomy)
+  const syncEconomyHistory = useGameStore((s) => s.syncEconomyHistory)
   const [sectorFilter, setSectorFilter] = useState('all')
   const [activeTab, setActiveTab] = useState<'economy' | 'fleets' | 'corporations' | 'characters' | 'graphs'>('economy')
   const [graphWareId, setGraphWareId] = useState<string>('all')
+  const [selectedCorpId, setSelectedCorpId] = useState<string | null>(null)
+  const [selectedStationId, setSelectedStationId] = useState<string | null>(null)
+  const [selectedFleetId, setSelectedFleetId] = useState<string | null>(null)
   const economyHistory = useGameStore((s) => s.economyHistory)
   const sectorList = Array.from(new Set<string>([...stations.map((st) => st.sectorId), ...Object.keys(sectorPrices)])).sort()
   const wareMap = new Map<string, string>(wares.map((w) => [w.id, w.name]))
@@ -823,6 +827,9 @@ function EconomyAdmin() {
   const recipeMap = new Map<string, { id: string; productId: string; inputs: { wareId: string; amount: number }[]; cycleTimeSec: number; batchSize: number }>(recipes.map((r) => [r.id, r]))
   const visibleStations = stations.filter((st) => sectorFilter === 'all' || st.sectorId === sectorFilter)
   const visibleFleets = fleets.filter((f) => sectorFilter === 'all' || f.currentSectorId === sectorFilter || f.destinationSectorId === sectorFilter)
+  const selectedCorp = selectedCorpId ? corporations.find((c) => c.id === selectedCorpId) : null
+  const selectedStation = selectedStationId ? stations.find((s) => s.id === selectedStationId) : null
+  const selectedFleet = selectedFleetId ? fleets.find((f) => f.id === selectedFleetId) : null
 
   // Calculate Total Economy Value
   const totalStationValue = stations.reduce((sum, st) => {
@@ -837,6 +844,23 @@ function EconomyAdmin() {
 
   useEffect(() => { syncEconomy() }, [syncEconomy])
   useEffect(() => { const id = setInterval(() => syncEconomy(), 1000); return () => clearInterval(id) }, [syncEconomy])
+  useEffect(() => {
+    if (activeTab !== 'graphs') return
+    syncEconomyHistory()
+    const id = setInterval(() => syncEconomyHistory(), 2000)
+    return () => clearInterval(id)
+  }, [activeTab, syncEconomyHistory])
+  useEffect(() => {
+    if (!selectedCorpId) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      if (selectedStationId) { setSelectedStationId(null); return }
+      if (selectedFleetId) { setSelectedFleetId(null); return }
+      setSelectedCorpId(null)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [selectedCorpId, selectedStationId, selectedFleetId])
 
   const getStateColor = (state: string) => {
     switch (state) {
@@ -848,6 +872,29 @@ function EconomyAdmin() {
       case 'undocking': return '#ff88aa'
       default: return '#888888'
     }
+  }
+
+  const isInternalTransfer = (t: { buyStationName: string; sellStationName: string }) => {
+    const buyStation = stations.find((s) => s.name === t.buyStationName)
+    const sellStation = stations.find((s) => s.name === t.sellStationName)
+    return !!buyStation?.ownerId && buyStation.ownerId === sellStation?.ownerId
+  }
+
+  const getStationOwnerIdByName = (stationName: string) => {
+    return stations.find((s) => s.name === stationName)?.ownerId ?? null
+  }
+  const getOwnerLabelById = (ownerId: string | null) => {
+    if (!ownerId) return 'unowned'
+    if (ownerId === 'player') return 'Player'
+    const corp = corporations.find((c) => c.id === ownerId)
+    return corp?.name ?? ownerId
+  }
+  const touchesTraderOwner = (t: { fleetId: string; buyStationName: string; sellStationName: string }) => {
+    const traderOwnerId = fleets.find((f) => f.id === t.fleetId)?.ownerId ?? null
+    if (!traderOwnerId) return false
+    const buyOwnerId = getStationOwnerIdByName(t.buyStationName)
+    const sellOwnerId = getStationOwnerIdByName(t.sellStationName)
+    return buyOwnerId === traderOwnerId || sellOwnerId === traderOwnerId
   }
 
   const getOwnerColor = (owner: string) => {
@@ -893,7 +940,7 @@ function EconomyAdmin() {
           }} style={{ padding: '6px 10px', border: '1px solid #ff4444', background: '#0f2230', color: '#ff4444', cursor: 'pointer', fontWeight: 'bold' }}>New Game</button>
           <button onClick={() => initEconomy()} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff', cursor: 'pointer' }}>Init</button>
           <button onClick={() => tickEconomy(10)} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff', cursor: 'pointer' }}>Tick +10s</button>
-          <button onClick={() => setTimeScale(timeScale === 1 ? 30 : 1)} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff', cursor: 'pointer' }}>Time {timeScale.toFixed(1)}x</button>
+          <button onClick={() => setTimeScale(timeScale === 1 ? 30 : 1, { bypassSafety: true })} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff', cursor: 'pointer' }}>Time {timeScale.toFixed(1)}x</button>
           <button onClick={() => { window.location.assign('/admin'); }} style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff', cursor: 'pointer' }}>Back</button>
         </div>
       </div>
@@ -1268,13 +1315,28 @@ function EconomyAdmin() {
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {tradeLog.slice(0, 20).map((t) => (
-                      <div key={t.id} style={{ fontSize: 11, padding: 6, background: '#0a1520', borderRadius: 4 }}>
+                      <div
+                        key={t.id}
+                        style={{
+                          fontSize: 11,
+                          padding: 6,
+                          background: touchesTraderOwner(t) ? '#102535' : '#0a1520',
+                          borderRadius: 4,
+                          border: touchesTraderOwner(t) ? '1px solid #3fb6ff' : '1px solid transparent',
+                        }}
+                      >
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
                           <span style={{ color: '#8ab6d6' }}>{t.fleetName}</span>
-                          <span style={{ color: '#88cc44' }}>+{t.profit}</span>
+                          <span style={{ color: t.profit >= 0 ? '#88cc44' : '#ff6666' }}>{t.profit >= 0 ? `+${t.profit}` : t.profit}</span>
                         </div>
                         <div style={{ color: '#6090a0' }}>
+                          {isInternalTransfer(t) && (
+                            <span style={{ marginRight: 6, color: '#8ab6d6' }}>(internal transfer)</span>
+                          )}
                           {t.quantity}x {t.wareName} • {t.buySectorId} → {t.sellSectorId}
+                        </div>
+                        <div style={{ color: '#8ab6d6', fontSize: 10, marginTop: 2 }}>
+                          Buy owner: {getOwnerLabelById(getStationOwnerIdByName(t.buyStationName))} → Sell owner: {getOwnerLabelById(getStationOwnerIdByName(t.sellStationName))}
                         </div>
                       </div>
                     ))}
@@ -1290,7 +1352,24 @@ function EconomyAdmin() {
             <div style={{ marginBottom: 12, color: '#8ab6d6', fontSize: 16, fontWeight: 'bold' }}>Corporations</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
               {corporations.map((corp) => (
-                <div key={corp.id} style={{ background: '#0a1520', border: '1px solid #184b6a', borderRadius: 6, padding: 16 }}>
+                <div
+                  key={corp.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelectedCorpId(corp.id)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedCorpId(corp.id) }}
+                  style={{
+                    background: '#0a1520',
+                    border: '1px solid #184b6a',
+                    borderRadius: 6,
+                    padding: 16,
+                    cursor: 'pointer',
+                    transition: 'border-color 120ms ease, box-shadow 120ms ease',
+                    boxShadow: selectedCorpId === corp.id ? '0 0 0 2px rgba(63,182,255,0.35)' : 'none'
+                  }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = '#3fb6ff' }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = '#184b6a' }}
+                >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                     <span style={{ fontSize: 16, fontWeight: 'bold', color: getOwnerColor(corp.race) }}>{corp.name}</span>
                     <span style={{ fontSize: 12, color: '#6090a0', textTransform: 'capitalize' }}>{corp.type}</span>
@@ -1325,6 +1404,280 @@ function EconomyAdmin() {
                 </div>
               ))}
             </div>
+
+            {selectedCorp && (
+              <div
+                onClick={() => setSelectedCorpId(null)}
+                style={{
+                  position: 'fixed',
+                  inset: 0,
+                  background: 'rgba(0,0,0,0.6)',
+                  zIndex: 1000,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 24
+                }}
+              >
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    width: 'min(900px, 95vw)',
+                    maxHeight: '90vh',
+                    overflow: 'auto',
+                    background: '#06121a',
+                    border: '1px solid #3fb6ff',
+                    borderRadius: 8,
+                    padding: 16,
+                    boxShadow: '0 12px 60px rgba(0,0,0,0.7)'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                      <span style={{ fontSize: 20, fontWeight: 'bold', color: getOwnerColor(selectedCorp.race) }}>{selectedCorp.name}</span>
+                      <span style={{ fontSize: 12, color: '#6090a0', textTransform: 'capitalize' }}>{selectedCorp.type}</span>
+                      <span style={{ fontSize: 12, color: '#8ab6d6' }}>{selectedCorp.race.toUpperCase()}</span>
+                    </div>
+                    <button
+                      onClick={() => setSelectedCorpId(null)}
+                      style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff', cursor: 'pointer' }}
+                    >
+                      Close
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 12, marginBottom: 14 }}>
+                    <div style={{ background: '#0f2230', border: '1px solid #184b6a', borderRadius: 6, padding: 10 }}>
+                      <div style={{ color: '#6090a0', fontSize: 10, marginBottom: 4 }}>FUNDS</div>
+                      <div style={{ color: '#c3e7ff', fontSize: 15 }}>{Math.floor(selectedCorp.credits).toLocaleString()} Cr</div>
+                    </div>
+                    <div style={{ background: '#0f2230', border: '1px solid #184b6a', borderRadius: 6, padding: 10 }}>
+                      <div style={{ color: '#6090a0', fontSize: 10, marginBottom: 4 }}>NET WORTH</div>
+                      <div style={{ color: '#88cc44', fontSize: 15 }}>{Math.floor(selectedCorp.netWorth).toLocaleString()} Cr</div>
+                    </div>
+                  </div>
+
+                  {(() => {
+                    const ownedStations = stations.filter((st) => selectedCorp.stationIds.includes(st.id) || st.ownerId === selectedCorp.id)
+                    const ownedFleets = fleets.filter((f) => selectedCorp.fleetIds.includes(f.id) || f.ownerId === selectedCorp.id)
+                    return (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                        <div style={{ background: '#0a1520', border: '1px solid #184b6a', borderRadius: 6, padding: 10, minHeight: 160 }}>
+                          <div style={{ marginBottom: 8, color: '#8ab6d6', fontWeight: 'bold' }}>Owned Stations ({ownedStations.length})</div>
+                          {ownedStations.length === 0 ? (
+                            <div style={{ color: '#6090a0', fontSize: 12 }}>None</div>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              {ownedStations.map((st) => {
+                                const recipe = recipeMap.get(st.recipeId)
+                                const productName = recipe ? (wareMap.get(recipe.productId) || recipe.productId) : st.recipeId
+                                return (
+                                  <div
+                                    key={st.id}
+                                    role="button"
+                                    tabIndex={0}
+                                    onClick={() => setSelectedStationId(st.id)}
+                                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedStationId(st.id) }}
+                                    style={{ fontSize: 12, padding: 6, background: '#0f2230', borderRadius: 4, border: '1px solid #12384f', cursor: 'pointer' }}
+                                  >
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                      <span style={{ color: '#c3e7ff' }}>{st.name}</span>
+                                      <span style={{ color: '#6090a0' }}>{st.sectorId}</span>
+                                    </div>
+                                    <div style={{ color: '#8ab6d6', fontSize: 11 }}>{productName}</div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+
+                        <div style={{ background: '#0a1520', border: '1px solid #184b6a', borderRadius: 6, padding: 10, minHeight: 160 }}>
+                          <div style={{ marginBottom: 8, color: '#8ab6d6', fontWeight: 'bold' }}>Owned Ships ({ownedFleets.length})</div>
+                          {ownedFleets.length === 0 ? (
+                            <div style={{ color: '#6090a0', fontSize: 12 }}>None</div>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              {ownedFleets.map((f) => (
+                                <div
+                                  key={f.id}
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={() => setSelectedFleetId(f.id)}
+                                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedFleetId(f.id) }}
+                                  style={{ fontSize: 12, padding: 6, background: '#0f2230', borderRadius: 4, border: '1px solid #12384f', cursor: 'pointer' }}
+                                >
+                                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span style={{ color: '#c3e7ff' }}>{f.name}</span>
+                                    <span style={{ color: '#6090a0' }}>{f.currentSectorId}</span>
+                                  </div>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#8ab6d6' }}>
+                                    <span>{f.shipType}</span>
+                                    <span style={{ textTransform: 'capitalize', color: getStateColor(f.state) }}>{f.state}</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })()}
+                </div>
+
+                {selectedStation && (
+                  <div
+                    onClick={() => setSelectedStationId(null)}
+                    style={{
+                      position: 'fixed',
+                      inset: 0,
+                      background: 'rgba(0,0,0,0.65)',
+                      zIndex: 1100,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: 24
+                    }}
+                  >
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        width: 'min(900px, 95vw)',
+                        maxHeight: '90vh',
+                        overflow: 'auto',
+                        background: '#06121a',
+                        border: '1px solid #3fb6ff',
+                        borderRadius: 8,
+                        padding: 14
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                        <div style={{ fontSize: 18, fontWeight: 'bold', color: '#c3e7ff' }}>{selectedStation.name}</div>
+                        <button
+                          onClick={() => setSelectedStationId(null)}
+                          style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff', cursor: 'pointer' }}
+                        >
+                          Close
+                        </button>
+                      </div>
+
+                      {(() => {
+                        const stationNameLower = selectedStation.name.toLowerCase()
+                        const stationTrades = tradeLog.filter((t) =>
+                          t.buyStationName.toLowerCase() === stationNameLower ||
+                          t.sellStationName.toLowerCase() === stationNameLower
+                        )
+                        return (
+                          <div>
+                            <div style={{ marginBottom: 8, color: '#8ab6d6' }}>Transactions ({stationTrades.length})</div>
+                            {stationTrades.length === 0 ? (
+                              <div style={{ color: '#6090a0', fontSize: 12 }}>No trades recorded for this station yet</div>
+                            ) : (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                {stationTrades.slice(0, 200).map((t) => (
+                                  <div key={t.id} style={{ fontSize: 12, padding: 8, background: '#0f2230', borderRadius: 4, border: '1px solid #12384f' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                                      <span style={{ color: '#c3e7ff' }}>{t.quantity}x {t.wareName}</span>
+                                      <span style={{ color: t.profit >= 0 ? '#88cc44' : '#ff6666' }}>{t.profit >= 0 ? `+${t.profit}` : t.profit} Cr</span>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#8ab6d6', fontSize: 11 }}>
+                                      <span>{t.buyStationName} ({t.buySectorId}) → {t.sellStationName} ({t.sellSectorId})</span>
+                                      <span>{t.fleetName}</span>
+                                    </div>
+                                    {isInternalTransfer(t) && (
+                                      <div style={{ color: '#8ab6d6', fontSize: 10, marginTop: 2 }}>(internal transfer)</div>
+                                    )}
+                                    <div style={{ color: '#6090a0', fontSize: 11 }}>Buy {t.buyPrice} / Sell {t.sellPrice}</div>
+                                  </div>
+                                ))}
+                                {stationTrades.length > 200 && (
+                                  <div style={{ color: '#6090a0', fontSize: 11 }}>Showing first 200 entries</div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })()}
+                    </div>
+                  </div>
+                )}
+
+                {selectedFleet && (
+                  <div
+                    onClick={() => setSelectedFleetId(null)}
+                    style={{
+                      position: 'fixed',
+                      inset: 0,
+                      background: 'rgba(0,0,0,0.65)',
+                      zIndex: 1100,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: 24
+                    }}
+                  >
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        width: 'min(900px, 95vw)',
+                        maxHeight: '90vh',
+                        overflow: 'auto',
+                        background: '#06121a',
+                        border: '1px solid #3fb6ff',
+                        borderRadius: 8,
+                        padding: 14
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+                          <div style={{ fontSize: 18, fontWeight: 'bold', color: '#c3e7ff' }}>{selectedFleet.name}</div>
+                          <div style={{ fontSize: 12, color: '#8ab6d6' }}>{selectedFleet.shipType}</div>
+                        </div>
+                        <button
+                          onClick={() => setSelectedFleetId(null)}
+                          style={{ padding: '6px 10px', border: '1px solid #3fb6ff', background: '#0f2230', color: '#c3e7ff', cursor: 'pointer' }}
+                        >
+                          Close
+                        </button>
+                      </div>
+
+                      {(() => {
+                        const fleetTrades = tradeLog.filter((t) => t.fleetId === selectedFleet.id)
+                        return (
+                          <div>
+                            <div style={{ marginBottom: 8, color: '#8ab6d6' }}>Trade Log ({fleetTrades.length})</div>
+                            {fleetTrades.length === 0 ? (
+                              <div style={{ color: '#6090a0', fontSize: 12 }}>No trades recorded for this ship yet</div>
+                            ) : (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                {fleetTrades.slice(0, 200).map((t) => (
+                                  <div key={t.id} style={{ fontSize: 12, padding: 8, background: '#0f2230', borderRadius: 4, border: '1px solid #12384f' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                                      <span style={{ color: '#c3e7ff' }}>{t.quantity}x {t.wareName}</span>
+                                      <span style={{ color: t.profit >= 0 ? '#88cc44' : '#ff6666' }}>{t.profit >= 0 ? `+${t.profit}` : t.profit} Cr</span>
+                                    </div>
+                                    <div style={{ color: '#8ab6d6', fontSize: 11 }}>
+                                      {isInternalTransfer(t) && (
+                                        <span style={{ marginRight: 6, color: '#8ab6d6' }}>(internal transfer)</span>
+                                      )}
+                                      {t.buyStationName} ({t.buySectorId}) → {t.sellStationName} ({t.sellSectorId})
+                                    </div>
+                                    <div style={{ color: '#6090a0', fontSize: 11 }}>Buy {t.buyPrice} / Sell {t.sellPrice}</div>
+                                  </div>
+                                ))}
+                                {fleetTrades.length > 200 && (
+                                  <div style={{ color: '#6090a0', fontSize: 11 }}>Showing first 200 entries</div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })()}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         ) : activeTab === 'characters' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>

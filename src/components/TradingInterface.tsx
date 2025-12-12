@@ -9,7 +9,6 @@ export const TradingInterface: React.FC = () => {
     const setDocked = useGameStore((state) => state.setDocked);
     const stations = useGameStore((state) => state.stations);
     const wares = useGameStore((state) => state.wares);
-    const recipes = useGameStore((state) => state.recipes);
     const playerCredits = useGameStore((state) => state.player.credits);
     // const addNotification = useGameStore((state) => state.addNotification); 
 

@@ -6,6 +6,7 @@ export const HUD: React.FC = () => {
     const throttle = useGameStore((state) => state.throttle);
     const maxSpeed = useGameStore((state) => state.maxSpeed);
     const timeScale = useGameStore((state) => state.timeScale);
+    const setaMessage = useGameStore((state) => state.setaMessage);
 
     const forwardThrottle = throttle > 0 ? throttle * 100 : 0;
     const reverseThrottle = throttle < 0 ? Math.abs(throttle) * 100 : 0;
@@ -62,6 +63,11 @@ export const HUD: React.FC = () => {
             {timeScale > 1.0 && (
                 <div style={{ marginTop: '10px', color: '#ffff00', fontWeight: 'bold', fontSize: '20px', animation: 'blink 1s infinite' }}>
                     SETA {timeScale.toFixed(0)}x
+                </div>
+            )}
+            {setaMessage && (
+                <div style={{ marginTop: '10px', color: '#ffb300', fontWeight: 'bold' }}>
+                    {setaMessage}
                 </div>
             )}
         </div>

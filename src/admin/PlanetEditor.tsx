@@ -4,10 +4,8 @@ import { Environment, OrthographicCamera, MapControls, Grid } from '@react-three
 import { Planet } from '../components/Planet';
 import { Sun } from '../components/Sun';
 import { Station } from '../components/Station';
-import { InstancedMesh, TextureLoader, SRGBColorSpace, LinearSRGBColorSpace, RepeatWrapping, Box3, Vector3, Texture, BackSide } from 'three';
+import { Box3, Vector3, BackSide } from 'three';
 import * as THREE from 'three';
-import { ensureRapier, getWorld, getWorldSync } from '../physics/RapierWorld';
-import type RAPIERType from '@dimforge/rapier3d-compat';
 import { DEFAULT_SECTOR_CONFIG } from '../config/sector';
 
 export const PlanetEditor: React.FC = () => {
@@ -460,5 +458,4 @@ export const PlanetEditor: React.FC = () => {
     </div>
   );
 };
-
 

@@ -40,8 +40,6 @@ const tmpDir = new Vector3();
 const DOCK_DISTANCE = 80;      // Distance to be considered "at" a station
 const ARRIVAL_DISTANCE = 50;   // Distance to complete arrival
 const DOCK_HOLD_DAMPING = 0.9; // How aggressively to damp velocity while docked
-const IDLE_DAMPING = 0.92;     // Idle damping to prevent jitter
-
 // Ship flight characteristics (Military ships are generally faster/more agile)
 const BASE_ACCELERATION = 20;       // Units per second squared
 const MAX_SPEED = 220;         // Maximum velocity
@@ -157,10 +155,10 @@ export const NPCMilitary: FC<NPCMilitaryProps> = ({
     }));
   }, [fleet.id]);
 
-  const report = useCallback((type: ShipReportType, extra?: { stationId?: string; wareId?: string; amount?: number; sectorIdOverride?: string; gateType?: string }) => {
+  const report = useCallback((type: ShipReportType, extra?: { stationId?: string; wareId?: string; amount?: number; sectorIdOverride?: string; gateType?: string; position?: [number, number, number] }) => {
     const ship = shipRef.current;
     if (!ship || !onReport) return;
-    const pos: [number, number, number] = [ship.position.x, ship.position.y, ship.position.z];
+    const pos: [number, number, number] = extra?.position ?? [ship.position.x, ship.position.y, ship.position.z];
 
     if (type !== 'position-update') {
       const reportKey = `${type}-${extra?.stationId || ''}-${extra?.wareId || ''}`;

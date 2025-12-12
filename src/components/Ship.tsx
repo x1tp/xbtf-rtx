@@ -1,16 +1,19 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { Vector3, Vector2, Group, MathUtils, Quaternion, Box3, Quaternion as TQuaternion, Mesh, BufferGeometry, Matrix4, Raycaster } from 'three';
+import { Vector3, Vector2, Group, MathUtils, Quaternion, Box3, Quaternion as TQuaternion, Mesh, BufferGeometry, Matrix4, Raycaster, type Object3D } from 'three';
 import { ensureRapier, getWorld, getWorldSync } from '../physics/RapierWorld';
 import type RAPIERType from '@dimforge/rapier3d-compat';
 type RapierExports = { ColliderDesc: { convexHull: (arr: Float32Array) => unknown } };
 import { useGameStore } from '../store/gameStore';
 import { ShipModel } from './ShipModel';
+import { ShieldWrapEffect, type ShieldWrapEffectHandle } from './ShieldWrapEffect';
 
 interface ShipProps {
     enableLights?: boolean;
     position?: [number, number, number];
 }
+
+const SETA_PROXIMITY_BLOCK_DIST = 2000;
 
 export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 0, 300] }) => {
     const shipRef = useRef<Group | null>(null);
@@ -43,6 +46,20 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
     const isTargetViewRef = useRef(false);
     const targetOrbitRef = useRef({ yaw: 0, pitch: 0.2, distance: 800 });
     const raycasterRef = useRef(new Raycaster());
+    const shieldRef = useRef<ShieldWrapEffectHandle | null>(null);
+    const [shieldThickness, setShieldThickness] = useState(0.18);
+    const [shieldTarget, setShieldTarget] = useState<Object3D | null>(null);
+
+    useEffect(() => {
+        if (!shipRef.current) return;
+        setShieldTarget(shipRef.current);
+        // Scale thickness based on ship size so it's a tight wrap.
+        const box = new Box3().setFromObject(shipRef.current);
+        const s = box.getSize(new Vector3());
+        const r = Math.max(s.x, s.y, s.z);
+        if (r > 1) setShieldThickness(MathUtils.clamp(r * 0.0035, 0.12, 0.35));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -326,7 +343,31 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
             }
         };
 
-        const registerImpact = (duration = 0.55, magnitude = 1.6) => {
+        const triggerShield = (hitDirWorld?: Vector3, strength = 1) => {
+            if (!shieldRef.current) return;
+            if (hitDirWorld && hitDirWorld.lengthSq() > 1e-6) {
+                const invQ = ship.quaternion.clone().invert();
+                const local = hitDirWorld.clone().applyQuaternion(invQ as unknown as TQuaternion).normalize();
+                shieldRef.current.trigger(local, strength);
+                useGameStore.getState().emitImpact({
+                    position: [ship.position.x, ship.position.y, ship.position.z],
+                    dir: [hitDirWorld.x, hitDirWorld.y, hitDirWorld.z],
+                    strength,
+                    source: 'player',
+                });
+            } else {
+                shieldRef.current.trigger(new Vector3(0, 0, 1), strength);
+                useGameStore.getState().emitImpact({
+                    position: [ship.position.x, ship.position.y, ship.position.z],
+                    dir: [0, 0, 1],
+                    strength,
+                    source: 'player',
+                });
+            }
+        };
+
+        const registerImpact = (duration = 0.55, magnitude = 1.6, hitDirWorld?: Vector3, strength = 1.3) => {
+            triggerShield(hitDirWorld, strength);
             cameraShakeRef.current = { elapsed: 0, duration, magnitude };
             velocity.set(0, 0, 0);
             setThrottle(0);
@@ -539,13 +580,13 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
                 collided = (Math.abs(result.x - move.x) + Math.abs(result.y - move.y) + Math.abs(result.z - move.z)) > 1e-4;
 
                 if (collided) {
-                const desiredLen = desiredVec.length();
-                const resultLen = resultVec.length();
-                const progress = desiredLen > 1e-5 ? resultLen / desiredLen : 0;
-                const diff = desiredVec.clone().sub(resultVec);
-                const alignment = desiredLen > 1e-5 && resultLen > 1e-5
-                    ? resultVec.dot(desiredVec) / (desiredLen * resultLen)
-                    : 1;
+                    const desiredLen = desiredVec.length();
+                    const resultLen = resultVec.length();
+                    const progress = desiredLen > 1e-5 ? resultLen / desiredLen : 0;
+                    const diff = desiredVec.clone().sub(resultVec);
+                    const alignment = desiredLen > 1e-5 && resultLen > 1e-5
+                        ? resultVec.dot(desiredVec) / (desiredLen * resultLen)
+                        : 1;
                     const desiredSpeed = desiredLen / Math.max(delta, 1e-4); // approximate world speed
                     // Treat only very aligned, mostly-unblocked moves as a glancing blow.
                     if (progress > 0.6 && alignment > 0.85) {
@@ -554,14 +595,19 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
                         ship.position.add(normal.multiplyScalar(pushStrength));
                         velocity.multiplyScalar(0.6);
                         setThrottle(MathUtils.clamp(throttle * 0.6, -1, 1));
-                        cameraShakeRef.current = { elapsed: 0, duration: 0.35, magnitude: 0.9 };
+                        // Pass negated normal to triggerShield so it represents "Direction TO Impact"
+                        // normal is "Push direction" (Away from wall).
+                        // -normal is "Towards wall" (Impact point).
+                        triggerShield(normal.clone().negate(), MathUtils.clamp(desiredSpeed / (maxSpeed || 1), 0.6, 1.6));
                     } else {
                         // On hard collision, stop the ship, pull it back a bit, and add camera shake feedback
                         if (diff.lengthSq() > 1e-8) {
                             const pushBack = diff.clone().normalize().negate().multiplyScalar(MathUtils.clamp(desiredSpeed * 0.08, 0.5, 10));
                             ship.position.add(pushBack);
                         }
-                        registerImpact();
+                        const normal = diff.lengthSq() > 1e-8 ? diff.clone().normalize().negate() : forward.clone().negate();
+                        // Negate normal for effect origin
+                        registerImpact(0.55, 1.6, normal.clone().negate(), MathUtils.clamp(desiredSpeed / (maxSpeed || 1), 1.0, 2.0));
                     }
                 }
             }
@@ -586,7 +632,9 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
                 const he = shipHalfExtentsRef.current;
                 const support = Math.abs(nLocal.x) * he.x + Math.abs(nLocal.y) * he.y + Math.abs(nLocal.z) * he.z;
                 ship.position.copy(c.clone().add(n.multiplyScalar(r + support)));
-                registerImpact(0.7, 1.8);
+                // planet n is 'direction from center to ship' (Up/Away).
+                // Impact is DOWN. so negate n.
+                registerImpact(0.7, 1.8, n.clone().negate(), 1.8);
             }
         }
 
@@ -646,6 +694,13 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
         const DOCK_DIST = 600; // Increased range
         const DOCK_SPEED = 50; // Increased allowance
 
+        // Auto-disengage SETA when approaching a station (prevents high-timeScale close-quarters flying)
+        const tsNow = useGameStore.getState().timeScale;
+        if (tsNow > 1.0 && nearestStationId && nearestDist < SETA_PROXIMITY_BLOCK_DIST) {
+            useGameStore.getState().setTimeScale(1.0);
+            useGameStore.getState().showSetaMessage('SETA disengaged: too close to an object');
+        }
+
         if (nearestStationId && nearestDist < DOCK_DIST && speed < DOCK_SPEED) {
             // Allow docking
             // TODO: Ideally verify ship is facing docking buy/light? For now, distance check.
@@ -659,6 +714,7 @@ export const Ship: React.FC<ShipProps> = ({ enableLights = true, position = [0, 
     return (
         <group ref={shipRef} name="PlayerShip" position={position}>
             <ShipModel enableLights={enableLights} modelPath="/models/00124.obj" throttle={throttle} />
+            <ShieldWrapEffect ref={shieldRef} target={shieldTarget} thickness={shieldThickness} />
             {/* External ship model could go here, but invisible from inside */}
         </group>
     );
