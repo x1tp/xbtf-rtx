@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import type { ViteDevServer } from 'vite'
 import type { IncomingMessage, ServerResponse } from 'http'
+import 'dotenv/config'
 import react from '@vitejs/plugin-react'
 import { INITIAL_CORPORATIONS, INITIAL_FLEETS, type Ware, type Recipe } from './src/types/simulation'
 import { UNIVERSE_SECTORS_XBTF } from './src/config/universe_xbtf'
@@ -33,7 +34,11 @@ type PendingConstruction = {
   targetSectorId: string
   status: 'planning' | 'in-transit' | 'building'
   builderShipId?: string
+  costPaid?: number
+  fundedAt?: number
+  lastFundingLogAt?: number
   createdAt: number
+  source?: 'llm' | 'npc'
 }
 
 type CorporationAIState = {
@@ -160,6 +165,7 @@ type ShipCommand = {
   wareId?: string
   amount?: number
   createdAt: number
+  source?: 'llm' | 'npc' | 'system'
 }
 
 type TradeOrder = {
@@ -267,9 +273,35 @@ const normalizeStationRecipes = (stations: Station[], recipes: Recipe[]) => {
     chip_plant: 'chip_plant_argon',
     crystal_fab: 'crystal_fab_teladi',
     shield_plant: 'shield_prod_25mw',
+    // Blueprint keys from STATION_BLUEPRINTS (not recipe IDs).
+    factory_hull_parts: 'hull_part_factory',
+    factory_engine_parts: 'engine_part_factory',
+    factory_microchips: 'chip_plant',
+    factory_scanning_arrays: 'scanning_array_factory',
+    factory_weapon_components: 'weapon_component_factory',
+    factory_shield_components: 'shield_component_factory',
+    factory_quantum_tubes: 'quantum_tube_fab',
+    factory_advanced_composites: 'advanced_composite_factory',
+    factory_field_coils: 'field_coil_factory',
+    factory_smart_chips: 'smart_chip_factory',
+    factory_claytronics: 'claytronics_factory',
+    factory_crystals: 'crystal_fab_teladi',
+    oil_refinery: 'sun_oil_refinery',
   }
 
   stations.forEach((st) => {
+    const n = String(st.name || '').toLowerCase()
+    // Repair common bad-normalizations where a station got defaulted to logistics_hub but the name indicates a real factory.
+    if (st.recipeId === 'logistics_hub') {
+      if (n.includes('shield component') && recipeSet.has('shield_component_factory')) {
+        st.recipeId = 'shield_component_factory'
+      } else if ((n.includes('1mw') || n.includes('1 mw')) && n.includes('shield') && recipeSet.has('shield_prod_1mw')) {
+        st.recipeId = 'shield_prod_1mw'
+      } else if ((n.includes('25mw') || n.includes('25 mw')) && n.includes('shield') && recipeSet.has('shield_prod_25mw')) {
+        st.recipeId = 'shield_prod_25mw'
+      }
+    }
+
     if (recipeSet.has(st.recipeId)) return
     const mapped = alias[st.recipeId]
     if (mapped && recipeSet.has(mapped)) {
@@ -280,8 +312,221 @@ const normalizeStationRecipes = (stations: Station[], recipes: Recipe[]) => {
   })
 }
 
+const patchShipyards = (stations: Station[], recipes: Recipe[], opts: { seedShipStock: boolean }) => {
+  const recipeById = new Map(recipes.map((r) => [r.id, r]))
+  const defaultShipStock: Record<string, number> = {
+    ship_vulture: 4,
+    ship_albatross: 1,
+    ship_express: 3,
+    ship_toucan: 3,
+    ship_buster: 2,
+    ship_discoverer: 3,
+  }
+
+  for (const st of stations) {
+    const isShipyard =
+      st.recipeId === 'shipyard' ||
+      String(st.name || '').toLowerCase().includes('shipyard') ||
+      String(st.name || '').toLowerCase().includes('wharf')
+
+    if (!isShipyard) continue
+
+    // 1) Ensure capabilities exist
+    if (!st.capabilities || st.capabilities.length === 0) {
+      st.capabilities = Object.keys(SHIP_CATALOG).map((k) => `build_${k}`)
+    }
+
+    // 2) Ensure inventory keys for ships exist + optionally seed stock for new games
+    for (const cap of st.capabilities) {
+      const shipKey = cap.replace('build_', 'ship_')
+      const hasKey = Object.prototype.hasOwnProperty.call(st.inventory, shipKey)
+      if (!hasKey) st.inventory[shipKey] = 0
+      if (opts.seedShipStock) {
+        const desired = defaultShipStock[shipKey]
+        if (typeof desired === 'number' && (st.inventory[shipKey] || 0) <= 0) st.inventory[shipKey] = desired
+      } else {
+        // For loaded saves, avoid "refilling" ships; only seed when the key was missing.
+        if (!hasKey) {
+          const desired = defaultShipStock[shipKey]
+          if (typeof desired === 'number') st.inventory[shipKey] = desired
+        }
+      }
+    }
+
+    // 3) Ensure the station is running a real production recipe (shipyard is a station-type, not a recipe).
+    if (!recipeById.has(st.recipeId)) {
+      const capRecipe = (st.capabilities || []).find((capId) => recipeById.has(capId))
+      if (capRecipe) st.recipeId = capRecipe
+      else if (recipeById.has('build_vulture')) st.recipeId = 'build_vulture'
+    }
+
+    // 4) Ensure build resources + reorder levels so traders will supply shipyards.
+    st.reorderLevel = st.reorderLevel || {}
+    const caps = Array.isArray(st.capabilities) ? st.capabilities : []
+    for (const capId of caps) {
+      const r = recipeById.get(capId)
+      if (!r) continue
+      for (const inp of r.inputs || []) {
+        const prev = Number(st.reorderLevel[inp.wareId] || 0)
+        const next = Math.max(prev, Math.max(1, Math.floor(Number(inp.amount || 0) * 20)))
+        st.reorderLevel[inp.wareId] = next
+        if (typeof st.inventory[inp.wareId] === 'undefined') st.inventory[inp.wareId] = 0
+      }
+    }
+  }
+}
+
 function createUniverse() {
   const state: UniverseState = { wares: [], recipes: [], stations: [], sectorPrices: {}, timeScale: 1, acc: 0, elapsedTimeSec: 0, corporations: [], fleets: [], tradeLog: [], lastTickTime: Date.now() }
+
+  type CorpAILogKind = 'context' | 'plan' | 'decision' | 'actions' | 'error'
+  type CorpAILogEntry = {
+    id: number
+    atMs: number
+    ingameTimeSec: number
+    corpId: string
+    kind: CorpAILogKind
+    data: any
+  }
+  let corpAILogNextId = 1
+  const corpAILogs: CorpAILogEntry[] = []
+  const CORP_AI_LOGS_FILE = path.resolve(process.cwd(), 'saves', 'corp_ai_logs.json')
+  let corpAILogsPersistTimer: any = null
+
+  const persistCorpAILogsNow = () => {
+    try {
+      const saveDir = path.resolve(process.cwd(), 'saves')
+      if (!fs.existsSync(saveDir)) fs.mkdirSync(saveDir)
+
+      const corpIds = new Set(state.corporations.map(c => c.id))
+      const logs = corpAILogs.filter(e => corpIds.size === 0 || corpIds.has(e.corpId)).slice(-2000)
+      const payload = {
+        version: 1,
+        atMs: Date.now(),
+        nextId: corpAILogNextId,
+        logs,
+      }
+      fs.writeFileSync(CORP_AI_LOGS_FILE, JSON.stringify(payload, null, 2))
+    } catch (e) {
+      console.warn('[CorpAI] Failed to persist logs:', (e as any)?.message || e)
+    }
+  }
+
+  const schedulePersistCorpAILogs = () => {
+    if (process.env.CORP_AUTOPILOT_PERSIST_LOGS === 'false') return
+    if (corpAILogsPersistTimer) return
+    corpAILogsPersistTimer = setTimeout(() => {
+      corpAILogsPersistTimer = null
+      persistCorpAILogsNow()
+    }, 250)
+  }
+
+  const clearPersistedCorpAILogs = () => {
+    try {
+      if (fs.existsSync(CORP_AI_LOGS_FILE)) fs.unlinkSync(CORP_AI_LOGS_FILE)
+    } catch {
+      // ignore
+    }
+  }
+
+  const loadPersistedCorpAILogs = () => {
+    try {
+      if (!fs.existsSync(CORP_AI_LOGS_FILE)) return
+      const raw = fs.readFileSync(CORP_AI_LOGS_FILE, 'utf-8')
+      const data: any = JSON.parse(raw || '{}')
+      const logs = Array.isArray(data?.logs) ? data.logs : []
+      const nextId = Number(data?.nextId || 0)
+
+      const corpIds = new Set(state.corporations.map(c => c.id))
+      const filtered: CorpAILogEntry[] = logs
+        .map((e: any) => ({
+          id: Number(e?.id || 0),
+          atMs: Number(e?.atMs || Date.now()),
+          ingameTimeSec: Number(e?.ingameTimeSec || 0),
+          corpId: String(e?.corpId || ''),
+          kind: String(e?.kind || 'context') as CorpAILogKind,
+          data: e?.data,
+        }))
+        .filter((e: CorpAILogEntry) => e.id > 0 && e.corpId && (corpIds.size === 0 || corpIds.has(e.corpId)))
+        .slice(-2000)
+
+      corpAILogs.length = 0
+      corpAILogs.push(...filtered)
+      corpAILogNextId = Math.max(
+        1,
+        Number.isFinite(nextId) && nextId > 0 ? nextId : (filtered.reduce((m, e) => Math.max(m, e.id), 0) + 1),
+      )
+    } catch (e) {
+      console.warn('[CorpAI] Failed to load persisted logs:', (e as any)?.message || e)
+    }
+  }
+
+  const pushCorpLog = (corpId: string, kind: CorpAILogKind, data: any) => {
+    corpAILogs.push({
+      id: corpAILogNextId++,
+      atMs: Date.now(),
+      ingameTimeSec: state.elapsedTimeSec,
+      corpId,
+      kind,
+      data,
+    })
+    if (corpAILogs.length > 2000) corpAILogs.splice(0, corpAILogs.length - 2000)
+    schedulePersistCorpAILogs()
+  }
+
+  type CorpAILiveState = {
+    corpId: string
+    status: 'idle' | 'running' | 'done' | 'error'
+    startedAtMs: number
+    updatedAtMs: number
+    pass: number
+    text: string
+    error?: string
+  }
+  const corpAILive = new Map<string, CorpAILiveState>()
+  const setCorpLive = (corpId: string, patch: Partial<CorpAILiveState>) => {
+    const prev = corpAILive.get(corpId) || {
+      corpId,
+      status: 'idle' as const,
+      startedAtMs: Date.now(),
+      updatedAtMs: Date.now(),
+      pass: 0,
+      text: '',
+    }
+    const next: CorpAILiveState = {
+      ...prev,
+      ...patch,
+      corpId,
+      updatedAtMs: Date.now(),
+    }
+    corpAILive.set(corpId, next)
+  }
+  const getCorpLive = (corpId: string) => corpAILive.get(corpId) || null
+
+  const getCorpLogs = (corpId: string, sinceId: number) => {
+    // If the user starts a new game or the server restarts, log ids reset.
+    // When the client keeps an old `since`, allow it to recover by treating it as 0.
+    let sid = Number.isFinite(sinceId) ? sinceId : 0
+    if (sid >= corpAILogNextId) sid = 0
+    return corpAILogs.filter((e) => e.corpId === corpId && e.id > sid)
+  }
+
+  const parseEnvList = (v: string | undefined) =>
+    String(v || '')
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean)
+
+  // If no explicit exclusive list is provided, default to the autopilot corp ids.
+  // This prevents "NPC traders start moving before the LLM responds" when a user
+  // enables autopilot but forgets to also set the exclusive list.
+  const explicitExclusive = parseEnvList(process.env.CORP_AUTOPILOT_EXCLUSIVE_CORP_IDS)
+  const defaultExclusive =
+    process.env.CORP_AUTOPILOT_ENABLED !== 'false'
+      ? parseEnvList(process.env.CORP_AUTOPILOT_CORP_IDS || 'teladi_company')
+      : []
+  const llmExclusiveCorpIds = new Set(explicitExclusive.length > 0 ? explicitExclusive : defaultExclusive)
+  const isLLMExclusiveCorp = (corpId?: string | null) => Boolean(corpId) && llmExclusiveCorpIds.has(String(corpId))
 
   // Fleet constants
   const FLEET_CONSTANTS = {
@@ -575,6 +820,14 @@ function createUniverse() {
 
   const init = (options?: { fresh?: boolean }) => {
     resetEconomyHistory()
+    corpAILogs.length = 0
+    corpAILogNextId = 1
+    ;(state as any)._corpAutopilotLastRunSec = {}
+    ;(state as any)._corpAutopilotInFlight = {}
+
+    if (options?.fresh) {
+      clearPersistedCorpAILogs()
+    }
 
     // Try loading save first (unless fresh start requested)
     if (!options?.fresh) {
@@ -597,34 +850,157 @@ function createUniverse() {
         state.tradeLog = loadedState.tradeLog || []
         remapLegacyStations()
 
-        // PATCH: Ensure Shipyards have capabilities and ship inventory
-        state.stations.forEach(st => {
-          if (st.recipeId === 'shipyard' || st.name.toLowerCase().includes('shipyard') || st.name.toLowerCase().includes('wharf')) {
-            // 1. Ensure Capabilities
-            if (!st.capabilities || st.capabilities.length === 0) {
-              st.capabilities = Object.keys(SHIP_CATALOG).map(k => `build_${k}`);
-              console.log(`[Universe] Patched capabilities for ${st.name}`);
+        // Ensure newly-added default corps exist in older saves.
+        try {
+          const existing = new Set(state.corporations.map(c => c.id))
+          const needed = ['teladi_shieldworks']
+          for (const id of needed) {
+            if (existing.has(id)) continue
+            const template = INITIAL_CORPORATIONS.find(c => c.id === id)
+            if (!template) continue
+            state.corporations.push(JSON.parse(JSON.stringify(template)))
+            console.log(`[Universe] Added missing default corporation: ${id}`)
+          }
+        } catch {
+          // ignore
+        }
+
+        // Ensure Shieldworks has at least some shield production stations.
+        try {
+          const shieldCorpId = 'teladi_shieldworks'
+          const corp = state.corporations.find((c) => c.id === shieldCorpId)
+          if (corp) {
+            const ensureStation = (sectorId: string, recipeId: string, name: string) => {
+              const r = state.recipes.find((rec: any) => rec.id === recipeId)
+              if (!r) return null
+
+              const exists = state.stations.some((s: any) => s.ownerId === shieldCorpId && s.recipeId === recipeId)
+              if (exists) return null
+
+              let id = `${sectorId}_${slug(name, genId())}`
+              let k = 2
+              while (state.stations.some((s: any) => s.id === id)) {
+                id = `${sectorId}_${slug(name, genId())}_${k++}`
+              }
+
+              const inv: Record<string, number> = {}
+              const reorder: Record<string, number> = {}
+              const reserve: Record<string, number> = {}
+              for (const i of r.inputs || []) {
+                inv[i.wareId] = Math.max(1, Math.floor(i.amount * 40))
+                reorder[i.wareId] = Math.max(1, Math.floor(i.amount * 60))
+              }
+              if (r.productStorageCap > 0) {
+                inv[r.productId] = Math.max(0, Math.floor(r.productStorageCap * 0.15))
+                reserve[r.productId] = Math.max(0, Math.floor(r.productStorageCap * 0.25))
+              }
+
+              const st: Station = {
+                id,
+                name: `${corp.name.split(' ')[0]} ${name}`,
+                recipeId,
+                sectorId,
+                position: randomPos(),
+                modelPath: '/models/00442.obj',
+                inventory: inv,
+                reorderLevel: reorder,
+                reserveLevel: reserve,
+                ownerId: shieldCorpId,
+              }
+              state.stations.push(st)
+              corp.stationIds = Array.isArray(corp.stationIds) ? corp.stationIds : []
+              corp.stationIds.push(st.id)
+              return st
             }
 
-            // 2. Ensure Inventory Keys for Ships
-            st.capabilities.forEach(cap => {
-              const shipKey = cap.replace('build_', 'ship_');
-              if (typeof st.inventory[shipKey] === 'undefined') {
-                st.inventory[shipKey] = 0;
-                console.log(`[Universe] Patched inventory key ${shipKey} for ${st.name}`);
-              }
-            });
+            ensureStation('seizewell', 'shield_component_factory', 'Shield Component Factory')
+            ensureStation('seizewell', 'shield_prod_1mw', '1MW Shield Plant')
+            ensureStation('teladi_gain', 'shield_prod_25mw', '25MW Shield Plant')
 
-            // 3. Ensure Build Resources
-            ['energy_cells', 'hull_parts', 'computer_components', 'quantum_tubes', 'microchips'].forEach(res => {
-              if (!st.inventory[res]) {
-                st.inventory[res] = 500;
-              }
-            });
+            normalizeStationRecipes(state.stations, state.recipes)
+            state.sectorPrices = computeSectorPrices(state.stations, state.recipes, state.wares)
           }
-        });
+        } catch {
+          // ignore
+        }
+
+        // Ensure Shieldworks has at least one trader fleet.
+        try {
+          const shieldCorpId = 'teladi_shieldworks'
+          const corp: any = state.corporations.find((c) => c.id === shieldCorpId)
+          if (corp) {
+            corp.fleetIds = Array.isArray(corp.fleetIds) ? corp.fleetIds : []
+            const hasFleet = state.fleets.some((f: any) => f?.ownerId === shieldCorpId)
+            if (!hasFleet) {
+              const now = Date.now()
+              const fleet: NPCFleet = {
+                id: `fleet_${genId()}`,
+                name: `${corp.name.split(' ')[0]} Trader ${genId().substring(0, 4)}`,
+                shipType: 'Vulture',
+                modelPath: SHIP_CATALOG.vulture.modelPath,
+                race: corp.race || 'teladi',
+                capacity: SHIP_CATALOG.vulture.capacity,
+                speed: SHIP_CATALOG.vulture.speed,
+                homeSectorId: 'seizewell',
+                ownerId: shieldCorpId,
+                ownerType: corp.type || 'guild',
+                behavior: 'corp-logistics',
+                autonomy: 0.7,
+                profitShare: 0.15,
+                currentSectorId: 'seizewell',
+                position: randomPos(),
+                state: 'idle',
+                stateStartTime: now,
+                lastReportAt: now,
+                cargo: {},
+                credits: 10000,
+                commandQueue: [],
+                totalProfit: 0,
+                tripsCompleted: 0
+              }
+              state.fleets.push(fleet)
+              corp.fleetIds.push(fleet.id)
+              console.log('[Universe] Added Shieldworks trader fleet.')
+            }
+          }
+        } catch {
+          // ignore
+        }
+
+        // If corp is LLM-exclusive, drop any legacy NPC construction jobs/TLs so only LLM drives expansion.
+        for (const corp of state.corporations) {
+          if (!isLLMExclusiveCorp(corp.id)) continue
+          if (!corp.aiState) continue
+
+          const before = corp.aiState.pendingConstructions.length
+          corp.aiState.pendingConstructions = corp.aiState.pendingConstructions.filter((j: any) => j?.source === 'llm')
+          const after = corp.aiState.pendingConstructions.length
+
+          const keepBuilderIds = new Set<string>(corp.aiState.pendingConstructions.map((j: any) => String(j.builderShipId || '')).filter(Boolean))
+          const removedConstructionFleets = state.fleets.filter((f: any) =>
+            f?.ownerId === corp.id &&
+            f?.behavior === 'construction' &&
+            !keepBuilderIds.has(String(f.id))
+          )
+
+          if (removedConstructionFleets.length > 0) {
+            state.fleets = state.fleets.filter((f: any) => !(f?.ownerId === corp.id && f?.behavior === 'construction' && !keepBuilderIds.has(String(f.id))))
+            corp.fleetIds = (corp.fleetIds || []).filter((id: string) => !removedConstructionFleets.some((f: any) => f.id === id))
+          }
+
+          if (before !== after) {
+            console.log(`[LLM] Purged ${before - after} NPC construction jobs for exclusive corp ${corp.id}`)
+          }
+          if (removedConstructionFleets.length > 0) {
+            console.log(`[LLM] Removed ${removedConstructionFleets.length} construction fleets for exclusive corp ${corp.id}`)
+          }
+        }
+
+        // PATCH: Ensure Shipyards have capabilities, build recipes, and starting ship stock keys.
+        patchShipyards(state.stations, state.recipes, { seedShipStock: false })
 
         console.log(`[Universe] State restored! ${state.stations.length} stations, ${state.fleets.length} fleets.`)
+        loadPersistedCorpAILogs()
         maybeSnapshotEconomy(Date.now())
         return
       }
@@ -647,6 +1023,7 @@ function createUniverse() {
     }
 
     console.log('[Universe] No save found, initializing fresh start...')
+    clearPersistedCorpAILogs()
     // Wares based on actual Teladi sector stations
     // Wares based on actual Teladi sector stations
     const wares = WARES_CONFIG
@@ -874,6 +1251,15 @@ function createUniverse() {
         capabilities = Object.keys(SHIP_CATALOG).map(k => `build_${k}`);
       }
 
+      // If a shipyard got recipeId=shipyard (station-type), ensure it runs an actual build recipe.
+      if ((recipeId === 'shipyard' || cs.name.toLowerCase().includes('shipyard') || cs.name.toLowerCase().includes('wharf')) && !recipes.find(r => r.id === recipeId)) {
+        if (recipes.find(r => r.id === 'build_vulture')) recipeId = 'build_vulture'
+        else if (capabilities) {
+          const capRecipe = capabilities.find((capId) => recipes.find(r => r.id === capId))
+          if (capRecipe) recipeId = capRecipe
+        }
+      }
+
       const st: Station = {
         id: finalId,
         name: cs.name,
@@ -933,7 +1319,7 @@ function createUniverse() {
           // Shipyards need Hull Parts, Computer Components, Energy Cells, etc.
           // Since we don't have a rigid universal recipe for 'shipyard' yet (it uses dynamic capabilities),
           // we should seed generic ship building resources if missing.
-          ['energy_cells', 'hull_parts', 'computer_components', 'quantum_tubes', 'microchips'].forEach(res => {
+          ['energy_cells', 'hull_parts', 'engine_parts', 'computer_components', 'quantum_tubes', 'microchips', '1mw_shield', '25mw_shield'].forEach(res => {
             if (!st.inventory[res]) st.inventory[res] = 500;
           });
         }
@@ -941,6 +1327,18 @@ function createUniverse() {
         // Ensure reorder/reserve levels are set
         if (Object.keys(st.reorderLevel).length === 0) {
           recipe.inputs.forEach(i => st.reorderLevel[i.wareId] = i.amount * 20)
+        }
+        // For shipyards, also add reorder levels for all build-capability inputs so the trade AI supplies them.
+        if (st.capabilities && st.capabilities.length > 0) {
+          st.capabilities.forEach(capId => {
+            const capR = recipes.find(r => r.id === capId)
+            if (!capR) return
+            capR.inputs.forEach(i => {
+              const prev = Number(st.reorderLevel[i.wareId] || 0)
+              st.reorderLevel[i.wareId] = Math.max(prev, i.amount * 20)
+              if (typeof st.inventory[i.wareId] === 'undefined') st.inventory[i.wareId] = 0
+            })
+          })
         }
         if (Object.keys(st.reserveLevel).length === 0 && recipe.productStorageCap > 0) {
           st.reserveLevel[recipe.productId] = recipe.productStorageCap * 0.2
@@ -1078,6 +1476,61 @@ function createUniverse() {
 
     // Populate sector prices
     normalizeStationRecipes(stations, recipes)
+    patchShipyards(stations, recipes, { seedShipStock: true })
+
+    // Ensure Shieldworks starts with shield fabs (deterministic seed, avoids random ownership misses).
+    try {
+      const shieldCorpId = 'teladi_shieldworks'
+      const corp = corporations.find((c) => c.id === shieldCorpId) || null
+      if (corp) {
+        const ensureStation = (sectorId: string, recipeId: string, name: string) => {
+          const r = recipes.find((rec: any) => rec.id === recipeId)
+          if (!r) return null
+          const exists = stations.some((s: any) => s.ownerId === shieldCorpId && s.recipeId === recipeId)
+          if (exists) return null
+
+          const baseName = `${corp.name.split(' ')[0]} ${name}`
+          let id = `${sectorId}_${slug(baseName, genId())}`
+          let k = 2
+          while (stations.some((s: any) => s.id === id)) id = `${sectorId}_${slug(baseName, genId())}_${k++}`
+
+          const inv: Record<string, number> = {}
+          const reorder: Record<string, number> = {}
+          const reserve: Record<string, number> = {}
+          for (const i of r.inputs || []) {
+            inv[i.wareId] = Math.max(1, Math.floor(i.amount * 40))
+            reorder[i.wareId] = Math.max(1, Math.floor(i.amount * 60))
+          }
+          if (r.productStorageCap > 0) {
+            inv[r.productId] = Math.max(0, Math.floor(r.productStorageCap * 0.15))
+            reserve[r.productId] = Math.max(0, Math.floor(r.productStorageCap * 0.25))
+          }
+
+          const st: Station = {
+            id,
+            name: baseName,
+            recipeId,
+            sectorId,
+            position: randomPos(),
+            modelPath: '/models/00442.obj',
+            inventory: inv,
+            reorderLevel: reorder,
+            reserveLevel: reserve,
+            ownerId: shieldCorpId,
+          }
+          stations.push(st)
+          corp.stationIds.push(st.id)
+          return st
+        }
+
+        ensureStation('seizewell', 'shield_component_factory', 'Shield Component Factory')
+        ensureStation('seizewell', 'shield_prod_1mw', '1MW Shield Plant')
+        ensureStation('teladi_gain', 'shield_prod_25mw', '25MW Shield Plant')
+      }
+    } catch {
+      // ignore
+    }
+
     state.wares = wares
     state.recipes = recipes
     state.stations = stations
@@ -1144,6 +1597,48 @@ function createUniverse() {
 
     state.corporations = corporations
     state.fleets = fleets
+
+    // Ensure Shieldworks starts with at least one trader fleet.
+    try {
+      const shieldCorpId = 'teladi_shieldworks'
+      const corp = corporations.find((c) => c.id === shieldCorpId) || null
+      if (corp) {
+        const hasFleet = fleets.some((f) => f.ownerId === shieldCorpId)
+        if (!hasFleet) {
+          const now = Date.now()
+          const fleet: NPCFleet = {
+            id: `fleet_${genId()}`,
+            name: `${corp.name.split(' ')[0]} Trader ${genId().substring(0, 4)}`,
+            shipType: 'Vulture',
+            modelPath: SHIP_CATALOG.vulture.modelPath,
+            race: corp.race,
+            capacity: SHIP_CATALOG.vulture.capacity,
+            speed: SHIP_CATALOG.vulture.speed,
+            homeSectorId: 'seizewell',
+            ownerId: corp.id,
+            ownerType: corp.type,
+            behavior: 'corp-logistics',
+            autonomy: 0.7,
+            profitShare: 0.15,
+            currentSectorId: 'seizewell',
+            position: randomPos(),
+            state: 'idle',
+            stateStartTime: now,
+            lastReportAt: now,
+            cargo: {},
+            credits: 10000,
+            commandQueue: [],
+            totalProfit: 0,
+            tripsCompleted: 0,
+          }
+          fleets.push(fleet)
+          corp.fleetIds.push(fleet.id)
+        }
+      }
+    } catch {
+      // ignore
+    }
+
     remapLegacyStations()
     state.tradeLog = []
     state.acc = 0
@@ -1157,6 +1652,7 @@ function createUniverse() {
     const now = Date.now()
 
     state.corporations.forEach(corp => {
+      const llmExclusive = isLLMExclusiveCorp(corp.id)
       // Initialize AI state if missing
       if (!corp.aiState) {
         corp.aiState = { lastExpansionCheck: now, currentGoal: 'expand', pendingConstructions: [] }
@@ -1166,8 +1662,46 @@ function createUniverse() {
       // Manage Pending Constructions
       for (let i = ai.pendingConstructions.length - 1; i >= 0; i--) {
         const job = ai.pendingConstructions[i]
+        const jobSource = job.source || 'npc'
 
         if (job.status === 'planning') {
+          if (llmExclusive && jobSource !== 'llm') {
+            // LLM-exclusive corp: ignore legacy NPC jobs.
+            continue
+          }
+          const blueprint = STATION_BLUEPRINTS[job.stationType]
+          if (!blueprint) {
+            console.warn(`[CorpAI] Unknown station type ${job.stationType} for job ${job.id}; dropping.`)
+            ai.pendingConstructions.splice(i, 1)
+            continue
+          }
+
+          if (jobSource === 'llm' && !job.costPaid) {
+            if (corp.credits < blueprint.cost) {
+              if (!job.lastFundingLogAt || now - job.lastFundingLogAt > 60000) {
+                pushCorpLog(corp.id, 'actions', {
+                  type: 'construction_waiting_funds',
+                  stationType: job.stationType,
+                  targetSectorId: job.targetSectorId,
+                  cost: blueprint.cost,
+                  credits: corp.credits,
+                })
+                job.lastFundingLogAt = now
+              }
+              continue
+            }
+            corp.credits -= blueprint.cost
+            job.costPaid = blueprint.cost
+            job.fundedAt = now
+            pushCorpLog(corp.id, 'actions', {
+              type: 'construction_funded',
+              stationType: job.stationType,
+              targetSectorId: job.targetSectorId,
+              cost: blueprint.cost,
+              credits: corp.credits,
+            })
+          }
+
           // Hire TL
           const tlId = `tl_${corp.id}_${genId()}`
           const spawnSector = getRaceHub(corp.race) // Default to corp/race home sector
@@ -1209,8 +1743,8 @@ function createUniverse() {
           if (path && path.length > 0) {
             const nextSector = path[0]
             tl.commandQueue = []
-            issueCommand(tl.id, { type: 'goto-gate', targetSectorId: nextSector })
-            issueCommand(tl.id, { type: 'use-gate', targetSectorId: nextSector })
+            issueCommand(tl.id, { type: 'goto-gate', targetSectorId: nextSector, source: jobSource })
+            issueCommand(tl.id, { type: 'use-gate', targetSectorId: nextSector, source: jobSource })
             tl.state = 'in-transit'
             tl.destinationSectorId = job.targetSectorId
             tl.stateStartTime = now
@@ -1222,6 +1756,9 @@ function createUniverse() {
           }
         }
         else if (job.status === 'in-transit') {
+          if (llmExclusive && jobSource !== 'llm') {
+            continue
+          }
           // Check if TL is there
           const tl = state.fleets.find(f => f.id === job.builderShipId)
           if (!tl) {
@@ -1232,6 +1769,41 @@ function createUniverse() {
 
 
           if (tl.currentSectorId === job.targetSectorId) {
+            const blueprint = STATION_BLUEPRINTS[job.stationType]
+            if (!blueprint) {
+              console.warn(`[CorpAI] Unknown station type ${job.stationType} for job ${job.id}; dropping.`)
+              ai.pendingConstructions.splice(i, 1)
+              continue
+            }
+
+            if (jobSource === 'llm' && !job.costPaid) {
+              if (corp.credits < blueprint.cost) {
+                if (!job.lastFundingLogAt || now - job.lastFundingLogAt > 60000) {
+                  pushCorpLog(corp.id, 'actions', {
+                    type: 'construction_waiting_funds',
+                    stationType: job.stationType,
+                    targetSectorId: job.targetSectorId,
+                    cost: blueprint.cost,
+                    credits: corp.credits,
+                  })
+                  job.lastFundingLogAt = now
+                }
+                tl.commandQueue = []
+                tl.state = 'idle'
+                continue
+              }
+              corp.credits -= blueprint.cost
+              job.costPaid = blueprint.cost
+              job.fundedAt = now
+              pushCorpLog(corp.id, 'actions', {
+                type: 'construction_funded',
+                stationType: job.stationType,
+                targetSectorId: job.targetSectorId,
+                cost: blueprint.cost,
+                credits: corp.credits,
+              })
+            }
+
             console.log(`[CorpAI] TL ${tl.name} arrived at target ${job.targetSectorId}. Starting construction.`)
             job.status = 'building'
             // Stop the ship
@@ -1257,8 +1829,8 @@ function createUniverse() {
 
             if (needsNewOrder) {
               tl.commandQueue = []
-              issueCommand(tl.id, { type: 'goto-gate', targetSectorId: nextSector })
-              issueCommand(tl.id, { type: 'use-gate', targetSectorId: nextSector })
+              issueCommand(tl.id, { type: 'goto-gate', targetSectorId: nextSector, source: jobSource })
+              issueCommand(tl.id, { type: 'use-gate', targetSectorId: nextSector, source: jobSource })
               tl.state = 'in-transit'
               tl.destinationSectorId = job.targetSectorId
               tl.stateStartTime = now
@@ -1268,9 +1840,13 @@ function createUniverse() {
           }
         }
         else if (job.status === 'building') {
+          if (llmExclusive && jobSource !== 'llm') {
+            continue
+          }
           // DEPLOY
           const blueprint = STATION_BLUEPRINTS[job.stationType]
           if (blueprint) {
+            const recipeSet = new Set(state.recipes.map((r) => r.id))
             const station: Station = {
               id: `station_${corp.id}_${genId()}`,
               name: blueprint.name,
@@ -1296,7 +1872,12 @@ function createUniverse() {
                 if (job.stationType === 'trading_station') return 'logistics_hub'
                 if (job.stationType === 'shipyard') return 'shipyard'
                 if (job.stationType === 'xenon_power') return 'spp_teladi'
-                return job.stationType
+                if (job.stationType === 'oil_refinery' && recipeSet.has('sun_oil_refinery')) return 'sun_oil_refinery'
+                // If the blueprint key isn't itself a recipe id (e.g. factory_shield_components),
+                // prefer the blueprint's id when it matches a recipe (e.g. shield_component_factory).
+                if (recipeSet.has(job.stationType)) return job.stationType
+                if (recipeSet.has(blueprint.id)) return blueprint.id
+                return recipeSet.has('logistics_hub') ? 'logistics_hub' : job.stationType
               })(),
               capabilities: job.stationType === 'shipyard' ? ['build_vulture', 'build_toucan', 'build_express', 'build_buster', 'build_discoverer'] : undefined,
               sectorId: job.targetSectorId,
@@ -1329,6 +1910,10 @@ function createUniverse() {
         }
       }
 
+      // If LLM-exclusive, stop NPC corp from making new decisions.
+      // We still process existing pending constructions so LLM-queued builds execute.
+      if (llmExclusive) return
+
       // Strategy: Expand (Every 60s)
       if (now - ai.lastExpansionCheck > 60000) {
         ai.lastExpansionCheck = now
@@ -1353,6 +1938,8 @@ function createUniverse() {
               stationType: type,
               targetSectorId: targetSector,
               status: 'planning',
+              costPaid: blueprint.cost,
+              fundedAt: now,
               createdAt: now
             })
             console.log(`[CorpAI] ${corp.name} ordered NEW ${blueprint.name} in ${targetSector}`)
@@ -1630,6 +2217,40 @@ function createUniverse() {
     spawnSoleTraders()
     runTraderPromotion()
 
+    // ============ LLM Corp Autopilot (every N in-game seconds) ============
+    const autopilotEnabled = process.env.CORP_AUTOPILOT_ENABLED !== 'false' && Boolean(process.env.OPENROUTER_API_KEY)
+    if (autopilotEnabled) {
+      const periodSec = Number(process.env.CORP_AUTOPILOT_PERIOD_SEC || '3600') || 3600
+      const corpIds = String(process.env.CORP_AUTOPILOT_CORP_IDS || 'teladi_company')
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean)
+
+      ;(state as any)._corpAutopilotLastRunSec = (state as any)._corpAutopilotLastRunSec || {}
+      ;(state as any)._corpAutopilotInFlight = (state as any)._corpAutopilotInFlight || {}
+      const lastRunMap: Record<string, number> = (state as any)._corpAutopilotLastRunSec
+      const inFlightMap: Record<string, boolean> = (state as any)._corpAutopilotInFlight
+
+      for (const corpId of corpIds) {
+        const last = typeof lastRunMap[corpId] === 'number' ? lastRunMap[corpId] : -Infinity
+        if (state.elapsedTimeSec - last < periodSec) continue
+        if (inFlightMap[corpId]) continue
+
+        inFlightMap[corpId] = true
+        lastRunMap[corpId] = state.elapsedTimeSec
+
+        void (async () => {
+          try {
+            await runCorpControllerStep({ corpId, reason: `autopilot @ t=${state.elapsedTimeSec}s` })
+          } catch (e: any) {
+            pushCorpLog(corpId, 'error', e?.message || 'autopilot_error')
+          } finally {
+            inFlightMap[corpId] = false
+          }
+        })()
+      }
+    }
+
     // ============ Fleet Tick Logic ============
     const now = Date.now()
 
@@ -1848,9 +2469,40 @@ function createUniverse() {
 
     // Process each fleet
     for (const fleet of state.fleets) {
+      const llmExclusiveTradingFleet =
+        isLLMExclusiveCorp(fleet.ownerId) &&
+        (fleet.behavior === 'station-supply' ||
+          fleet.behavior === 'station-distribute' ||
+          fleet.behavior === 'corp-logistics' ||
+          fleet.behavior === 'freelance' ||
+          fleet.behavior === 'guild-assigned')
+      const llmExclusiveFleet = isLLMExclusiveCorp(fleet.ownerId)
       // Autonomous mode: if fleet has commands queued, let frontend handle it
       // Backend only issues new commands when queue is empty
-      const hasQueuedCommands = fleet.commandQueue.length > 0
+      let hasQueuedCommands = fleet.commandQueue.length > 0
+
+      if (llmExclusiveFleet && fleet.behavior !== 'construction') {
+        const orderSource = (fleet.currentOrder as any)?._source
+        const hasLLMCommand = fleet.commandQueue.some((c: any) => c?.source === 'llm')
+        // Hard stop: exclusive corps can only move on LLM-tagged commands/orders.
+        if (orderSource !== 'llm' && !hasLLMCommand) {
+          if (fleet.state !== 'idle' || fleet.destinationSectorId || fleet.targetStationId) {
+            fleet.destinationSectorId = undefined
+            fleet.targetStationId = undefined
+            fleet.state = 'idle'
+            fleet.stateStartTime = now
+          }
+        }
+        if (hasQueuedCommands && !hasLLMCommand && orderSource !== 'llm') {
+          fleet.commandQueue = []
+          fleet.currentOrder = undefined
+          fleet.destinationSectorId = undefined
+          fleet.targetStationId = undefined
+          fleet.state = 'idle'
+          fleet.stateStartTime = now
+          hasQueuedCommands = false
+        }
+      }
 
       // Systemic Queue Cleanup (gentler)
       // If we detect a mismatch, try to resume instead of wiping commands.
@@ -1867,6 +2519,21 @@ function createUniverse() {
         const isDesync = fleet.state === 'idle'
         const zombieLimit = fleet.behavior === 'construction' ? 900000 : 300000 // Construction TLs get a bigger window
         const isZombieTransit = fleet.state === 'in-transit' && stuckDuration > zombieLimit
+
+        if (llmExclusiveFleet && fleet.behavior !== 'construction') {
+          const hasLLMCommand = fleet.commandQueue.some((c: any) => c?.source === 'llm')
+          const orderSource = (fleet.currentOrder as any)?._source
+          if (!hasLLMCommand && orderSource !== 'llm') {
+            // Don’t let legacy queues drive exclusive corp fleets.
+            fleet.commandQueue = []
+            fleet.currentOrder = undefined
+            fleet.destinationSectorId = undefined
+            fleet.targetStationId = undefined
+            fleet.state = 'idle'
+            fleet.stateStartTime = now
+            continue
+          }
+        }
 
         if (isDesync || isZombieTransit) {
           const cmd = fleet.commandQueue[0]
@@ -2073,11 +2740,19 @@ function createUniverse() {
 
         // 1.5 REQUEUE LOST TRANSIT (e.g., TLs with destination but empty queue)
         if (fleet.state === 'in-transit' && !hasQueuedCommands && fleet.destinationSectorId) {
+          if (llmExclusiveFleet && (fleet.currentOrder as any)?._source !== 'llm') {
+            // Don’t auto-recover movement for exclusive corps unless it’s an LLM-issued order.
+            fleet.destinationSectorId = undefined
+            fleet.targetStationId = undefined
+            fleet.state = 'idle'
+            fleet.stateStartTime = now
+            continue
+          }
           const path = findSectorPath(fleet.currentSectorId, fleet.destinationSectorId)
           if (path && path.length > 0) {
             const nextSector = path[0]
-            issueCommand(fleet.id, { type: 'goto-gate', targetSectorId: nextSector })
-            issueCommand(fleet.id, { type: 'use-gate', targetSectorId: nextSector })
+            issueCommand(fleet.id, { type: 'goto-gate', targetSectorId: nextSector, source: llmExclusiveFleet ? 'llm' : 'npc' })
+            issueCommand(fleet.id, { type: 'use-gate', targetSectorId: nextSector, source: llmExclusiveFleet ? 'llm' : 'npc' })
             fleet.state = 'in-transit'
             fleet.stateStartTime = now
             continue
@@ -2090,6 +2765,10 @@ function createUniverse() {
 
         // 2. REGULAR TRADE LOGIC (Only if no current order)
         if (!fleet.currentOrder) {
+          if (llmExclusiveFleet && fleet.behavior !== 'construction') {
+            // LLM-exclusive corps: do not auto-run patrol/trade when idle.
+            continue
+          }
 
           if (fleet.behavior === 'patrol') {
             // Patrol logic: Fly to random station in current sector
@@ -2172,6 +2851,11 @@ function createUniverse() {
               }
             }
           } else {
+            if (llmExclusiveTradingFleet) {
+              // LLM-controlled corp: do not auto-assign trade orders here.
+              // The autopilot (or manual LLM runs) will decide when/where to trade.
+              continue
+            }
             // Trade logic
             const order = findBestTradeRoute(fleet)
             if (!order) {
@@ -2286,6 +2970,11 @@ function createUniverse() {
     }
   }
 
+  const saveGameAfterAICycle = () => {
+    if (process.env.CORP_AUTOPILOT_SAVE_AFTER_STEP === 'false') return
+    saveGame()
+  }
+
   const advanceTime = (deltaSec: number) => {
     if (deltaSec <= 0) return
 
@@ -2323,6 +3012,1205 @@ function createUniverse() {
       createdAt: Date.now()
     }
     fleet.commandQueue.push(cmd)
+  }
+
+  const recomputeSectorPrices = () => {
+    state.sectorPrices = computeSectorPrices(state.stations, state.recipes, state.wares)
+  }
+
+  const setStationReorderLevel = (corpId: string, stationId: string, wareId: string, reorderLevel: number) => {
+    const st = state.stations.find(s => s.id === stationId)
+    if (!st) return { ok: false as const, error: 'station_not_found' }
+    if (st.ownerId !== corpId) return { ok: false as const, error: 'station_not_owned_by_corp' }
+    if (!Number.isFinite(reorderLevel) || reorderLevel < 0) return { ok: false as const, error: 'invalid_reorder_level' }
+
+    st.reorderLevel[wareId] = Math.floor(reorderLevel)
+    recomputeSectorPrices()
+    return { ok: true as const }
+  }
+
+  const setStationReserveLevel = (corpId: string, stationId: string, wareId: string, reserveLevel: number) => {
+    const st = state.stations.find(s => s.id === stationId)
+    if (!st) return { ok: false as const, error: 'station_not_found' }
+    if (st.ownerId !== corpId) return { ok: false as const, error: 'station_not_owned_by_corp' }
+    if (!Number.isFinite(reserveLevel) || reserveLevel < 0) return { ok: false as const, error: 'invalid_reserve_level' }
+
+    st.reserveLevel[wareId] = Math.floor(reserveLevel)
+    recomputeSectorPrices()
+    return { ok: true as const }
+  }
+
+  const setCorpGoal = (corpId: string, goal: string) => {
+    const corp = state.corporations.find(c => c.id === corpId)
+    if (!corp) return { ok: false as const, error: 'corp_not_found' }
+
+    const allowed = new Set(['stabilize', 'expand', 'war', 'consolidate'])
+    if (!allowed.has(goal)) return { ok: false as const, error: 'invalid_goal' }
+
+    corp.aiState = corp.aiState || { lastExpansionCheck: 0, currentGoal: 'consolidate', pendingConstructions: [] }
+    ;(corp.aiState as any).currentGoal = goal
+    return { ok: true as const }
+  }
+
+  const assignTradeOrderToFleet = (corpId: string, fleetId: string, buyStationId: string, sellStationId: string, wareId: string, qty: number) => {
+    const fleet = state.fleets.find(f => f.id === fleetId)
+    if (!fleet) return { ok: false as const, error: 'fleet_not_found' }
+    if (fleet.ownerId !== corpId) return { ok: false as const, error: 'fleet_not_owned_by_corp' }
+
+    const buyStation = state.stations.find(s => s.id === buyStationId)
+    const sellStation = state.stations.find(s => s.id === sellStationId)
+    if (!buyStation || !sellStation) return { ok: false as const, error: 'station_not_found' }
+
+    const ware = state.wares.find(w => w.id === wareId)
+    if (!ware) return { ok: false as const, error: 'ware_not_found' }
+
+    const available = Math.max(0, buyStation.inventory[wareId] || 0)
+    if (available <= 0) return { ok: false as const, error: 'no_stock_at_buy_station' }
+
+    const maxByCapacity = Math.max(0, Math.floor(fleet.capacity / Math.max(1, ware.volume || 1)))
+    const desiredQty = Number.isFinite(qty) ? Math.floor(qty) : 0
+    const finalQty = Math.max(1, Math.min(desiredQty || Math.min(available, maxByCapacity), available, maxByCapacity))
+    if (finalQty <= 0) return { ok: false as const, error: 'invalid_qty' }
+
+    const now = Date.now()
+    const buyPrice = state.sectorPrices[buyStation.sectorId]?.[wareId] ?? ware.basePrice
+    const sellPrice = state.sectorPrices[sellStation.sectorId]?.[wareId] ?? ware.basePrice
+    const expectedProfit = Math.max(0, (sellPrice - buyPrice) * finalQty)
+
+    const order = {
+      id: genId(),
+      buyStationId,
+      buyStationName: buyStation.name,
+      buySectorId: buyStation.sectorId,
+      buyWareId: wareId,
+      buyWareName: ware.name,
+      buyQty: finalQty,
+      buyPrice,
+      sellStationId,
+      sellStationName: sellStation.name,
+      sellSectorId: sellStation.sectorId,
+      sellWareId: wareId,
+      sellWareName: ware.name,
+      sellQty: finalQty,
+      sellPrice,
+      expectedProfit,
+      createdAt: now,
+    } as any
+    order._source = 'llm'
+
+    const issuePathCommands = (fromSectorId: string, toSectorId: string) => {
+      const path = findSectorPath(fromSectorId, toSectorId) || []
+      for (const nextSector of path) {
+        issueCommand(fleet.id, { type: 'goto-gate', targetSectorId: nextSector, source: 'llm' })
+        issueCommand(fleet.id, { type: 'use-gate', targetSectorId: nextSector, source: 'llm' })
+      }
+    }
+
+    fleet.currentOrder = order
+    fleet.commandQueue = []
+
+    issuePathCommands(fleet.currentSectorId, buyStation.sectorId)
+    issueCommand(fleet.id, { type: 'goto-station', targetStationId: buyStation.id, targetSectorId: buyStation.sectorId, source: 'llm' })
+    issueCommand(fleet.id, { type: 'dock', targetStationId: buyStation.id, source: 'llm' })
+    issueCommand(fleet.id, { type: 'load-cargo', targetStationId: buyStation.id, wareId, amount: finalQty, source: 'llm' })
+    issueCommand(fleet.id, { type: 'undock', targetStationId: buyStation.id, source: 'llm' })
+
+    issuePathCommands(buyStation.sectorId, sellStation.sectorId)
+    issueCommand(fleet.id, { type: 'goto-station', targetStationId: sellStation.id, targetSectorId: sellStation.sectorId, source: 'llm' })
+    issueCommand(fleet.id, { type: 'dock', targetStationId: sellStation.id, source: 'llm' })
+    issueCommand(fleet.id, { type: 'unload-cargo', targetStationId: sellStation.id, wareId, amount: finalQty, source: 'llm' })
+    issueCommand(fleet.id, { type: 'undock', targetStationId: sellStation.id, source: 'llm' })
+
+    fleet.state = 'in-transit'
+    fleet.stateStartTime = now
+    fleet.destinationSectorId = buyStation.sectorId
+    fleet.targetStationId = buyStation.id
+
+    return { ok: true as const, order }
+  }
+
+  const getCorpControlContext = (corpId: string) => {
+    const corp = state.corporations.find(c => c.id === corpId) || null
+    const corpName = corp?.name || corpId
+    const getOwnerName = (ownerId?: string | null) => {
+      if (!ownerId) return null
+      const c = state.corporations.find(cc => cc.id === ownerId)
+      return c ? c.name : ownerId
+    }
+    const corpStations = state.stations.filter(s => s.ownerId === corpId).map(s => ({
+      id: s.id,
+      name: s.name,
+      sectorId: s.sectorId,
+      recipeId: s.recipeId,
+      ownerId: s.ownerId || null,
+      isOwnedByCorp: true,
+      inventory: s.inventory,
+      reorderLevel: s.reorderLevel,
+      reserveLevel: s.reserveLevel,
+    }))
+    const corpFleets = state.fleets.filter(f => f.ownerId === corpId).map(f => ({
+      id: f.id,
+      name: f.name,
+      shipType: f.shipType,
+      capacity: f.capacity,
+      currentSectorId: f.currentSectorId,
+      behavior: f.behavior,
+      state: f.state,
+      cargo: f.cargo,
+      credits: f.credits,
+      currentOrder: f.currentOrder || null,
+      currentOrderMeta: (() => {
+        const o: any = f.currentOrder
+        if (!o) return null
+        const buyStation = state.stations.find(s => s.id === o.buyStationId)
+        const sellStation = state.stations.find(s => s.id === o.sellStationId)
+        const buyOwnerId = buyStation?.ownerId || null
+        const sellOwnerId = sellStation?.ownerId || null
+        const isInternalTransfer = Boolean(buyOwnerId) && buyOwnerId === corpId && Boolean(sellOwnerId) && sellOwnerId === corpId
+        const kind =
+          isInternalTransfer ? 'internal_transfer'
+            : (sellOwnerId === corpId ? 'import_to_corp'
+              : (buyOwnerId === corpId ? 'export_from_corp'
+                : 'external_trade'))
+        const creditNote =
+          isInternalTransfer
+            ? 'Internal stock movement: no credit profit is recorded (0 profit expected).'
+            : 'External trade: credits can change when selling to non-corp owners.'
+        return {
+          buyStationId: o.buyStationId,
+          sellStationId: o.sellStationId,
+          buyStationName: buyStation?.name || o.buyStationName || null,
+          sellStationName: sellStation?.name || o.sellStationName || null,
+          buySectorId: buyStation?.sectorId || o.buySectorId || null,
+          sellSectorId: sellStation?.sectorId || o.sellSectorId || null,
+          buyOwnerId,
+          sellOwnerId,
+          buyOwnerName: getOwnerName(buyOwnerId),
+          sellOwnerName: getOwnerName(sellOwnerId),
+          kind,
+          isInternalTransfer,
+          creditNote,
+        }
+      })(),
+    }))
+    const wares = state.wares.map(w => ({ id: w.id, name: w.name, basePrice: w.basePrice, volume: w.volume }))
+    return {
+      corp,
+      wares,
+      stations: corpStations,
+      fleets: corpFleets,
+      sectorPrices: state.sectorPrices,
+      corpStationIds: corpStations.map(s => s.id),
+      tradeAccounting: {
+        corpId,
+        corpName,
+        notes: [
+          'Corp-owned stations are listed in stations[] and corpStationIds[].',
+          'Trades where BOTH buy and sell stations are corp-owned are internal transfers: they DO NOT generate credit profit and will show 0 profit.',
+          'External trades (selling to a station not owned by the corp) can generate credit profit for the corp.',
+        ],
+      },
+    }
+  }
+
+  const getCorpAutopilotContext = (corpId: string) => {
+    const base = getCorpControlContext(corpId)
+    if (!base.corp) return base
+
+    const llmPlan = (base.corp as any)?.aiState?.llmPlan || null
+
+    const relevantWareIds = new Set<string>()
+    for (const st of base.stations) {
+      for (const k of Object.keys(st.inventory || {})) relevantWareIds.add(k)
+      for (const k of Object.keys(st.reorderLevel || {})) relevantWareIds.add(k)
+      for (const k of Object.keys(st.reserveLevel || {})) relevantWareIds.add(k)
+    }
+
+    const waresById = new Map(state.wares.map(w => [w.id, w]))
+    const relevantWares = Array.from(relevantWareIds)
+      .filter(id => waresById.has(id))
+      .slice(0, 30)
+      .map(id => {
+        const w = waresById.get(id)!
+        return { id: w.id, name: w.name, basePrice: w.basePrice, volume: w.volume }
+      })
+
+    const marketStations = state.stations.slice(0, 400).map(st => {
+      const inv: Record<string, number> = {}
+      for (const w of relevantWares) {
+        const q = st.inventory?.[w.id] || 0
+        if (q > 0) inv[w.id] = q
+      }
+      return {
+        id: st.id,
+        name: st.name,
+        sectorId: st.sectorId,
+        ownerId: st.ownerId || null,
+        isOwnedByCorp: st.ownerId === corpId,
+        recipeId: st.recipeId,
+        inventory: inv,
+      }
+    })
+
+    const shipCatalog = Object.entries(SHIP_CATALOG)
+      .slice(0, 12)
+      .map(([id, info]) => ({
+        id,
+        wareId: `ship_${id}`,
+        name: info.name,
+        cost: info.cost,
+        capacity: info.capacity,
+        speed: info.speed,
+      }))
+
+    const buildableByCapability = (cap: string) => String(cap || '').startsWith('build_')
+    const shipyards = state.stations
+      .filter(st => Array.isArray(st.capabilities) && st.capabilities.some(buildableByCapability))
+      .slice(0, 60)
+      .map(st => {
+        const available: any[] = []
+        for (const cap of Array.isArray(st.capabilities) ? st.capabilities : []) {
+          if (!buildableByCapability(cap)) continue
+          const shipKey = cap.replace('build_', '')
+          const wareId = `ship_${shipKey}`
+          const stock = Number(st.inventory?.[wareId] || 0)
+          const price = Number(state.sectorPrices?.[st.sectorId]?.[wareId] || (SHIP_CATALOG as any)?.[shipKey]?.cost || 0)
+          if (stock > 0) available.push({ wareId, stock, price })
+        }
+        return {
+          id: st.id,
+          name: st.name,
+          sectorId: st.sectorId,
+          ownerId: st.ownerId || null,
+          capabilities: st.capabilities,
+          availableShips: available,
+        }
+      })
+
+    return {
+      ...base,
+      now: { ingameTimeSec: state.elapsedTimeSec, timeScale: state.timeScale, llmExclusive: isLLMExclusiveCorp(corpId) },
+      llmPlan,
+      relevantWares,
+      marketStations,
+      shipCatalog,
+      shipyards,
+      recentTrades: state.tradeLog.slice(0, 80),
+    }
+  }
+
+  const sanitizeShortText = (s: any, maxLen: number) => {
+    const t = String(s || '').replace(/\s+/g, ' ').trim()
+    if (!t) return ''
+    return t.length > maxLen ? t.slice(0, maxLen) : t
+  }
+
+  const ensureCorpLLMPlan = (corpId: string) => {
+    const corp: any = state.corporations.find((c: any) => c.id === corpId)
+    if (!corp) return null
+    corp.aiState = corp.aiState || { lastExpansionCheck: Date.now(), currentGoal: 'consolidate', pendingConstructions: [] }
+    corp.aiState.llmPlan = corp.aiState.llmPlan || {
+      strategy: '',
+      todos: [] as any[],
+      lastOutcomes: [] as any[],
+      updatedAt: Date.now(),
+    }
+    return corp.aiState.llmPlan as any
+  }
+
+  const updateCorpLLMPlan = (corpId: string, patch: any) => {
+    const plan = ensureCorpLLMPlan(corpId)
+    if (!plan) return { ok: false as const, error: 'corp_not_found' }
+
+    if (typeof patch?.strategy === 'string') {
+      plan.strategy = sanitizeShortText(patch.strategy, 280)
+    }
+
+    if (Array.isArray(patch?.todos)) {
+      const existing = new Map<string, any>()
+      for (const t of Array.isArray(plan.todos) ? plan.todos : []) {
+        if (t && typeof t.id === 'string' && t.id) existing.set(String(t.id), t)
+      }
+
+      const out: any[] = []
+      const maxTodos = 20
+      for (const raw of patch.todos.slice(0, maxTodos)) {
+        const id = sanitizeShortText(raw?.id || raw?.title || '', 64) || genId()
+        const title = sanitizeShortText(raw?.title, 120)
+        if (!title) continue
+        const statusRaw = String(raw?.status || 'open').toLowerCase()
+        const status = statusRaw === 'done' || statusRaw === 'doing' || statusRaw === 'blocked' ? statusRaw : 'open'
+        const notes = sanitizeShortText(raw?.notes, 220)
+        const prev = existing.get(id) || null
+        out.push({
+          id,
+          title,
+          status,
+          notes,
+          createdAt: typeof prev?.createdAt === 'number' ? prev.createdAt : Date.now(),
+          updatedAt: Date.now(),
+        })
+      }
+      plan.todos = out
+    }
+
+    plan.lastOutcomes = Array.isArray(plan.lastOutcomes) ? plan.lastOutcomes : []
+    plan.updatedAt = Date.now()
+    return { ok: true as const, plan }
+  }
+
+  const getSectorRoute = (fromSectorId: string, toSectorId: string) => {
+    const from = String(fromSectorId || '')
+    const to = String(toSectorId || '')
+    if (!from || !to) return { ok: false as const, error: 'missing_ids' }
+    const path = findSectorPath(from, to)
+    if (!path) return { ok: false as const, error: 'no_path' }
+    const hops = path.length
+    const etaSec = hops * FLEET_CONSTANTS.BASE_JUMP_TIME
+    return { ok: true as const, fromSectorId: from, toSectorId: to, hops, etaSec, path }
+  }
+
+  const estimateTradeEta = (fleetId: string, buyStationId: string, sellStationId: string, qty: number) => {
+    const fleet = state.fleets.find(f => f.id === fleetId)
+    const buyStation = state.stations.find(s => s.id === buyStationId)
+    const sellStation = state.stations.find(s => s.id === sellStationId)
+    if (!fleet) return { ok: false as const, error: 'fleet_not_found' }
+    if (!buyStation) return { ok: false as const, error: 'buy_station_not_found' }
+    if (!sellStation) return { ok: false as const, error: 'sell_station_not_found' }
+
+    const qtyN = Math.max(0, Math.floor(Number(qty) || 0))
+    const routeToBuy = getSectorRoute(fleet.currentSectorId, buyStation.sectorId)
+    const routeToSell = getSectorRoute(buyStation.sectorId, sellStation.sectorId)
+    if (!routeToBuy.ok) return { ok: false as const, error: 'no_path_to_buy' }
+    if (!routeToSell.ok) return { ok: false as const, error: 'no_path_to_sell' }
+
+    const transferTicks = Math.max(1, Math.ceil(qtyN / 1000))
+    const transferSec = transferTicks * FLEET_CONSTANTS.TRANSFER_TIME_PER_1000
+    const dockUndockPerStopSec = FLEET_CONSTANTS.DOCK_TIME * 2
+
+    const travelSec = routeToBuy.etaSec + routeToSell.etaSec
+    const handlingSec = dockUndockPerStopSec * 2 + transferSec * 2
+    const etaSec = travelSec + handlingSec
+
+    return {
+      ok: true as const,
+      fleetId,
+      buyStationId,
+      sellStationId,
+      qty: qtyN,
+      hops: routeToBuy.hops + routeToSell.hops,
+      etaSec,
+      breakdown: {
+        travelSec,
+        dockUndockSec: dockUndockPerStopSec * 2,
+        transferSec: transferSec * 2,
+        routeToBuy,
+        routeToSell,
+      },
+    }
+  }
+
+  const buyVultureTraderForCorp = (corpId: string) => {
+    const now = Date.now()
+    const corp = state.corporations.find(c => c.id === corpId)
+    if (!corp) return { ok: false as const, error: 'corp_not_found' }
+
+    const shipyards = state.stations.filter(st => st.capabilities && st.capabilities.includes('build_vulture'))
+    let chosenShipyard: Station | null = null
+    let price: number = SHIP_CATALOG.vulture.cost
+
+    for (const yard of shipyards) {
+      const stock = yard.inventory['ship_vulture'] || 0
+      if (stock < 1) continue
+      const p = state.sectorPrices[yard.sectorId]?.['ship_vulture'] || SHIP_CATALOG.vulture.cost
+      if (corp.credits >= p) {
+        chosenShipyard = yard
+        price = p
+        break
+      }
+    }
+
+    if (!chosenShipyard) return { ok: false as const, error: 'no_shipyard_with_stock_or_insufficient_credits' }
+
+    chosenShipyard.inventory['ship_vulture'] = Math.max(0, (chosenShipyard.inventory['ship_vulture'] || 0) - 1)
+    corp.credits -= price
+
+    const newFleet: NPCFleet = {
+      id: `fleet_${genId()}`,
+      name: `${corp.name.split(' ')[0]} Trader ${genId().substring(0, 4)}`,
+      shipType: 'Vulture',
+      modelPath: SHIP_CATALOG.vulture.modelPath,
+      race: corp.race,
+      capacity: SHIP_CATALOG.vulture.capacity,
+      speed: SHIP_CATALOG.vulture.speed,
+      homeSectorId: chosenShipyard.sectorId,
+      ownerId: corp.id,
+      ownerType: corp.type,
+      behavior: 'corp-logistics',
+      autonomy: 0.5,
+      profitShare: 0.15,
+      currentSectorId: chosenShipyard.sectorId,
+      position: chosenShipyard.position || [0, 0, 0],
+      state: 'undocking',
+      stateStartTime: now,
+      lastReportAt: now,
+      cargo: {},
+      credits: 10000,
+      commandQueue: [{
+        id: genId(),
+        type: 'undock',
+        targetStationId: chosenShipyard.id,
+        createdAt: now
+      }],
+      totalProfit: 0,
+      tripsCompleted: 0
+    }
+
+    state.fleets.push(newFleet)
+    corp.fleetIds.push(newFleet.id)
+
+    return { ok: true as const, fleetId: newFleet.id, price, shipyardId: chosenShipyard.id }
+  }
+
+  const queueStationConstruction = (corpId: string, stationType: string, targetSectorId: string) => {
+    const now = Date.now()
+    const corp = state.corporations.find(c => c.id === corpId)
+    if (!corp) return { ok: false as const, error: 'corp_not_found' }
+
+    const rawType = String(stationType || '').trim()
+    if (!rawType) return { ok: false as const, error: 'unknown_station_type' }
+
+    const resolveRecipeIdFromBlueprintKey = (blueprintKey: string) => {
+      if (blueprintKey === 'spp_cycle') return 'spp_teladi'
+      if (blueprintKey === 'spp_argon' || blueprintKey === 'spp_split' || blueprintKey === 'spp_paranid' || blueprintKey === 'spp_boron') return 'spp_teladi'
+      if (blueprintKey === 'mine_silicon') return 'silicon_mine'
+      if (blueprintKey === 'mine_ore') return 'ore_mine'
+      if (blueprintKey === 'equipment_dock') return 'logistics_hub'
+      if (blueprintKey === 'trading_station') return 'logistics_hub'
+      if (blueprintKey === 'xenon_power') return 'spp_teladi'
+      return blueprintKey
+    }
+
+    const preferredBlueprintForRecipe: Record<string, string> = {
+      logistics_hub: 'trading_station',
+      spp_teladi: 'spp_cycle',
+      ore_mine: 'mine_ore',
+      silicon_mine: 'mine_silicon',
+    }
+
+    // Accept blueprint key, blueprint id, or the resulting recipe id (common in STATE_JSON).
+    let blueprintKey = preferredBlueprintForRecipe[rawType] || rawType
+    let blueprint = STATION_BLUEPRINTS[blueprintKey]
+
+    if (!blueprint) {
+      const matchByBlueprintId = Object.entries(STATION_BLUEPRINTS).find(([, bp]) => String((bp as any)?.id || '') === rawType)
+      if (matchByBlueprintId) {
+        blueprintKey = matchByBlueprintId[0]
+        blueprint = matchByBlueprintId[1]
+      }
+    }
+
+    if (!blueprint) {
+      const matchByRecipeId = Object.keys(STATION_BLUEPRINTS).find((key) => resolveRecipeIdFromBlueprintKey(key) === rawType)
+      if (matchByRecipeId) {
+        blueprintKey = matchByRecipeId
+        blueprint = STATION_BLUEPRINTS[blueprintKey]
+      }
+    }
+    if (!blueprint) return { ok: false as const, error: 'unknown_station_type' }
+    if (!SECTOR_GRAPH[targetSectorId]) return { ok: false as const, error: 'unknown_target_sector' }
+
+    corp.aiState = corp.aiState || { lastExpansionCheck: now, currentGoal: 'consolidate', pendingConstructions: [] }
+    corp.aiState.pendingConstructions.push({
+      id: genId(),
+      stationType: blueprintKey,
+      targetSectorId,
+      status: 'planning',
+      createdAt: now,
+      source: 'llm',
+    })
+    return { ok: true as const }
+  }
+
+  const buildTools = () => ([
+    {
+      type: 'function',
+      function: {
+        name: 'update_llm_plan',
+        description: 'Update the long-horizon strategy + TODO list for this corp controller. This does not execute an in-world order.',
+        parameters: {
+          type: 'object',
+          properties: {
+            strategy: { type: 'string' },
+            todos: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  title: { type: 'string' },
+                  status: { type: 'string', description: 'open|doing|blocked|done' },
+                  notes: { type: 'string' },
+                },
+                required: ['title'],
+              },
+            },
+          },
+          required: [],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'get_sector_route',
+        description: 'Query the sector route (gate hops) and ETA between two sectors. Read-only; use before assigning long trades.',
+        parameters: {
+          type: 'object',
+          properties: {
+            fromSectorId: { type: 'string' },
+            toSectorId: { type: 'string' },
+          },
+          required: ['fromSectorId', 'toSectorId'],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'get_trade_eta',
+        description: 'Estimate total time (seconds) for a specific fleet to buy at one station then sell at another. Read-only.',
+        parameters: {
+          type: 'object',
+          properties: {
+            fleetId: { type: 'string' },
+            buyStationId: { type: 'string' },
+            sellStationId: { type: 'string' },
+            qty: { type: 'number' },
+          },
+          required: ['fleetId', 'buyStationId', 'sellStationId', 'qty'],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'set_station_reorder_level',
+        description: 'Set station reorder level (input demand threshold) for a ware at a corp-owned station.',
+        parameters: {
+          type: 'object',
+          properties: {
+            stationId: { type: 'string' },
+            wareId: { type: 'string' },
+            reorderLevel: { type: 'number' },
+          },
+          required: ['stationId', 'wareId', 'reorderLevel'],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'set_station_reserve_level',
+        description: 'Set station reserve level (product stock target) for a ware at a corp-owned station.',
+        parameters: {
+          type: 'object',
+          properties: {
+            stationId: { type: 'string' },
+            wareId: { type: 'string' },
+            reserveLevel: { type: 'number' },
+          },
+          required: ['stationId', 'wareId', 'reserveLevel'],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'assign_trade',
+        description: 'Assign a specific trade run to a corp-owned fleet: buy ware at buyStation then sell at sellStation.',
+        parameters: {
+          type: 'object',
+          properties: {
+            fleetId: { type: 'string' },
+            buyStationId: { type: 'string' },
+            sellStationId: { type: 'string' },
+            wareId: { type: 'string' },
+            qty: { type: 'number' },
+          },
+          required: ['fleetId', 'buyStationId', 'sellStationId', 'wareId', 'qty'],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'set_corp_goal',
+        description: "Set the corp AI goal. Allowed: stabilize, expand, war, consolidate.",
+        parameters: {
+          type: 'object',
+          properties: { goal: { type: 'string' } },
+          required: ['goal'],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'buy_trader_vulture',
+        description: 'Buy a Vulture trader for the corp from any shipyard that has stock; spawns fleet and deducts credits.',
+        parameters: { type: 'object', properties: {}, required: [] },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'queue_station_construction',
+        description: 'Queue construction of a new station type in a sector (corp AI will hire TL and deploy when funded).',
+        parameters: {
+          type: 'object',
+          properties: {
+            stationType: { type: 'string' },
+            targetSectorId: { type: 'string' },
+          },
+          required: ['stationType', 'targetSectorId'],
+        },
+      },
+    },
+  ])
+
+  const runCorpControllerStep = async (opts: {
+    corpId: string
+    reason: string
+    messages?: { role: 'user' | 'assistant'; content: string }[]
+  }) => {
+    const corpId = opts.corpId
+    const key = process.env.OPENROUTER_API_KEY
+    const shieldworksModel =
+      corpId === 'teladi_shieldworks'
+        ? (process.env.OPENROUTER_MODEL_SHIELDWORKS || process.env.OPENROUTER_MODEL_2)
+        : undefined
+    const model = (shieldworksModel && shieldworksModel.trim())
+      ? shieldworksModel.trim()
+      : (process.env.OPENROUTER_MODEL || 'mistralai/devstral-2512:free')
+    if (!key) return { ok: false as const, error: 'missing_openrouter_key' }
+
+    const contextBase = getCorpAutopilotContext(corpId)
+    if (!contextBase.corp) return { ok: false as const, error: 'corp_not_found' }
+
+    // Lightweight estimate (chars/4) for reporting only; avoids pulling in a tokenizer dependency.
+    const contextForLog: any = { ...contextBase, _meta: { contextChars: 0, contextTokensEstimated: 0 } }
+    let contextJson = JSON.stringify(contextForLog)
+    contextForLog._meta.contextChars = contextJson.length
+    contextForLog._meta.contextTokensEstimated = Math.max(1, Math.ceil(contextForLog._meta.contextChars / 4))
+    contextJson = JSON.stringify(contextForLog)
+
+    pushCorpLog(corpId, 'context', contextForLog)
+    pushCorpLog(
+      corpId,
+      'decision',
+      `STATUS: running LLM (${model}); context ≈ ${Number(contextForLog._meta.contextTokensEstimated).toLocaleString()} tokens (${Number(contextForLog._meta.contextChars).toLocaleString()} chars)…`,
+    )
+
+    const maxWorldActionsPerStep = Math.max(0, Number(process.env.CORP_AUTOPILOT_MAX_ACTIONS_PER_STEP || '1') || 1)
+
+    const corpFocus =
+      corpId === 'teladi_shieldworks'
+        ? [
+            'SPECIALIZATION: You run Teladi Shieldworks. Your job is to expand and operate shield manufacturing.',
+            'Prioritize building Shield Component Factories and Shield Plants (1MW/25MW/5MW/125MW where available) and keep them supplied.',
+            'When calling queue_station_construction, you may use either the blueprint key or the recipe id. Example: stationType=factory_shield_components (or shield_component_factory).',
+            'Primary customers are Shipyards and Equipment Docks; sell finished shields externally for profit.',
+            'Use `shipyards` in STATE_JSON to see ship stock and prices; ensure shield component supply supports ship production demand.',
+          ].join('\n')
+        : ''
+
+    const system = [
+      'You are an Taladi, your goal is profitssss.',
+      'You receive current world state as JSON and may take actions using tools.',
+      'Do not ask questions; decide whether to act now.',
+      'Maintain a short long-horizon strategy and TODO list; update it with update_llm_plan when it changes.',
+      'When you need travel time or distance, call get_sector_route / get_trade_eta first. After receiving results, decide actions in a later pass.',
+      'After you receive route/ETA tool results, you must either take an in-world action (e.g., assign_trade) or reply DONE.',
+      'IMPORTANT: Internal transfers between two corp-owned stations do not generate credit profit; only do them to balance stock. Prefer external trades for profit.',
+      'If acting and you have multiple idle corp-logistics fleets, assign multiple trades in priority order until you reach the action limit.',
+      `IMPORTANT: You may execute at most ${maxWorldActionsPerStep} in-world order(s) in this step.`,
+      'Never invent IDs; only use IDs from the provided JSON.',
+      'Write a short DECISION + RATIONALE summary. Do not reveal chain-of-thought.',
+      ...(corpFocus ? [corpFocus] : []),
+    ].join('\\n')
+
+    const tools = buildTools()
+
+    const sanitizedMessages = (opts.messages || [])
+      .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+      .slice(-12)
+
+    const userKick = sanitizedMessages.length > 0 ? null : { role: 'user', content: `Scheduled step: ${opts.reason}. Decide what to do (or do nothing).` }
+
+    const callOpenRouter = async (messages: any[], opts?: { streamPass?: number }) => {
+      const allowFallbacksBase = process.env.OPENROUTER_ALLOW_FALLBACKS !== 'false'
+      const allowFallbacks =
+        corpId === 'teladi_shieldworks'
+          ? (process.env.OPENROUTER_ALLOW_FALLBACKS_SHIELDWORKS === 'true')
+          : allowFallbacksBase
+      const streamEnabled = process.env.CORP_AUTOPILOT_STREAM_DECISION === 'true'
+      const streamThis = streamEnabled && typeof opts?.streamPass === 'number' && opts.streamPass > 0
+      const openrouterBody = {
+        model,
+        provider: { allow_fallbacks: allowFallbacks },
+        messages,
+        tools,
+        tool_choice: 'auto',
+        temperature: 0.2,
+        stream: streamThis,
+      }
+
+      const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${key}`,
+          'x-title': process.env.OPENROUTER_APP_NAME || 'xbtf-rtx',
+          'http-referer': process.env.OPENROUTER_SITE_URL || 'http://localhost',
+          ...(streamThis ? { accept: 'text/event-stream' } : {}),
+        },
+        body: JSON.stringify(openrouterBody),
+      })
+
+      if (!r.ok) {
+        const txt = await r.text().catch(() => '')
+        throw new Error(`openrouter_http_${r.status}${txt ? `: ${txt.slice(0, 300)}` : ''}`)
+      }
+
+      if (!streamThis) {
+        const data: any = await r.json().catch(() => ({} as any))
+        const msg = data?.choices?.[0]?.message || {}
+        const usedModel = typeof data?.model === 'string' ? data.model : model
+        if (usedModel && usedModel !== model) {
+          pushCorpLog(corpId, 'decision', `INFO: OpenRouter routed model=${usedModel} (requested ${model})`)
+          if (!allowFallbacks) throw new Error(`openrouter_model_mismatch:${usedModel}`)
+        }
+        return {
+          assistantMessage: typeof msg?.content === 'string' ? msg.content : '',
+          toolCalls: Array.isArray(msg?.tool_calls) ? msg.tool_calls : [],
+          usedModel,
+        }
+      }
+
+      const contentType = String(r.headers.get('content-type') || '')
+      if (!contentType.toLowerCase().includes('text/event-stream')) {
+        // Some providers/models ignore `stream: true` and return a normal JSON response.
+        const data: any = await r.json().catch(() => ({} as any))
+        const msg = data?.choices?.[0]?.message || {}
+        const usedModel = typeof data?.model === 'string' ? data.model : model
+        if (usedModel && usedModel !== model) {
+          pushCorpLog(corpId, 'decision', `INFO: OpenRouter routed model=${usedModel} (requested ${model})`)
+          if (!allowFallbacks) throw new Error(`openrouter_model_mismatch:${usedModel}`)
+        }
+        const assistantMessage = typeof msg?.content === 'string' ? msg.content : ''
+        setCorpLive(corpId, { status: 'running', pass: Number(opts?.streamPass || 0), text: assistantMessage })
+        return {
+          assistantMessage,
+          toolCalls: Array.isArray(msg?.tool_calls) ? msg.tool_calls : [],
+          usedModel,
+        }
+      }
+
+      // Streaming: accumulate deltas (content + tool_calls) while updating a live buffer for the UI.
+      const reader = r.body?.getReader()
+      if (!reader) throw new Error('stream_no_body')
+      const decoder = new TextDecoder()
+
+      let buffer = ''
+      let assistantMessage = ''
+      const toolCallsByIndex: any[] = []
+      let usedModel = model
+      let lastLivePush = 0
+
+      const pushLive = (force?: boolean) => {
+        const now = Date.now()
+        if (!force && now - lastLivePush < 150) return
+        lastLivePush = now
+        setCorpLive(corpId, { status: 'running', pass: Number(opts?.streamPass || 0), text: assistantMessage })
+      }
+
+      while (true) {
+        const { value, done } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const parts = buffer.split('\n\n')
+        buffer = parts.pop() || ''
+
+        for (const part of parts) {
+          const lines = part.split('\n').map(l => l.trim()).filter(Boolean)
+          for (const line of lines) {
+            if (!line.startsWith('data:')) continue
+            const payload = line.slice('data:'.length).trim()
+            if (!payload) continue
+            if (payload === '[DONE]') {
+              pushLive(true)
+              continue
+            }
+            let json: any = null
+            try { json = JSON.parse(payload) } catch { json = null }
+            if (!json) continue
+
+            if (typeof json?.model === 'string') usedModel = json.model
+            const delta = json?.choices?.[0]?.delta || {}
+            if (typeof delta?.content === 'string') {
+              assistantMessage += delta.content
+              pushLive()
+            }
+            const deltaToolCalls = Array.isArray(delta?.tool_calls) ? delta.tool_calls : []
+            for (const tc of deltaToolCalls) {
+              const idx = Number(tc?.index)
+              if (!Number.isFinite(idx) || idx < 0) continue
+              toolCallsByIndex[idx] = toolCallsByIndex[idx] || { id: tc?.id || genId(), type: 'function', function: { name: '', arguments: '' } }
+              if (tc?.id) toolCallsByIndex[idx].id = tc.id
+              const fn = tc?.function || {}
+              if (typeof fn?.name === 'string') toolCallsByIndex[idx].function.name = fn.name
+              if (typeof fn?.arguments === 'string') toolCallsByIndex[idx].function.arguments += fn.arguments
+            }
+          }
+        }
+      }
+
+      const toolCalls = toolCallsByIndex.filter(Boolean)
+      setCorpLive(corpId, { status: 'done', pass: Number(opts?.streamPass || 0), text: assistantMessage })
+      if (usedModel && usedModel !== model) {
+        pushCorpLog(corpId, 'decision', `INFO: OpenRouter routed model=${usedModel} (requested ${model})`)
+        if (!allowFallbacks) throw new Error(`openrouter_model_mismatch:${usedModel}`)
+      }
+      return { assistantMessage, toolCalls, usedModel }
+    }
+
+    const parseInlineToolCalls = (text: string) => {
+      const out: any[] = []
+      const allowed = new Set([
+        'update_llm_plan',
+        'get_sector_route',
+        'get_trade_eta',
+        'set_station_reorder_level',
+        'set_station_reserve_level',
+        'assign_trade',
+        'set_corp_goal',
+        'buy_trader_vulture',
+        'queue_station_construction',
+      ])
+
+      const lines = String(text || '').split(/\r?\n/)
+      let pendingName: string | null = null
+
+      const add = (name: string, rawArgs: string) => {
+        if (!allowed.has(name)) return
+        const trimmed = (rawArgs || '').trim()
+        // Light validation: must parse as JSON object.
+        try {
+          const parsed = JSON.parse(trimmed || '{}')
+          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return
+        } catch {
+          return
+        }
+        out.push({ id: genId(), type: 'function', function: { name, arguments: trimmed } })
+      }
+
+      for (const rawLine of lines) {
+        const line = String(rawLine || '').trim()
+        if (!line) continue
+
+        // Match "toolName{...}" or "toolName {...}" on one line.
+        const oneLine = line.match(/^([a-z_]+)\s*(\{.*\})\s*$/i)
+        if (oneLine) {
+          const name = String(oneLine[1] || '')
+          const rawArgs = String(oneLine[2] || '')
+          add(name, rawArgs)
+          pendingName = null
+          continue
+        }
+
+        // Match "some text ... toolName{...}" embedded in a line.
+        if (line.includes('{') && line.includes('}')) {
+          for (const name of allowed) {
+            const idx = line.toLowerCase().indexOf(name)
+            if (idx < 0) continue
+            const braceStart = line.indexOf('{', idx + name.length)
+            const braceEnd = line.lastIndexOf('}')
+            if (braceStart < 0 || braceEnd <= braceStart) continue
+            const rawArgs = line.slice(braceStart, braceEnd + 1)
+            add(name, rawArgs)
+          }
+          pendingName = null
+        }
+
+        // Match "toolName" on its own line, JSON on next line.
+        if (allowed.has(line)) {
+          pendingName = line
+          continue
+        }
+        if (pendingName && line.startsWith('{') && line.endsWith('}')) {
+          add(pendingName, line)
+          pendingName = null
+          continue
+        }
+        pendingName = null
+      }
+
+      return out
+    }
+
+    const looksLikeIntent = (s: string) => {
+      const t = (s || '').toLowerCase()
+      return (
+        t.includes('i will') ||
+        t.includes("i'll") ||
+        t.includes('assign') ||
+        t.includes('queue') ||
+        t.includes('buy ') ||
+        t.includes('set ') ||
+        t.includes('order ') ||
+        // Models sometimes "write" tool calls as text instead of emitting tool_calls.
+        t.includes('get_sector_route') ||
+        t.includes('get_trade_eta')
+      )
+    }
+
+    let maxPasses = Math.max(1, Number(process.env.CORP_AUTOPILOT_MAX_PASSES || '3') || 3)
+    const maxExtraPasses = Math.max(0, Number(process.env.CORP_AUTOPILOT_MAX_EXTRA_PASSES || '4') || 4)
+    const maxPassesHard = maxPasses + maxExtraPasses
+    const maxQueryRounds = Math.max(1, Number(process.env.CORP_AUTOPILOT_MAX_QUERY_ROUNDS || '2') || 2)
+    const conversation: any[] = [
+      { role: 'system', content: system },
+      { role: 'system', content: `STATE_JSON=${contextJson}` },
+      ...(userKick ? [userKick] : []),
+      ...sanitizedMessages,
+    ]
+
+    let assistantMessage = ''
+    let finalToolCalls: any[] = []
+    let didFollowupNudge = false
+    let queryRounds = 0
+
+    let followupsGranted = 0
+    setCorpLive(corpId, { status: 'running', startedAtMs: Date.now(), pass: 0, text: '' })
+    for (let pass = 1; pass <= maxPasses; pass++) {
+      setCorpLive(corpId, { status: 'running', pass, text: '' })
+      let resp: any
+      try {
+        resp = await callOpenRouter(conversation, { streamPass: pass })
+      } catch (e: any) {
+        setCorpLive(corpId, { status: 'error', pass, error: e?.message || 'llm_stream_error' })
+        throw e
+      }
+      assistantMessage = resp.assistantMessage || ''
+      let toolCalls = Array.isArray(resp.toolCalls) ? resp.toolCalls : []
+      if (toolCalls.length === 0 && assistantMessage) {
+        const parsed = parseInlineToolCalls(assistantMessage)
+        if (parsed.length > 0) {
+          toolCalls = parsed
+          pushCorpLog(corpId, 'decision', `INFO: recovered ${parsed.length} tool call(s) from plain text.`)
+        }
+      }
+      // Ensure every tool call has a stable id so tool output can reference it.
+      for (const tc of toolCalls) {
+        if (!tc || typeof tc !== 'object') continue
+        if (!tc.id) tc.id = genId()
+      }
+      // Ensure the live buffer reflects the final text even when streaming is disabled.
+      setCorpLive(corpId, { status: 'running', pass, text: assistantMessage })
+
+      if (resp.usedModel && resp.usedModel !== model) {
+        pushCorpLog(corpId, 'decision', `INFO: OpenRouter routed model=${resp.usedModel} (requested ${model})`)
+      }
+
+      const assistantMsg: any = { role: 'assistant', content: assistantMessage }
+      if (toolCalls.length > 0) assistantMsg.tool_calls = toolCalls
+      conversation.push(assistantMsg)
+
+      if (assistantMessage) {
+        pushCorpLog(corpId, 'decision', pass === 1 ? assistantMessage : `PASS ${pass}/${maxPasses}:\n${assistantMessage}`)
+      }
+
+      // If the model wrote an intent but didn't call tools, add a nudge once and try another pass.
+      if (!didFollowupNudge && toolCalls.length === 0 && assistantMessage && looksLikeIntent(assistantMessage)) {
+        didFollowupNudge = true
+        conversation.push({
+          role: 'user',
+          content: 'Implement the decision now by calling the appropriate tools. If you need route/ETA info, call get_sector_route/get_trade_eta first. If no action is possible, reply DONE and do not call any tools.',
+        })
+        // Ensure we always leave room for a follow-up pass.
+        if (pass === maxPasses && maxPasses < maxPassesHard) {
+          maxPasses++
+          followupsGranted++
+          pushCorpLog(corpId, 'decision', `INFO: extending pass budget (${followupsGranted}/${maxExtraPasses}) to allow tool execution.`)
+        }
+        continue
+      }
+
+      const queryCalls = toolCalls.filter((c: any) => {
+        const name = String(c?.function?.name || '')
+        return name === 'get_sector_route' || name === 'get_trade_eta'
+      })
+
+      if (queryCalls.length > 0) {
+        queryRounds++
+        if (queryRounds > maxQueryRounds) {
+          pushCorpLog(corpId, 'decision', `INFO: query round limit reached (${maxQueryRounds}); skipping further route/ETA tools this step.`)
+          for (const call of queryCalls.slice(0, 8)) {
+            const name = String(call?.function?.name || '')
+            pushCorpLog(corpId, 'decision', `TOOL ${name}: error: query_round_limit_exceeded`)
+            conversation.push({
+              role: 'tool',
+              tool_call_id: String(call?.id || genId()),
+              name,
+              content: JSON.stringify({ ok: false, error: 'query_round_limit_exceeded' }),
+            })
+          }
+          conversation.push({
+            role: 'user',
+            content:
+              'You have enough route/ETA info for this step. Now either take an in-world action (assign_trade, set_station_reorder_level, buy_trader_vulture, queue_station_construction, etc.) or reply DONE. Do not call get_sector_route/get_trade_eta again this step.',
+          })
+          if (pass === maxPasses && maxPasses < maxPassesHard) {
+            maxPasses++
+            followupsGranted++
+            pushCorpLog(corpId, 'decision', `INFO: extending pass budget (${followupsGranted}/${maxExtraPasses}) to allow post-tool decision.`)
+          }
+          continue
+        }
+
+        for (const call of queryCalls.slice(0, 8)) {
+          const name = String(call?.function?.name || '')
+          const rawArgs = call?.function?.arguments
+          let args: any = {}
+          try { args = JSON.parse(rawArgs || '{}') } catch { args = {} }
+
+          let result: any = { ok: false, error: 'unknown_tool' }
+          if (name === 'get_sector_route') {
+            result = getSectorRoute(String(args.fromSectorId || ''), String(args.toSectorId || ''))
+          } else if (name === 'get_trade_eta') {
+            result = estimateTradeEta(String(args.fleetId || ''), String(args.buyStationId || ''), String(args.sellStationId || ''), Number(args.qty))
+          }
+
+          const short =
+            name === 'get_sector_route'
+              ? (result.ok ? `route ${result.fromSectorId} -> ${result.toSectorId}: ${result.hops} hops, ~${result.etaSec}s` : `route error: ${result.error}`)
+              : (result.ok ? `eta fleet=${result.fleetId}: ${result.hops} hops, ~${result.etaSec}s` : `eta error: ${result.error}`)
+          pushCorpLog(corpId, 'decision', `TOOL ${name}: ${short}`)
+
+          conversation.push({
+            role: 'tool',
+            tool_call_id: String(call?.id || genId()),
+            name,
+            content: JSON.stringify(result),
+          })
+        }
+        conversation.push({
+          role: 'user',
+          content:
+            'Using the tool results above, now either take an in-world action (assign_trade, etc.) or reply DONE. Do not call get_sector_route/get_trade_eta again this step.',
+        })
+        // Ensure we always leave room for the model to act after seeing tool results.
+        if (pass === maxPasses && maxPasses < maxPassesHard) {
+          maxPasses++
+          followupsGranted++
+          pushCorpLog(corpId, 'decision', `INFO: extending pass budget (${followupsGranted}/${maxExtraPasses}) to allow post-tool decision.`)
+        }
+        continue
+      }
+
+      finalToolCalls = toolCalls
+      break
+    }
+    setCorpLive(corpId, { status: 'done', pass: 0, text: assistantMessage })
+
+    const appliedActions: any[] = []
+    let worldActionsUsed = 0
+    const nonWorldTools = new Set(['update_llm_plan', 'get_sector_route', 'get_trade_eta'])
+    const isWorldAction = (toolName: string) => !nonWorldTools.has(toolName)
+    const maxToolCalls = 16
+
+    for (const call of finalToolCalls.slice(0, maxToolCalls)) {
+      const name = call?.function?.name
+      const rawArgs = call?.function?.arguments
+      let args: any = {}
+      try { args = JSON.parse(rawArgs || '{}') } catch { args = {} }
+
+      if (isWorldAction(String(name || '')) && worldActionsUsed >= maxWorldActionsPerStep) continue
+
+      if (name === 'update_llm_plan') {
+        const out = updateCorpLLMPlan(corpId, args)
+        appliedActions.push({ type: name, ok: out.ok, plan: out.ok ? out.plan : undefined, error: out.ok ? undefined : out.error })
+        if (out.ok) pushCorpLog(corpId, 'plan', out.plan)
+      } else if (name === 'get_sector_route') {
+        const out = getSectorRoute(String(args.fromSectorId || ''), String(args.toSectorId || ''))
+        appliedActions.push({ type: name, ok: out.ok, fromSectorId: (out as any).fromSectorId, toSectorId: (out as any).toSectorId, hops: (out as any).hops, etaSec: (out as any).etaSec, error: out.ok ? undefined : (out as any).error })
+      } else if (name === 'get_trade_eta') {
+        const out = estimateTradeEta(String(args.fleetId || ''), String(args.buyStationId || ''), String(args.sellStationId || ''), Number(args.qty))
+        appliedActions.push({ type: name, ok: out.ok, fleetId: (out as any).fleetId, hops: (out as any).hops, etaSec: (out as any).etaSec, error: out.ok ? undefined : (out as any).error })
+      } else if (name === 'set_station_reorder_level') {
+        const stationId = String(args.stationId || '')
+        const wareId = String(args.wareId || '')
+        const reorderLevel = Number(args.reorderLevel)
+        const out = setStationReorderLevel(corpId, stationId, wareId, reorderLevel)
+        appliedActions.push({ type: name, ok: out.ok, stationId, wareId, reorderLevel: Math.floor(reorderLevel), error: out.ok ? undefined : (out as any).error })
+        if (out.ok) worldActionsUsed++
+      } else if (name === 'set_station_reserve_level') {
+        const stationId = String(args.stationId || '')
+        const wareId = String(args.wareId || '')
+        const reserveLevel = Number(args.reserveLevel)
+        const out = setStationReserveLevel(corpId, stationId, wareId, reserveLevel)
+        appliedActions.push({ type: name, ok: out.ok, stationId, wareId, reserveLevel: Math.floor(reserveLevel), error: out.ok ? undefined : (out as any).error })
+        if (out.ok) worldActionsUsed++
+      } else if (name === 'assign_trade') {
+        const fleetId = String(args.fleetId || '')
+        const buyStationId = String(args.buyStationId || '')
+        const sellStationId = String(args.sellStationId || '')
+        const wareId = String(args.wareId || '')
+        const qty = Number(args.qty)
+        const out = assignTradeOrderToFleet(corpId, fleetId, buyStationId, sellStationId, wareId, qty)
+        appliedActions.push({ type: name, ok: out.ok, fleetId, buyStationId, sellStationId, wareId, qty: Math.floor(qty), error: out.ok ? undefined : (out as any).error })
+        if (out.ok) worldActionsUsed++
+      } else if (name === 'set_corp_goal') {
+        const goal = String(args.goal || '')
+        const out = setCorpGoal(corpId, goal)
+        appliedActions.push({ type: name, ok: out.ok, corpId, goal, error: out.ok ? undefined : (out as any).error })
+        if (out.ok) worldActionsUsed++
+      } else if (name === 'buy_trader_vulture') {
+        const out = buyVultureTraderForCorp(corpId)
+        appliedActions.push({ type: name, ok: out.ok, fleetId: (out as any).fleetId, price: (out as any).price, shipyardId: (out as any).shipyardId, error: out.ok ? undefined : (out as any).error })
+        if (out.ok) worldActionsUsed++
+      } else if (name === 'queue_station_construction') {
+        const stationType = String(args.stationType || '')
+        const targetSectorId = String(args.targetSectorId || '')
+        const out = queueStationConstruction(corpId, stationType, targetSectorId)
+        appliedActions.push({ type: name, ok: out.ok, stationType, targetSectorId, error: out.ok ? undefined : (out as any).error })
+        if (out.ok) worldActionsUsed++
+      }
+    }
+
+    pushCorpLog(corpId, 'actions', appliedActions)
+
+    // Persist a tiny "what happened" trail for long-horizon planning.
+    try {
+      const corp: any = state.corporations.find((c: any) => c.id === corpId)
+      if (corp) {
+        corp.aiState = corp.aiState || { lastExpansionCheck: Date.now(), currentGoal: 'consolidate', pendingConstructions: [] }
+        corp.aiState.llmPlan = corp.aiState.llmPlan || { strategy: '', todos: [], lastOutcomes: [], updatedAt: Date.now() }
+        const outcomes = Array.isArray(corp.aiState.llmPlan.lastOutcomes) ? corp.aiState.llmPlan.lastOutcomes : []
+        for (const a of appliedActions.slice(0, 8)) {
+          if (!a || typeof a.type !== 'string') continue
+          outcomes.unshift({ ingameTimeSec: state.elapsedTimeSec, type: a.type, ok: Boolean(a.ok) })
+        }
+        corp.aiState.llmPlan.lastOutcomes = outcomes.slice(0, 20)
+        corp.aiState.llmPlan.updatedAt = Date.now()
+      }
+    } catch {
+      // ignore
+    }
+
+    saveGameAfterAICycle()
+    return { ok: true as const, assistantMessage, appliedActions }
   }
 
   const settleCurrentOrder = (fleet: NPCFleet) => {
@@ -2667,7 +4555,26 @@ function createUniverse() {
     }
   }
 
-  return { state, init, tick, loop, setTimeScale, handleShipReport, issueCommand, advanceTime, getEconomyHistory }
+  return {
+    state,
+    init,
+    tick,
+    loop,
+    setTimeScale,
+    handleShipReport,
+    issueCommand,
+    advanceTime,
+    getEconomyHistory,
+    recomputeSectorPrices,
+    setStationReorderLevel,
+    setStationReserveLevel,
+    setCorpGoal,
+    assignTradeOrderToFleet,
+    getCorpControlContext,
+    getCorpLogs,
+    getCorpLive,
+    runCorpControllerStep,
+  }
 }
 
 function universePlugin() {
@@ -2680,6 +4587,109 @@ function universePlugin() {
       server.httpServer?.on('close', () => clearInterval(i))
       server.middlewares.use((req: IncomingMessage, res: ServerResponse, next: () => void) => {
         const url = req.url || ''
+
+        if (req.method === 'POST' && url.startsWith('/__ai/corp-control')) {
+          let body = ''
+          req.on('data', (chunk) => { body += chunk.toString() })
+          req.on('end', async () => {
+            try {
+              const payload = JSON.parse(body || '{}')
+              const corpId = String(payload?.corpId || '')
+              const incomingMessages = Array.isArray(payload?.messages) ? payload.messages : []
+              if (!corpId) {
+                res.statusCode = 400
+                res.setHeader('content-type', 'application/json')
+                res.end(JSON.stringify({ error: 'corpId is required' }))
+                return
+              }
+              const sanitizedMessages = incomingMessages
+                .filter((m: any) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+                .map((m: any) => ({ role: m.role, content: m.content }))
+
+              const out = await u.runCorpControllerStep({ corpId, reason: 'manual', messages: sanitizedMessages })
+              if (!out.ok) {
+                res.statusCode = 400
+                res.setHeader('content-type', 'application/json')
+                res.end(JSON.stringify({ error: out.error }))
+                return
+              }
+
+              res.statusCode = 200
+              res.setHeader('content-type', 'application/json')
+              res.end(JSON.stringify({ assistantMessage: out.assistantMessage, appliedActions: out.appliedActions }))
+            } catch (e: any) {
+              res.statusCode = 500
+              res.setHeader('content-type', 'application/json')
+              res.end(JSON.stringify({ error: e?.message || 'AI server error' }))
+            }
+          })
+          return
+        }
+
+        if (req.method === 'GET' && url.startsWith('/__ai/corp-logs')) {
+          const full = new URL(url, 'http://localhost')
+          const corpId = String(full.searchParams.get('corpId') || '')
+          const since = Number(full.searchParams.get('since') || '0')
+          if (!corpId) {
+            res.statusCode = 400
+            res.setHeader('content-type', 'application/json')
+            res.end(JSON.stringify({ error: 'corpId is required' }))
+            return
+          }
+          res.statusCode = 200
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify({ entries: u.getCorpLogs(corpId, since) }))
+          return
+        }
+
+        if (req.method === 'GET' && url.startsWith('/__ai/corp-live')) {
+          const full = new URL(url, 'http://localhost')
+          const corpId = String(full.searchParams.get('corpId') || '')
+          if (!corpId) {
+            res.statusCode = 400
+            res.setHeader('content-type', 'application/json')
+            res.end(JSON.stringify({ error: 'corpId is required' }))
+            return
+          }
+          res.statusCode = 200
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify({ live: u.getCorpLive(corpId) }))
+          return
+        }
+
+        if (req.method === 'POST' && url.startsWith('/__ai/corp-autopilot-run')) {
+          const full = new URL(url, 'http://localhost')
+          const corpId = String(full.searchParams.get('corpId') || '')
+          if (!corpId) {
+            res.statusCode = 400
+            res.setHeader('content-type', 'application/json')
+            res.end(JSON.stringify({ error: 'corpId is required' }))
+            return
+          }
+          let body = ''
+          req.on('data', (chunk) => { body += chunk.toString() })
+          req.on('end', () => {
+            u.runCorpControllerStep({ corpId, reason: 'manual_trigger' })
+              .then((out: any) => {
+                if (!out?.ok) {
+                  res.statusCode = 400
+                  res.setHeader('content-type', 'application/json')
+                  res.end(JSON.stringify({ error: out?.error || 'run_failed' }))
+                  return
+                }
+                res.statusCode = 200
+                res.setHeader('content-type', 'application/json')
+                res.end(JSON.stringify({ ok: true }))
+              })
+              .catch((e: any) => {
+                res.statusCode = 500
+                res.setHeader('content-type', 'application/json')
+                res.end(JSON.stringify({ error: e?.message || 'AI server error' }))
+              })
+          })
+          return
+        }
+
         if (req.method === 'GET' && url.startsWith('/__universe/economy-history')) {
           const full = new URL(url, 'http://localhost')
           const since = Number(full.searchParams.get('since') || '0')

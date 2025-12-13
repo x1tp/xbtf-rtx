@@ -34,6 +34,8 @@ import { StationInfo } from './components/StationInfo';
 import { FleetSimulator } from './simulation/FleetSimulator';
 import { getStationPriceMap } from './services/stationPricing';
 import { SimpleLineChart } from './components/SimpleLineChart';
+import { CorpAIAgentTab } from './components/CorpAIAgentTab';
+import { MultiCorpAIAgentTab } from './components/MultiCorpAIAgentTab';
 
 
 
@@ -815,7 +817,7 @@ function EconomyAdmin() {
   const syncEconomy = useGameStore((s) => s.syncEconomy)
   const syncEconomyHistory = useGameStore((s) => s.syncEconomyHistory)
   const [sectorFilter, setSectorFilter] = useState('all')
-  const [activeTab, setActiveTab] = useState<'economy' | 'fleets' | 'corporations' | 'characters' | 'graphs'>('economy')
+  const [activeTab, setActiveTab] = useState<'economy' | 'fleets' | 'corporations' | 'teladi_ai' | 'corp_ai_2' | 'characters' | 'graphs'>('economy')
   const [graphWareId, setGraphWareId] = useState<string>('all')
   const [selectedCorpId, setSelectedCorpId] = useState<string | null>(null)
   const [selectedStationId, setSelectedStationId] = useState<string | null>(null)
@@ -981,6 +983,28 @@ function EconomyAdmin() {
               borderRadius: '4px 4px 0 0'
             }}
           >Corporations ({corporations.length})</button>
+          <button
+            onClick={() => setActiveTab('teladi_ai')}
+            style={{
+              padding: '6px 16px',
+              border: activeTab === 'teladi_ai' ? '1px solid #88cc44' : '1px solid #184b6a',
+              background: activeTab === 'teladi_ai' ? '#203a2a' : '#0f2230',
+              color: activeTab === 'teladi_ai' ? '#88cc44' : '#8ab6d6',
+              cursor: 'pointer',
+              borderRadius: '4px 4px 0 0'
+            }}
+          >Teladi AI</button>
+          <button
+            onClick={() => setActiveTab('corp_ai_2')}
+            style={{
+              padding: '6px 16px',
+              border: activeTab === 'corp_ai_2' ? '1px solid #3fb6ff' : '1px solid #184b6a',
+              background: activeTab === 'corp_ai_2' ? '#1a3a50' : '#0f2230',
+              color: activeTab === 'corp_ai_2' ? '#fff' : '#8ab6d6',
+              cursor: 'pointer',
+              borderRadius: '4px 4px 0 0'
+            }}
+          >Corp AI 2</button>
           <button
             onClick={() => setActiveTab('characters')}
             style={{
@@ -1678,6 +1702,14 @@ function EconomyAdmin() {
                 )}
               </div>
             )}
+          </div>
+        ) : activeTab === 'teladi_ai' ? (
+          <div style={{ height: '100%' }}>
+            <CorpAIAgentTab corpId="teladi_company" corporations={corporations} stations={stations} fleets={fleets} />
+          </div>
+        ) : activeTab === 'corp_ai_2' ? (
+          <div style={{ height: '100%' }}>
+            <MultiCorpAIAgentTab corporations={corporations} stations={stations} fleets={fleets} />
           </div>
         ) : activeTab === 'characters' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>

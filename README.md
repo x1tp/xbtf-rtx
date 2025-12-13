@@ -71,3 +71,16 @@ export default defineConfig([
   },
 ])
 ```
+
+## Corp AI (OpenRouter)
+
+1. Copy `.env.example` to `.env`
+2. Set `OPENROUTER_API_KEY` (and optionally `OPENROUTER_MODEL`)
+3. Run `npm run dev`
+4. Open the Economy Admin and use the `Teladi AI` tab
+
+Autopilot runs every 1 in-game hour by default (configurable via `CORP_AUTOPILOT_*` in `.env`).
+
+To limit how many actions the LLM can apply per step, set `CORP_AUTOPILOT_MAX_ACTIONS_PER_STEP` (default: `1`).
+
+To make the experiment corp fully LLM-controlled (no NPC corp decisions or auto-assigned corp trader orders), set `CORP_AUTOPILOT_EXCLUSIVE_CORP_IDS=teladi_company`.

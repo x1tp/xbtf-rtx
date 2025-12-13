@@ -286,7 +286,7 @@ export const RECIPES_CONFIG: Recipe[] = [
             { wareId: 'hull_parts', amount: 50 },
             { wareId: 'engine_parts', amount: 20 },
             { wareId: 'energy_cells', amount: 200 }, // Labor/Power
-            { wareId: 'shield_components', amount: 5 },
+            { wareId: '25mw_shield', amount: 2 },
         ], cycleTimeSec: 300, batchSize: 1, productStorageCap: 10
     },
     {
@@ -295,6 +295,7 @@ export const RECIPES_CONFIG: Recipe[] = [
             { wareId: 'engine_parts', amount: 30 },
             { wareId: 'energy_cells', amount: 250 },
             { wareId: 'scanning_arrays', amount: 5 },
+            { wareId: '25mw_shield', amount: 2 },
         ], cycleTimeSec: 400, batchSize: 1, productStorageCap: 10
     },
     {
@@ -303,13 +304,14 @@ export const RECIPES_CONFIG: Recipe[] = [
             { wareId: 'engine_parts', amount: 40 },
             { wareId: 'energy_cells', amount: 300 },
             { wareId: 'advanced_composites', amount: 10 },
+            { wareId: '25mw_shield', amount: 3 },
         ], cycleTimeSec: 500, batchSize: 1, productStorageCap: 10
     },
     {
         id: 'build_buster', productId: 'ship_buster', inputs: [
             { wareId: 'hull_parts', amount: 40 },
             { wareId: 'weapon_components', amount: 20 },
-            { wareId: 'shield_components', amount: 20 },
+            { wareId: '1mw_shield', amount: 2 },
             { wareId: 'energy_cells', amount: 300 },
             { wareId: 'advanced_electronics', amount: 5 },
         ], cycleTimeSec: 600, batchSize: 1, productStorageCap: 5
@@ -320,6 +322,7 @@ export const RECIPES_CONFIG: Recipe[] = [
             { wareId: 'engine_parts', amount: 20 },
             { wareId: 'energy_cells', amount: 150 },
             { wareId: 'scanning_arrays', amount: 2 },
+            { wareId: '1mw_shield', amount: 1 },
         ], cycleTimeSec: 200, batchSize: 1, productStorageCap: 10
     },
 
