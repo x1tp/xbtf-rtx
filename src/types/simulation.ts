@@ -209,8 +209,10 @@ export interface SectorEvent {
 export interface TradeLogEntry {
   id: string
   timestamp: number
+  ingameTimeSec?: number
   fleetId: string
   fleetName: string
+  fleetOwnerId?: string | null
   wareId: string
   wareName: string
   quantity: number
@@ -219,8 +221,12 @@ export interface TradeLogEntry {
   profit: number
   buySectorId: string
   sellSectorId: string
+  buyStationId?: string
+  sellStationId?: string
   buyStationName: string
   sellStationName: string
+  buyStationOwnerId?: string | null
+  sellStationOwnerId?: string | null
 }
 
 // ============================================================================

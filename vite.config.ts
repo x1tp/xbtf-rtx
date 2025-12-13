@@ -200,10 +200,14 @@ type Corporation = {
 
 type TradeLogEntry = {
   id: string; timestamp: number; fleetId: string; fleetName: string
+  ingameTimeSec?: number
+  fleetOwnerId?: string | null
   wareId: string; wareName: string; quantity: number
   buyPrice: number; sellPrice: number; profit: number
   buySectorId: string; sellSectorId: string
+  buyStationId?: string; sellStationId?: string
   buyStationName: string; sellStationName: string
+  buyStationOwnerId?: string | null; sellStationOwnerId?: string | null
 }
 
 type EconomyHistoryEntry = {
@@ -218,8 +222,28 @@ type UniverseState = {
   wares: Ware[]; recipes: Recipe[]; stations: Station[]; sectorPrices: Record<string, Record<string, number>>; timeScale: number; acc: number; elapsedTimeSec: number
   // Fleet simulation
   corporations: Corporation[]; fleets: NPCFleet[]; tradeLog: TradeLogEntry[]; lastTickTime: number
+  // Optional corp-issued work orders that any trader can fulfill for a bonus.
+  workOrders?: WorkOrder[]
   // Dynamic economy
   lastTraderSpawnCheck?: number
+}
+
+type WorkOrderStatus = 'open' | 'assigned' | 'completed' | 'cancelled' | 'expired'
+type WorkOrder = {
+  id: string
+  corpId: string
+  title: string
+  wareId: string
+  qtyTotal: number
+  qtyRemaining: number
+  buyStationId: string
+  sellStationId: string
+  bonusPerUnit: number
+  escrowRemaining: number
+  status: WorkOrderStatus
+  assignedFleetId?: string | null
+  createdAtMs: number
+  expiresAtMs?: number | null
 }
 
 // Derive sector price map from station inventories/reserves
@@ -377,7 +401,7 @@ const patchShipyards = (stations: Station[], recipes: Recipe[], opts: { seedShip
 }
 
 function createUniverse() {
-  const state: UniverseState = { wares: [], recipes: [], stations: [], sectorPrices: {}, timeScale: 1, acc: 0, elapsedTimeSec: 0, corporations: [], fleets: [], tradeLog: [], lastTickTime: Date.now() }
+  const state: UniverseState = { wares: [], recipes: [], stations: [], sectorPrices: {}, timeScale: 1, acc: 0, elapsedTimeSec: 0, corporations: [], fleets: [], tradeLog: [], workOrders: [], lastTickTime: Date.now() }
 
   type CorpAILogKind = 'context' | 'plan' | 'decision' | 'actions' | 'error'
   type CorpAILogEntry = {
@@ -426,6 +450,53 @@ function createUniverse() {
       if (fs.existsSync(CORP_AI_LOGS_FILE)) fs.unlinkSync(CORP_AI_LOGS_FILE)
     } catch {
       // ignore
+    }
+  }
+
+  const getCorpExternalStationSales = (corpId: string, windowSec: number) => {
+    const nowMs = Date.now()
+    const windowMs = Math.max(0, windowSec) * 1000
+    const inWindow = (t: any) => (windowMs <= 0 ? true : (Number(t?.timestamp || 0) >= nowMs - windowMs))
+
+    let total = 0
+    let totalCount = 0
+    let windowTotal = 0
+    let windowCount = 0
+    const byWareWindow = new Map<string, number>()
+
+    for (const t of state.tradeLog) {
+      const sellerStationOwnerId = (t as any)?.buyStationOwnerId ?? null
+      const buyerFleetOwnerId = (t as any)?.fleetOwnerId ?? null
+      if (sellerStationOwnerId !== corpId) continue
+      if (buyerFleetOwnerId === corpId) continue // internal purchase
+
+      const qty = Number((t as any)?.quantity || 0)
+      const buyPrice = Number((t as any)?.buyPrice || 0)
+      const revenue = Math.max(0, qty * buyPrice)
+      if (revenue <= 0) continue
+
+      total += revenue
+      totalCount += 1
+
+      if (inWindow(t)) {
+        windowTotal += revenue
+        windowCount += 1
+        const wareId = String((t as any)?.wareId || 'unknown')
+        byWareWindow.set(wareId, (byWareWindow.get(wareId) || 0) + revenue)
+      }
+    }
+
+    return {
+      corpId,
+      windowSec,
+      externalStationSalesTotal: Math.floor(total),
+      externalStationSalesTradesTotal: totalCount,
+      externalStationSalesWindow: Math.floor(windowTotal),
+      externalStationSalesTradesWindow: windowCount,
+      byWareWindow: Array.from(byWareWindow.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 6)
+        .map(([wareId, revenue]) => ({ wareId, revenue: Math.floor(revenue) })),
     }
   }
 
@@ -848,6 +919,7 @@ function createUniverse() {
           lastReportAt: f.lastReportAt || f.stateStartTime || Date.now()
         }))
         state.tradeLog = loadedState.tradeLog || []
+        state.workOrders = Array.isArray((loadedState as any).workOrders) ? (loadedState as any).workOrders : []
         remapLegacyStations()
 
         // Ensure newly-added default corps exist in older saves.
@@ -1535,6 +1607,7 @@ function createUniverse() {
     state.recipes = recipes
     state.stations = stations
     state.sectorPrices = computeSectorPrices(stations, recipes, wares)
+    state.workOrders = []
 
     // Corporations already initialized above, but we need to assign the updated list to state
     // But we copied INITIAL_CORPORATIONS, so we're good.
@@ -2211,6 +2284,7 @@ function createUniverse() {
     }
     state.stations = nextStations
     state.sectorPrices = computeSectorPrices(nextStations, state.recipes, state.wares)
+    sweepWorkOrders()
 
     // Run AI
     runCorporationAI()
@@ -2269,6 +2343,67 @@ function createUniverse() {
   // Helper: Find best trade route for a fleet
   const findBestTradeRoute = (fleet: NPCFleet): TradeOrder | null => {
       const routes: { buyStation: Station; sellStation: Station; wareId: string; profit: number; qty: number; score: number; buyPrice: number; sellPrice: number }[] = []
+
+      // Prefer corp-issued work orders for independent traders.
+      const isIndependent = !fleet.ownerId
+      if (isIndependent && Array.isArray(state.workOrders) && state.workOrders.length > 0) {
+        const now = Date.now()
+        let best: { wo: WorkOrder; buyStation: Station; sellStation: Station; qty: number; buyPrice: number; sellPrice: number; expectedProfit: number } | null = null
+
+        const getWare = (wareId: string) => state.wares.find(w => w.id === wareId)
+        for (const wo of state.workOrders) {
+          if (!wo || wo.status === 'completed' || wo.status === 'cancelled' || wo.status === 'expired') continue
+          if (wo.expiresAtMs && wo.expiresAtMs <= now) continue
+          if (wo.qtyRemaining <= 0) continue
+          if (wo.assignedFleetId && wo.assignedFleetId !== fleet.id) continue
+          if (!wo.assignedFleetId && wo.status === 'assigned') continue
+
+          const buyStation = state.stations.find(s => s.id === wo.buyStationId)
+          const sellStation = state.stations.find(s => s.id === wo.sellStationId)
+          if (!buyStation || !sellStation) continue
+
+          const ware = getWare(wo.wareId)
+          const volume = ware?.volume || 1
+          const maxByCapacity = Math.max(0, Math.floor(fleet.capacity / Math.max(1, volume)))
+          if (maxByCapacity <= 0) continue
+
+          const buyPrice = state.sectorPrices[buyStation.sectorId]?.[wo.wareId] || ware?.basePrice || 0
+          const sellPrice = state.sectorPrices[sellStation.sectorId]?.[wo.wareId] || ware?.basePrice || 0
+          const maxAffordable = buyPrice > 0 ? Math.floor(fleet.credits / buyPrice) : maxByCapacity
+          const qty = Math.max(0, Math.min(wo.qtyRemaining, maxByCapacity, maxAffordable, buyStation.inventory[wo.wareId] || 0))
+          if (qty <= 0) continue
+
+          const expectedProfit = ((sellPrice - buyPrice) + wo.bonusPerUnit) * qty
+          if (!best || expectedProfit > best.expectedProfit) {
+            best = { wo, buyStation, sellStation, qty, buyPrice, sellPrice, expectedProfit }
+          }
+        }
+
+        if (best) {
+          const o: any = {
+            id: genId(),
+            buyStationId: best.buyStation.id,
+            buyStationName: best.buyStation.name,
+            buySectorId: best.buyStation.sectorId,
+            buyWareId: best.wo.wareId,
+            buyWareName: state.wares.find(w => w.id === best.wo.wareId)?.name || best.wo.wareId,
+            buyQty: best.qty,
+            buyPrice: best.buyPrice,
+            sellStationId: best.sellStation.id,
+            sellStationName: best.sellStation.name,
+            sellSectorId: best.sellStation.sectorId,
+            sellWareId: best.wo.wareId,
+            sellWareName: state.wares.find(w => w.id === best.wo.wareId)?.name || best.wo.wareId,
+            sellQty: best.qty,
+            sellPrice: best.sellPrice,
+            expectedProfit: best.expectedProfit,
+            createdAt: now,
+            _workOrderId: best.wo.id,
+            _workOrderBonusPerUnit: best.wo.bonusPerUnit,
+          }
+          return o as TradeOrder
+        }
+      }
 
       // Allow stations to trade a slice of their current stock even if they're below their ideal reserve.
       // This prevents newly-seeded stations with large reserve targets from never exporting anything.
@@ -2625,8 +2760,10 @@ function createUniverse() {
             state.tradeLog.unshift({
               id: genId(),
               timestamp: now,
+              ingameTimeSec: state.elapsedTimeSec,
               fleetId: fleet.id,
               fleetName: fleet.name,
+              fleetOwnerId: sellerOwner,
               wareId,
               wareName: state.wares.find(w => w.id === wareId)?.name || wareId,
               quantity: amount,
@@ -2635,8 +2772,11 @@ function createUniverse() {
               profit: isInternalSale ? 0 : revenue,
               buySectorId: fleet.currentSectorId,
               sellSectorId: station.sectorId,
+              sellStationId: station.id,
               buyStationName: fleet.targetStationId || 'unknown',
               sellStationName: station.name,
+              buyStationOwnerId: null,
+              sellStationOwnerId: station.ownerId || null,
             })
             if (state.tradeLog.length > 100) state.tradeLog.length = 100
           }
@@ -2862,6 +3002,16 @@ function createUniverse() {
               console.log(`[Universe] Idle: No profitable trade found for ${fleet.name}`)
             }
             if (order) {
+              // If this is a corp-issued work order, claim it for this fleet (best-effort).
+              const woId = String((order as any)?._workOrderId || '')
+              if (woId && Array.isArray(state.workOrders)) {
+                const wo = state.workOrders.find(w => w.id === woId)
+                if (wo && (wo.status === 'open' || (wo.status === 'assigned' && wo.assignedFleetId === fleet.id))) {
+                  wo.status = 'assigned'
+                  wo.assignedFleetId = fleet.id
+                }
+              }
+
               fleet.currentOrder = order
 
               // Reserve supply/demand so later fleets this tick don't pick the identical leg.
@@ -3016,6 +3166,36 @@ function createUniverse() {
 
   const recomputeSectorPrices = () => {
     state.sectorPrices = computeSectorPrices(state.stations, state.recipes, state.wares)
+  }
+
+  const sweepWorkOrders = () => {
+    const now = Date.now()
+    state.workOrders = Array.isArray(state.workOrders) ? state.workOrders : []
+
+    for (const wo of state.workOrders) {
+      if (!wo || typeof wo !== 'object') continue
+      if (wo.status === 'completed' || wo.status === 'cancelled' || wo.status === 'expired') continue
+
+      const expired = Boolean(wo.expiresAtMs) && Number(wo.expiresAtMs) <= now
+      const corp = state.corporations.find(c => c.id === wo.corpId)
+      if (expired || !corp) {
+        // Expire and refund any remaining escrow.
+        if (corp && wo.escrowRemaining > 0) corp.credits += wo.escrowRemaining
+        wo.escrowRemaining = 0
+        wo.status = expired ? 'expired' : 'cancelled'
+        wo.assignedFleetId = null
+        continue
+      }
+
+      // If assigned fleet vanished, release the order back to open.
+      if (wo.status === 'assigned' && wo.assignedFleetId) {
+        const f = state.fleets.find(ff => ff.id === wo.assignedFleetId)
+        if (!f) {
+          wo.assignedFleetId = null
+          wo.status = 'open'
+        }
+      }
+    }
   }
 
   const setStationReorderLevel = (corpId: string, stationId: string, wareId: string, reorderLevel: number) => {
@@ -3194,6 +3374,22 @@ function createUniverse() {
       })(),
     }))
     const wares = state.wares.map(w => ({ id: w.id, name: w.name, basePrice: w.basePrice, volume: w.volume }))
+    const workOrders = (Array.isArray(state.workOrders) ? state.workOrders : [])
+      .filter(w => w && w.corpId === corpId)
+      .slice(0, 25)
+      .map(w => ({
+        id: w.id,
+        status: w.status,
+        title: w.title,
+        wareId: w.wareId,
+        qtyRemaining: w.qtyRemaining,
+        bonusPerUnit: w.bonusPerUnit,
+        escrowRemaining: w.escrowRemaining,
+        buyStationId: w.buyStationId,
+        sellStationId: w.sellStationId,
+        assignedFleetId: w.assignedFleetId || null,
+        expiresAtMs: w.expiresAtMs || null,
+      }))
     return {
       corp,
       wares,
@@ -3201,6 +3397,7 @@ function createUniverse() {
       fleets: corpFleets,
       sectorPrices: state.sectorPrices,
       corpStationIds: corpStations.map(s => s.id),
+      workOrders,
       tradeAccounting: {
         corpId,
         corpName,
@@ -3532,6 +3729,67 @@ function createUniverse() {
     return { ok: true as const }
   }
 
+  const postWorkOrder = (corpId: string, args: any) => {
+    const now = Date.now()
+    const corp = state.corporations.find(c => c.id === corpId)
+    if (!corp) return { ok: false as const, error: 'corp_not_found' }
+
+    const wareId = String(args?.wareId || '').trim()
+    const qty = Math.floor(Number(args?.qty || 0))
+    const buyStationId = String(args?.buyStationId || '').trim()
+    const sellStationId = String(args?.sellStationId || '').trim()
+    const bonusPerUnit = Number(args?.bonusPerUnit || 0)
+    const expiresInSec = Number(args?.expiresInSec || 0)
+    const title = String(args?.title || `${wareId} delivery`).trim()
+
+    if (!wareId || !state.wares.some(w => w.id === wareId)) return { ok: false as const, error: 'unknown_ware' }
+    if (!Number.isFinite(qty) || qty <= 0) return { ok: false as const, error: 'invalid_qty' }
+    if (!Number.isFinite(bonusPerUnit) || bonusPerUnit <= 0) return { ok: false as const, error: 'invalid_bonus' }
+    const buyStation = state.stations.find(s => s.id === buyStationId)
+    const sellStation = state.stations.find(s => s.id === sellStationId)
+    if (!buyStation) return { ok: false as const, error: 'buy_station_not_found' }
+    if (!sellStation) return { ok: false as const, error: 'sell_station_not_found' }
+    if (sellStation.ownerId !== corpId) return { ok: false as const, error: 'sell_station_not_owned_by_corp' }
+
+    const escrow = Math.floor(qty * bonusPerUnit)
+    if (corp.credits < escrow) return { ok: false as const, error: 'insufficient_credits_for_escrow' }
+    corp.credits -= escrow
+
+    const wo: WorkOrder = {
+      id: `wo_${genId()}`,
+      corpId,
+      title: title || `${wareId} delivery`,
+      wareId,
+      qtyTotal: qty,
+      qtyRemaining: qty,
+      buyStationId,
+      sellStationId,
+      bonusPerUnit,
+      escrowRemaining: escrow,
+      status: 'open',
+      assignedFleetId: null,
+      createdAtMs: now,
+      expiresAtMs: Number.isFinite(expiresInSec) && expiresInSec > 0 ? now + Math.floor(expiresInSec * 1000) : null,
+    }
+    state.workOrders = Array.isArray(state.workOrders) ? state.workOrders : []
+    state.workOrders.unshift(wo)
+    if (state.workOrders.length > 200) state.workOrders.length = 200
+
+    pushCorpLog(corpId, 'actions', {
+      type: 'post_work_order',
+      workOrderId: wo.id,
+      title: wo.title,
+      wareId,
+      qty,
+      bonusPerUnit,
+      escrow,
+      buyStationId,
+      sellStationId,
+    })
+
+    return { ok: true as const, workOrderId: wo.id, escrow }
+  }
+
   const buildTools = () => ([
     {
       type: 'function',
@@ -3677,6 +3935,26 @@ function createUniverse() {
         },
       },
     },
+    {
+      type: 'function',
+      function: {
+        name: 'post_work_order',
+        description: 'Post a paid work order (contract) that independent traders can fulfill; corp escrows the bonus and pays it on delivery to the destination station.',
+        parameters: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', description: 'Short title shown to traders.' },
+            wareId: { type: 'string' },
+            qty: { type: 'number' },
+            buyStationId: { type: 'string', description: 'Where the contractor should buy the ware.' },
+            sellStationId: { type: 'string', description: 'Where the contractor should deliver the ware.' },
+            bonusPerUnit: { type: 'number', description: 'Extra payment per unit delivered (in addition to normal station trade).' },
+            expiresInSec: { type: 'number', description: 'Optional expiry window in seconds.' },
+          },
+          required: ['wareId', 'qty', 'buyStationId', 'sellStationId', 'bonusPerUnit'],
+        },
+      },
+    },
   ])
 
   const runCorpControllerStep = async (opts: {
@@ -3730,6 +4008,8 @@ function createUniverse() {
       'You receive current world state as JSON and may take actions using tools.',
       'Do not ask questions; decide whether to act now.',
       'Maintain a short long-horizon strategy and TODO list; update it with update_llm_plan when it changes.',
+      'If you call update_llm_plan, immediately attempt the highest-priority TODO using in-world tools in the same step (unless impossible, then reply DONE).',
+      'If your corp lacks enough traders to keep stations supplied, use post_work_order to pay independent traders a bonus for delivering needed wares to your stations.',
       'When you need travel time or distance, call get_sector_route / get_trade_eta first. After receiving results, decide actions in a later pass.',
       'After you receive route/ETA tool results, you must either take an in-world action (e.g., assign_trade) or reply DONE.',
       'IMPORTANT: Internal transfers between two corp-owned stations do not generate credit profit; only do them to balance stock. Prefer external trades for profit.',
@@ -3897,6 +4177,7 @@ function createUniverse() {
         'set_corp_goal',
         'buy_trader_vulture',
         'queue_station_construction',
+        'post_work_order',
       ])
 
       const lines = String(text || '').split(/\r?\n/)
@@ -3988,7 +4269,8 @@ function createUniverse() {
 
     let assistantMessage = ''
     let finalToolCalls: any[] = []
-    let didFollowupNudge = false
+    let toolExecutionNudges = 0
+    const maxToolExecutionNudges = 2
     let queryRounds = 0
 
     let followupsGranted = 0
@@ -4031,12 +4313,13 @@ function createUniverse() {
         pushCorpLog(corpId, 'decision', pass === 1 ? assistantMessage : `PASS ${pass}/${maxPasses}:\n${assistantMessage}`)
       }
 
-      // If the model wrote an intent but didn't call tools, add a nudge once and try another pass.
-      if (!didFollowupNudge && toolCalls.length === 0 && assistantMessage && looksLikeIntent(assistantMessage)) {
-        didFollowupNudge = true
+      // If the model wrote an intent but didn't call tools, add a nudge and try another pass.
+      if (toolExecutionNudges < maxToolExecutionNudges && toolCalls.length === 0 && assistantMessage && looksLikeIntent(assistantMessage)) {
+        toolExecutionNudges++
         conversation.push({
           role: 'user',
-          content: 'Implement the decision now by calling the appropriate tools. If you need route/ETA info, call get_sector_route/get_trade_eta first. If no action is possible, reply DONE and do not call any tools.',
+          content:
+            'Implement the decision now by calling tools. You may call assign_trade / set_station_reorder_level / set_station_reserve_level / buy_trader_vulture / queue_station_construction / set_corp_goal / update_llm_plan. Do NOT call get_sector_route/get_trade_eta again in this step. If no action is possible, reply DONE.',
         })
         // Ensure we always leave room for a follow-up pass.
         if (pass === maxPasses && maxPasses < maxPassesHard) {
@@ -4047,10 +4330,32 @@ function createUniverse() {
         continue
       }
 
+      const nonWorldToolNames = new Set(['update_llm_plan', 'get_sector_route', 'get_trade_eta'])
+      const hasPlanUpdate = toolCalls.some((c: any) => String(c?.function?.name || '') === 'update_llm_plan')
+
       const queryCalls = toolCalls.filter((c: any) => {
         const name = String(c?.function?.name || '')
         return name === 'get_sector_route' || name === 'get_trade_eta'
       })
+
+      // If the model only updated a plan (no in-world action tools), nudge it to execute the first TODO immediately.
+      if (queryCalls.length === 0 && hasPlanUpdate) {
+        const worldCalls = toolCalls.filter((c: any) => !nonWorldToolNames.has(String(c?.function?.name || '')))
+        if (worldCalls.length === 0 && toolExecutionNudges < maxToolExecutionNudges) {
+          toolExecutionNudges++
+          conversation.push({
+            role: 'user',
+            content:
+              'You updated the plan. Now execute the highest-priority TODO immediately using in-world tools (assign_trade / set_station_reorder_level / set_station_reserve_level / buy_trader_vulture / queue_station_construction / set_corp_goal). Do NOT call get_sector_route/get_trade_eta again this step. If it is impossible right now (e.g., no idle fleets / no valid trade), reply DONE.',
+          })
+          if (pass === maxPasses && maxPasses < maxPassesHard) {
+            maxPasses++
+            followupsGranted++
+            pushCorpLog(corpId, 'decision', `INFO: extending pass budget (${followupsGranted}/${maxExtraPasses}) to execute TODO.`)
+          }
+          continue
+        }
+      }
 
       if (queryCalls.length > 0) {
         queryRounds++
@@ -4069,7 +4374,7 @@ function createUniverse() {
           conversation.push({
             role: 'user',
             content:
-              'You have enough route/ETA info for this step. Now either take an in-world action (assign_trade, set_station_reorder_level, buy_trader_vulture, queue_station_construction, etc.) or reply DONE. Do not call get_sector_route/get_trade_eta again this step.',
+              'You have enough route/ETA info for this step. Now call one or more in-world action tools: assign_trade / set_station_reorder_level / set_station_reserve_level / buy_trader_vulture / queue_station_construction / set_corp_goal. You may also update_llm_plan. Do NOT call get_sector_route/get_trade_eta again this step. If no action is possible, reply DONE.',
           })
           if (pass === maxPasses && maxPasses < maxPassesHard) {
             maxPasses++
@@ -4108,7 +4413,7 @@ function createUniverse() {
         conversation.push({
           role: 'user',
           content:
-            'Using the tool results above, now either take an in-world action (assign_trade, etc.) or reply DONE. Do not call get_sector_route/get_trade_eta again this step.',
+            'Using the tool results above, now call one or more in-world action tools: assign_trade / set_station_reorder_level / set_station_reserve_level / buy_trader_vulture / queue_station_construction / set_corp_goal. You may also update_llm_plan. Do NOT call get_sector_route/get_trade_eta again this step. If no action is possible, reply DONE.',
         })
         // Ensure we always leave room for the model to act after seeing tool results.
         if (pass === maxPasses && maxPasses < maxPassesHard) {
@@ -4186,6 +4491,10 @@ function createUniverse() {
         const out = queueStationConstruction(corpId, stationType, targetSectorId)
         appliedActions.push({ type: name, ok: out.ok, stationType, targetSectorId, error: out.ok ? undefined : (out as any).error })
         if (out.ok) worldActionsUsed++
+      } else if (name === 'post_work_order') {
+        const out = postWorkOrder(corpId, args)
+        appliedActions.push({ type: name, ok: out.ok, workOrderId: (out as any).workOrderId, escrow: (out as any).escrow, error: out.ok ? undefined : (out as any).error })
+        if (out.ok) worldActionsUsed++
       }
     }
 
@@ -4255,6 +4564,36 @@ function createUniverse() {
     }
     fleet.tripsCompleted++
 
+    // Work order bonus payout (independent traders only).
+    if (!sellerOwner) {
+      const woId = String((order as any)?._workOrderId || '')
+      if (woId && Array.isArray(state.workOrders)) {
+        const wo = state.workOrders.find(w => w.id === woId)
+        if (wo && wo.status !== 'completed' && wo.status !== 'cancelled' && wo.status !== 'expired') {
+          if (wo.sellStationId === station.id && wo.wareId === wareId) {
+            const deliverQty = Math.max(0, Math.min(amount, wo.qtyRemaining))
+            const bonus = Math.floor(deliverQty * wo.bonusPerUnit)
+            const paid = Math.max(0, Math.min(bonus, wo.escrowRemaining))
+            if (paid > 0) {
+              fleet.credits += paid
+              wo.escrowRemaining -= paid
+            }
+            wo.qtyRemaining = Math.max(0, wo.qtyRemaining - deliverQty)
+            if (wo.qtyRemaining <= 0) {
+              wo.status = 'completed'
+              wo.assignedFleetId = null
+              const corp = state.corporations.find(c => c.id === wo.corpId)
+              if (corp && wo.escrowRemaining > 0) corp.credits += wo.escrowRemaining
+              wo.escrowRemaining = 0
+            } else {
+              wo.status = 'open'
+              wo.assignedFleetId = null
+            }
+          }
+        }
+      }
+    }
+
     if (fleet.ownerId) {
       const corp = state.corporations.find(c => c.id === fleet.ownerId)
       if (corp) {
@@ -4266,8 +4605,10 @@ function createUniverse() {
     state.tradeLog.unshift({
       id: genId(),
       timestamp: Date.now(),
+      ingameTimeSec: state.elapsedTimeSec,
       fleetId: fleet.id,
       fleetName: fleet.name,
+      fleetOwnerId: sellerOwner,
       wareId,
       wareName: order.sellWareName || wareId,
       quantity: amount,
@@ -4276,8 +4617,12 @@ function createUniverse() {
       profit: netForSellerOwner,
       buySectorId: order.buySectorId,
       sellSectorId: station.sectorId,
+      buyStationId: order.buyStationId,
+      sellStationId: station.id,
       buyStationName: order.buyStationName,
       sellStationName: station.name,
+      buyStationOwnerId: buyStation.ownerId || null,
+      sellStationOwnerId: station.ownerId || null,
     })
     if (state.tradeLog.length > 100) state.tradeLog.length = 100
 
@@ -4473,6 +4818,37 @@ function createUniverse() {
               applyCashDelta(sellerOwner, revenue)
             }
 
+            // Work order bonus payout (independent traders only).
+            if (!sellerOwner) {
+              const woId = String((order as any)?._workOrderId || '')
+              if (woId && Array.isArray(state.workOrders)) {
+                const wo = state.workOrders.find(w => w.id === woId)
+                if (wo && wo.status !== 'completed' && wo.status !== 'cancelled' && wo.status !== 'expired') {
+                  if (wo.sellStationId === station.id && wo.wareId === report.wareId) {
+                    const deliverQty = Math.max(0, Math.min(report.amount, wo.qtyRemaining))
+                    const bonus = Math.floor(deliverQty * wo.bonusPerUnit)
+                    const paid = Math.max(0, Math.min(bonus, wo.escrowRemaining))
+                    if (paid > 0) {
+                      fleet.credits += paid
+                      wo.escrowRemaining -= paid
+                    }
+                    wo.qtyRemaining = Math.max(0, wo.qtyRemaining - deliverQty)
+                    if (wo.qtyRemaining <= 0) {
+                      wo.status = 'completed'
+                      wo.assignedFleetId = null
+                      const corp = state.corporations.find(c => c.id === wo.corpId)
+                      if (corp && wo.escrowRemaining > 0) corp.credits += wo.escrowRemaining
+                      wo.escrowRemaining = 0
+                      pushCorpLog(wo.corpId, 'actions', { type: 'work_order_completed', workOrderId: wo.id })
+                    } else {
+                      wo.status = 'open'
+                      wo.assignedFleetId = null
+                    }
+                  }
+                }
+              }
+            }
+
             // Profit tracking is only meaningful for independent fleets.
             if (!sellerOwner) {
               fleet.totalProfit += netForSellerOwner
@@ -4483,8 +4859,10 @@ function createUniverse() {
             state.tradeLog.unshift({
               id: genId(),
               timestamp: Date.now(),
+              ingameTimeSec: state.elapsedTimeSec,
               fleetId: fleet.id,
               fleetName: fleet.name,
+              fleetOwnerId: sellerOwner,
               wareId: report.wareId,
               wareName: order ? order.sellWareName : getWareName(report.wareId),
               quantity: report.amount,
@@ -4493,8 +4871,15 @@ function createUniverse() {
               profit: netForSellerOwner,
               buySectorId: order ? order.buySectorId : 'unknown',
               sellSectorId: order ? order.sellSectorId : station.sectorId,
+              buyStationId: order ? order.buyStationId : undefined,
+              sellStationId: station.id,
               buyStationName: order ? order.buyStationName : 'unknown',
               sellStationName: order ? order.sellStationName : station.name,
+              buyStationOwnerId: (() => {
+                const bs = order ? state.stations.find(s => s.id === order.buyStationId) : null
+                return bs ? (bs.ownerId || null) : null
+              })(),
+              sellStationOwnerId: station.ownerId || null,
             })
             if (state.tradeLog.length > 100) state.tradeLog.length = 100
 
@@ -4571,6 +4956,7 @@ function createUniverse() {
     setCorpGoal,
     assignTradeOrderToFleet,
     getCorpControlContext,
+    getCorpExternalStationSales,
     getCorpLogs,
     getCorpLive,
     runCorpControllerStep,
@@ -4726,6 +5112,20 @@ function universePlugin() {
         if (req.method === 'GET' && url.startsWith('/__universe/trade-log')) {
           res.setHeader('content-type', 'application/json')
           res.end(JSON.stringify({ tradeLog: u.state.tradeLog }))
+          return
+        }
+        if (req.method === 'GET' && url.startsWith('/__universe/corp-revenue')) {
+          const full = new URL(url, 'http://localhost')
+          const corpId = String(full.searchParams.get('corpId') || '')
+          const windowSec = Number(full.searchParams.get('windowSec') || '3600')
+          if (!corpId) {
+            res.statusCode = 400
+            res.setHeader('content-type', 'application/json')
+            res.end(JSON.stringify({ error: 'corpId is required' }))
+            return
+          }
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify(u.getCorpExternalStationSales(corpId, windowSec)))
           return
         }
         if (req.method === 'POST' && url.startsWith('/__universe/init')) {

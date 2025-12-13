@@ -49,6 +49,14 @@ export function CorpAIAgentTab(props: {
   const [busy, setBusy] = useState(false)
   const [lastActions, setLastActions] = useState<AppliedAction[] | null>(null)
   const [lastError, setLastError] = useState<string | null>(null)
+  const [stationSales, setStationSales] = useState<{
+    windowSec: number
+    externalStationSalesTotal: number
+    externalStationSalesWindow: number
+    externalStationSalesTradesTotal: number
+    externalStationSalesTradesWindow: number
+    byWareWindow: { wareId: string; revenue: number }[]
+  } | null>(null)
   const [lastLogId, setLastLogId] = useState(0)
   const pollingRef = useRef<number | null>(null)
   const lastLogIdRef = useRef(0)
@@ -339,6 +347,29 @@ export function CorpAIAgentTab(props: {
     }
   }, [corpId])
 
+  useEffect(() => {
+    let stopped = false
+    const windowSec = 3600
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`/__universe/corp-revenue?corpId=${encodeURIComponent(corpId)}&windowSec=${windowSec}`)
+        const data = await res.json().catch(() => null)
+        if (!res.ok) return
+        if (!stopped && data && typeof data === 'object') setStationSales(data)
+      } catch {
+        // ignore
+      }
+    }
+
+    const id = window.setInterval(() => { void poll() }, 2000)
+    void poll()
+    return () => {
+      stopped = true
+      window.clearInterval(id)
+    }
+  }, [corpId])
+
   const send = async () => {
     const text = prompt.trim()
     if (!text || busy) return
@@ -395,6 +426,20 @@ export function CorpAIAgentTab(props: {
             <div style={{ color: '#c3e7ff', fontSize: 14 }}>{corp.aiState?.currentGoal || 'unknown'}</div>
           </div>
         </div>
+        {stationSales && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 12, marginBottom: 12 }}>
+            <div style={{ background: '#0a1520', border: '1px solid #12384f', borderRadius: 6, padding: 8 }}>
+              <div style={{ color: '#6090a0', fontSize: 10 }}>STATION SALES (1H)</div>
+              <div style={{ color: '#c3e7ff', fontSize: 14 }}>{Number(stationSales.externalStationSalesWindow || 0).toLocaleString()} Cr</div>
+              <div style={{ color: '#6090a0', fontSize: 10 }}>{Number(stationSales.externalStationSalesTradesWindow || 0).toLocaleString()} trades</div>
+            </div>
+            <div style={{ background: '#0a1520', border: '1px solid #12384f', borderRadius: 6, padding: 8 }}>
+              <div style={{ color: '#6090a0', fontSize: 10 }}>STATION SALES (LOG)</div>
+              <div style={{ color: '#c3e7ff', fontSize: 14 }}>{Number(stationSales.externalStationSalesTotal || 0).toLocaleString()} Cr</div>
+              <div style={{ color: '#6090a0', fontSize: 10 }}>{Number(stationSales.externalStationSalesTradesTotal || 0).toLocaleString()} trades</div>
+            </div>
+          </div>
+        )}
 
         <div style={{ marginBottom: 10 }}>
           <div style={{ marginBottom: 6, color: '#8ab6d6' }}>Stations ({corpStations.length})</div>
